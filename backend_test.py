@@ -621,7 +621,8 @@ class APITester:
             # Error handling tests
             self.test_get_nonexistent_document,
             # Cleanup
-            self.test_delete_document
+            self.test_delete_document,
+            self.cleanup_test_data
         ]
         
         passed = 0
