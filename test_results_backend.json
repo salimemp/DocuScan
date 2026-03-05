@@ -1,0 +1,84 @@
+{
+  "timestamp": "2026-03-05T11:41:50.395139",
+  "base_url": "https://gemini-scanner.preview.emergentagent.com/api",
+  "overall_success": true,
+  "results": [
+    {
+      "test": "Root Endpoint",
+      "success": true,
+      "message": "API version: DocScan Pro API v3",
+      "details": {},
+      "timestamp": "2026-03-05T11:41:48.881600"
+    },
+    {
+      "test": "Stats Endpoint",
+      "success": true,
+      "message": "Stats: 0 scans, 0 KB storage",
+      "details": {},
+      "timestamp": "2026-03-05T11:41:48.943805"
+    },
+    {
+      "test": "List Documents",
+      "success": true,
+      "message": "Retrieved 0 documents",
+      "details": {},
+      "timestamp": "2026-03-05T11:41:49.004194"
+    },
+    {
+      "test": "Create Document",
+      "success": true,
+      "message": "Created document with ID: 0d1f74e9-6fac-4b92-a46c-567dd72c4f47",
+      "details": {},
+      "timestamp": "2026-03-05T11:41:49.075648"
+    },
+    {
+      "test": "Get Document",
+      "success": true,
+      "message": "Retrieved document: Sample Business Invoice #INV-2024-001",
+      "details": {},
+      "timestamp": "2026-03-05T11:41:49.137865"
+    },
+    {
+      "test": "Update Document",
+      "success": true,
+      "message": "Updated title to: Updated Business Invoice #INV-2024-001 [PAID]",
+      "details": {},
+      "timestamp": "2026-03-05T11:41:49.192815"
+    },
+    {
+      "test": "Export PDF",
+      "success": true,
+      "message": "PDF exported: Updated_Business_Invoice_INV-2024-001_PA.pdf (2713 bytes)",
+      "details": {},
+      "timestamp": "2026-03-05T11:41:50.184047"
+    },
+    {
+      "test": "Export TXT",
+      "success": true,
+      "message": "TXT exported: Updated_Business_Invoice_INV-2024-001_PA.txt (1066 chars)",
+      "details": {},
+      "timestamp": "2026-03-05T11:41:50.238805"
+    },
+    {
+      "test": "Export Invalid Format",
+      "success": true,
+      "message": "Correctly rejected invalid format",
+      "details": {},
+      "timestamp": "2026-03-05T11:41:50.290590"
+    },
+    {
+      "test": "Get Nonexistent Document",
+      "success": true,
+      "message": "Correctly returned 404 for invalid ID",
+      "details": {},
+      "timestamp": "2026-03-05T11:41:50.343361"
+    },
+    {
+      "test": "Delete Document",
+      "success": true,
+      "message": "Document deleted: 0d1f74e9-6fac-4b92-a46c-567dd72c4f47",
+      "details": {},
+      "timestamp": "2026-03-05T11:41:50.395034"
+    }
+  ]
+}
