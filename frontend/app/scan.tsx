@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Platform,
+  ScrollView, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -8,7 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { setScanImage } from '../utils/scanStore';
+import { addScanPage, getScanPages, clearScanData, removeScanPage, getScanPageCount } from '../utils/scanStore';
 import { useTheme } from '../hooks/useTheme';
 
 export default function ScanScreen() {
@@ -18,25 +19,33 @@ export default function ScanScreen() {
   const [facing, setFacing] = useState<'back' | 'front'>('back');
   const [flash, setFlash] = useState<'off' | 'on'>('off');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [pages, setPages] = useState(getScanPages());
   const cameraRef = useRef<CameraView>(null);
 
-  const processAndNavigate = async (uri: string) => {
+  const refreshPages = () => setPages(getScanPages());
+
+  const processImage = async (uri: string) => {
+    // Compress main image for AI analysis (max 1024px wide)
+    const compressed = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: 1024 } }],
+      { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+    );
+    // Generate small thumbnail for storage (300px wide)
+    const thumbnail = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: 300 } }],
+      { compress: 0.65, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+    );
+    return { base64: compressed.base64!, thumbnailBase64: thumbnail.base64!, uri };
+  };
+
+  const addPage = async (uri: string) => {
     setIsProcessing(true);
     try {
-      // Compress main image for AI analysis (max 1024px wide)
-      const compressed = await ImageManipulator.manipulateAsync(
-        uri,
-        [{ resize: { width: 1024 } }],
-        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-      );
-      // Generate small thumbnail for storage (300px wide)
-      const thumbnail = await ImageManipulator.manipulateAsync(
-        uri,
-        [{ resize: { width: 300 } }],
-        { compress: 0.65, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-      );
-      setScanImage(compressed.base64!, thumbnail.base64!, uri);
-      router.push('/preview');
+      const pageData = await processImage(uri);
+      addScanPage(pageData);
+      refreshPages();
     } catch {
       Alert.alert('Error', 'Failed to process image. Please try again.');
     } finally {
@@ -48,7 +57,7 @@ export default function ScanScreen() {
     if (!cameraRef.current || isProcessing) return;
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.9 });
-      if (photo?.uri) await processAndNavigate(photo.uri);
+      if (photo?.uri) await addPage(photo.uri);
     } catch {
       Alert.alert('Error', 'Failed to capture photo.');
     }
@@ -63,9 +72,63 @@ export default function ScanScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.9,
+      allowsMultipleSelection: true,
     });
-    if (!result.canceled && result.assets[0]?.uri) {
-      await processAndNavigate(result.assets[0].uri);
+    if (!result.canceled && result.assets?.length > 0) {
+      setIsProcessing(true);
+      try {
+        for (const asset of result.assets) {
+          if (asset.uri) {
+            const pageData = await processImage(asset.uri);
+            addScanPage(pageData);
+          }
+        }
+        refreshPages();
+      } catch {
+        Alert.alert('Error', 'Failed to process some images.');
+      } finally {
+        setIsProcessing(false);
+      }
+    }
+  };
+
+  const handleRemovePage = (index: number) => {
+    Alert.alert('Remove Page', `Remove page ${index + 1}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => {
+          removeScanPage(index);
+          refreshPages();
+        },
+      },
+    ]);
+  };
+
+  const handleContinue = () => {
+    if (pages.length === 0) {
+      Alert.alert('No Pages', 'Please scan at least one page.');
+      return;
+    }
+    router.push('/preview');
+  };
+
+  const handleCancel = () => {
+    if (pages.length > 0) {
+      Alert.alert('Discard Scan?', 'All scanned pages will be lost.', [
+        { text: 'Keep Scanning', style: 'cancel' },
+        {
+          text: 'Discard',
+          style: 'destructive',
+          onPress: () => {
+            clearScanData();
+            router.back();
+          },
+        },
+      ]);
+    } else {
+      router.back();
     }
   };
 
@@ -110,6 +173,8 @@ export default function ScanScreen() {
     );
   }
 
+  const pageCount = pages.length;
+
   return (
     <View style={styles.container}>
       {/* Camera View */}
@@ -140,14 +205,21 @@ export default function ScanScreen() {
           <TouchableOpacity
             testID="scan-close-btn"
             style={styles.ctrlBtn}
-            onPress={() => router.back()}
+            onPress={handleCancel}
             activeOpacity={0.8}
             accessibilityLabel="Close scanner"
           >
             <Ionicons name="close" size={26} color="#FFF" />
           </TouchableOpacity>
 
-          <Text style={styles.topTitle}>Scan Document</Text>
+          <View style={styles.topCenter}>
+            <Text style={styles.topTitle}>Scan Document</Text>
+            {pageCount > 0 && (
+              <View style={[styles.pageCountBadge, { backgroundColor: colors.primary }]}>
+                <Text style={styles.pageCountText}>{pageCount} page{pageCount !== 1 ? 's' : ''}</Text>
+              </View>
+            )}
+          </View>
 
           <TouchableOpacity
             testID="scan-flash-btn"
@@ -168,9 +240,41 @@ export default function ScanScreen() {
       {/* Center instruction */}
       <View style={styles.centerInstruction}>
         <Text style={styles.instructionText}>
-          Align document within the frame
+          {pageCount === 0 ? 'Align document within the frame' : 'Add more pages or continue'}
         </Text>
       </View>
+
+      {/* Page thumbnails strip */}
+      {pageCount > 0 && (
+        <View style={styles.thumbStrip}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.thumbScrollContent}
+          >
+            {pages.map((page, index) => (
+              <TouchableOpacity
+                key={index}
+                testID={`page-thumb-${index}`}
+                style={styles.thumbContainer}
+                onPress={() => handleRemovePage(index)}
+                activeOpacity={0.8}
+              >
+                <Image
+                  source={{ uri: `data:image/jpeg;base64,${page.thumbnailBase64}` }}
+                  style={styles.thumbImage}
+                />
+                <View style={styles.thumbBadge}>
+                  <Text style={styles.thumbBadgeText}>{index + 1}</Text>
+                </View>
+                <View style={styles.thumbRemove}>
+                  <Ionicons name="close-circle" size={18} color="#EF4444" />
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       {/* Bottom Controls */}
       <SafeAreaView edges={['bottom']} style={styles.bottomSafe}>
@@ -203,19 +307,34 @@ export default function ScanScreen() {
               : <View style={styles.shutterInner} />}
           </TouchableOpacity>
 
-          {/* Flip */}
-          <TouchableOpacity
-            testID="flip-camera-btn"
-            style={styles.sideAction}
-            onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}
-            activeOpacity={0.8}
-            accessibilityLabel="Flip camera"
-          >
-            <View style={styles.sideActionIcon}>
-              <Ionicons name="camera-reverse-outline" size={26} color="#FFF" />
-            </View>
-            <Text style={styles.sideActionLabel}>Flip</Text>
-          </TouchableOpacity>
+          {/* Continue or Flip */}
+          {pageCount > 0 ? (
+            <TouchableOpacity
+              testID="continue-btn"
+              style={styles.sideAction}
+              onPress={handleContinue}
+              activeOpacity={0.8}
+              accessibilityLabel="Continue to preview"
+            >
+              <View style={[styles.sideActionIcon, { backgroundColor: colors.primary }]}>
+                <Ionicons name="arrow-forward" size={26} color="#FFF" />
+              </View>
+              <Text style={styles.sideActionLabel}>Continue</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              testID="flip-camera-btn"
+              style={styles.sideAction}
+              onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}
+              activeOpacity={0.8}
+              accessibilityLabel="Flip camera"
+            >
+              <View style={styles.sideActionIcon}>
+                <Ionicons name="camera-reverse-outline" size={26} color="#FFF" />
+              </View>
+              <Text style={styles.sideActionLabel}>Flip</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </SafeAreaView>
 
@@ -225,7 +344,7 @@ export default function ScanScreen() {
           <View style={styles.processingCard}>
             <ActivityIndicator color={colors.primary} size="large" />
             <Text style={styles.processingText}>Processing image...</Text>
-            <Text style={styles.processingSubtext}>Preparing for AI analysis</Text>
+            <Text style={styles.processingSubtext}>Preparing page {pageCount + 1}</Text>
           </View>
         </View>
       )}
@@ -322,7 +441,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center', justifyContent: 'center',
   },
+  topCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   topTitle: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  pageCountBadge: {
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
+  },
+  pageCountText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
 
   // Center instruction
   centerInstruction: {
@@ -334,6 +458,33 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.8)',
     fontSize: 13,
     textAlign: 'center',
+  },
+
+  // Thumbnail strip
+  thumbStrip: {
+    position: 'absolute',
+    bottom: '26%',
+    left: 0,
+    right: 0,
+    height: 80,
+  },
+  thumbScrollContent: { paddingHorizontal: 20, gap: 10 },
+  thumbContainer: {
+    width: 56, height: 72, borderRadius: 8,
+    borderWidth: 2, borderColor: '#FFF',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  thumbImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  thumbBadge: {
+    position: 'absolute', bottom: 4, left: 4,
+    backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 4,
+    paddingHorizontal: 5, paddingVertical: 1,
+  },
+  thumbBadgeText: { color: '#FFF', fontSize: 10, fontWeight: '700' },
+  thumbRemove: {
+    position: 'absolute', top: -2, right: -2,
+    backgroundColor: '#FFF', borderRadius: 10,
   },
 
   // Bottom bar
