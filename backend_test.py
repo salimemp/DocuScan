@@ -582,6 +582,8 @@ class APITester:
         except Exception as e:
             self.log_result("Get Nonexistent Document", False, f"Request failed: {str(e)}")
             return False
+    
+    def test_delete_document(self) -> bool:
         """Test DELETE /api/documents/{id} - Delete document"""
         if not self.test_document_id:
             self.log_result("Delete Document", False, "No test document ID available")
