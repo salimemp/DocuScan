@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../hooks/useTheme';
-import { getScanImage, clearScanImage } from '../utils/scanStore';
+import { getScanPages, clearScanData } from '../utils/scanStore';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -125,20 +125,25 @@ export default function PreviewScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedPage, setSelectedPage] = useState(0);
 
-  const { imageBase64, thumbnailBase64, imageUri } = getScanImage();
+  const pages = getScanPages();
+  const pageCount = pages.length;
+  const currentPage = pages[selectedPage];
 
   const analyze = useCallback(async () => {
-    if (!imageBase64) {
-      setError('No image found. Please scan again.');
+    if (pageCount === 0) {
+      setError('No images found. Please scan again.');
       setIsAnalyzing(false);
       return;
     }
     try {
+      // Send all pages to the backend for analysis
+      const images = pages.map(p => p.base64);
       const res = await fetch(`${BACKEND_URL}/api/scan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_base64: imageBase64, mime_type: 'image/jpeg' }),
+        body: JSON.stringify({ images, mime_type: 'image/jpeg' }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail ?? 'Analysis failed');
@@ -148,7 +153,7 @@ export default function PreviewScreen() {
     } finally {
       setIsAnalyzing(false);
     }
-  }, [imageBase64]);
+  }, [pages, pageCount]);
 
   useEffect(() => { analyze(); }, []);
 
@@ -156,16 +161,23 @@ export default function PreviewScreen() {
     if (!result) return;
     setIsSaving(true);
     try {
+      // Create thumbnails array from all pages
+      const pagesThumbnails = pages.map(p => p.thumbnailBase64);
       const res = await fetch(`${BACKEND_URL}/api/documents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...result, image_thumbnail: thumbnailBase64 }),
+        body: JSON.stringify({
+          ...result,
+          image_thumbnail: pagesThumbnails[0] || null,
+          pages_thumbnails: pagesThumbnails,
+          pages_count: pageCount,
+        }),
       });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.detail ?? 'Save failed');
       }
-      clearScanImage();
+      clearScanData();
       router.replace('/dashboard');
     } catch (e: any) {
       Alert.alert('Save Failed', e.message);
@@ -175,7 +187,7 @@ export default function PreviewScreen() {
   };
 
   const handleDiscard = () => {
-    clearScanImage();
+    clearScanData();
     router.back();
   };
 
@@ -189,7 +201,7 @@ export default function PreviewScreen() {
         <View style={[styles.loadingCard, { backgroundColor: colors.surface, ...shadows.lg }]}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingTitle, { color: colors.textPrimary }]}>
-            Analyzing Document
+            Analyzing {pageCount} Page{pageCount !== 1 ? 's' : ''}
           </Text>
           <Text style={[styles.loadingSubtitle, { color: colors.textSecondary }]}>
             Gemini AI is reading your document in all languages...
@@ -203,9 +215,9 @@ export default function PreviewScreen() {
             ))}
           </View>
         </View>
-        {thumbnailBase64 && (
+        {currentPage?.thumbnailBase64 && (
           <Image
-            source={{ uri: `data:image/jpeg;base64,${thumbnailBase64}` }}
+            source={{ uri: `data:image/jpeg;base64,${currentPage.thumbnailBase64}` }}
             style={styles.loadingThumb}
           />
         )}
@@ -272,9 +284,9 @@ export default function PreviewScreen() {
         {/* Document type hero row */}
         <View style={[styles.heroCard, { backgroundColor: meta.color + '12', borderColor: meta.color + '30' }]}>
           <View style={styles.heroLeft}>
-            {thumbnailBase64 ? (
+            {currentPage?.thumbnailBase64 ? (
               <Image
-                source={{ uri: `data:image/jpeg;base64,${thumbnailBase64}` }}
+                source={{ uri: `data:image/jpeg;base64,${currentPage.thumbnailBase64}` }}
                 style={styles.heroThumb}
               />
             ) : (
@@ -300,9 +312,46 @@ export default function PreviewScreen() {
                   {result.detected_language ?? 'Unknown'}
                 </Text>
               </View>
+              <View style={[styles.langBadge, { backgroundColor: colors.surface }]}>
+                <Ionicons name="document-outline" size={13} color={colors.textSecondary} />
+                <Text style={[styles.langText, { color: colors.textSecondary }]}>
+                  {pageCount} page{pageCount !== 1 ? 's' : ''}
+                </Text>
+              </View>
             </View>
           </View>
         </View>
+
+        {/* Page thumbnails for multi-page documents */}
+        {pageCount > 1 && (
+          <View style={[styles.pagesSection, { backgroundColor: colors.surface, ...shadows.sm }]}>
+            <Text style={[styles.cardSectionTitle, { color: colors.textSecondary, marginBottom: 12 }]}>
+              Pages ({pageCount})
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pagesRow}>
+              {pages.map((page, index) => (
+                <TouchableOpacity
+                  key={index}
+                  testID={`preview-page-${index}`}
+                  onPress={() => setSelectedPage(index)}
+                  style={[
+                    styles.pageThumb,
+                    selectedPage === index && { borderColor: colors.primary, borderWidth: 2 },
+                  ]}
+                  activeOpacity={0.8}
+                >
+                  <Image
+                    source={{ uri: `data:image/jpeg;base64,${page.thumbnailBase64}` }}
+                    style={styles.pageThumbImg}
+                  />
+                  <View style={[styles.pageNumber, { backgroundColor: selectedPage === index ? colors.primary : 'rgba(0,0,0,0.6)' }]}>
+                    <Text style={styles.pageNumberText}>{index + 1}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* Confidence bar */}
         <View style={[styles.confRow, { backgroundColor: colors.surface, ...shadows.sm }]}>
@@ -514,12 +563,26 @@ const styles = StyleSheet.create({
   docTypeBadgeText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
   docSubtype: { fontSize: 12 },
   docTitle: { fontSize: 15, fontWeight: '700', lineHeight: 20 },
-  heroMeta: { flexDirection: 'row', gap: 8 },
+  heroMeta: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   langBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
   },
   langText: { fontSize: 11 },
+
+  // Pages section
+  pagesSection: { marginHorizontal: 20, marginTop: 12, borderRadius: 16, padding: 16 },
+  pagesRow: { gap: 10 },
+  pageThumb: {
+    width: 60, height: 80, borderRadius: 8, overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)',
+  },
+  pageThumbImg: { width: '100%', height: '100%', resizeMode: 'cover' },
+  pageNumber: {
+    position: 'absolute', bottom: 4, right: 4,
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+  },
+  pageNumberText: { color: '#FFF', fontSize: 10, fontWeight: '700' },
 
   // Confidence
   confRow: {
