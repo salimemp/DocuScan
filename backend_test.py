@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 DocScan Pro Backend API Testing Suite
-Tests all backend endpoints with comprehensive validation
+Tests all backend endpoints including new features: signatures, comments, password protection
 """
 
 import requests
@@ -22,6 +22,8 @@ class APITester:
             'Accept': 'application/json'
         })
         self.test_document_id = None
+        self.test_signature_id = None
+        self.test_comment_id = None
         self.results = []
         
     def log_result(self, test_name: str, success: bool, message: str, details: Optional[Dict] = None):
