@@ -199,6 +199,54 @@ backend:
         agent: "testing"
         comment: "All export formats tested successfully: PDF (2713 bytes), TXT (1066 chars), DOCX (36951 bytes), PPTX (31126 bytes), PNG (11999 bytes), JPEG (30555 bytes). Base64 encoding working correctly. Error handling for invalid formats working (returns 400)."
 
+  - task: "Password Protection - Set/Verify/Remove password"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Password protection fully functional. Set password (POST /password), verify correct password (returns verified: true), reject wrong password (403 Forbidden), password hashing with SHA-256 working correctly."
+
+  - task: "Comments System - Add/Resolve/Reply to comments"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Comments system fully functional. Add comments (POST /comments), resolve comments (PUT /resolve), comments properly stored in document, comment IDs generated correctly, author and content fields working."
+
+  - task: "Signatures System - Create/List/Add to documents"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Signatures system fully functional. Create signatures (POST /signatures), list signatures (GET /signatures), add signatures to documents with positioning (x, y, width, page), signature base64 storage working, cleanup functionality working."
+
+  - task: "Signature Requests - Request signatures via email"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Signature request system working. POST /request-signature accepts requester/signer details, background email task queued successfully, request tracking implemented. Email sending is mocked but request flow is complete."
+
 frontend:
   - task: "Dashboard screen"
     implemented: true
