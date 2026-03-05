@@ -545,7 +545,43 @@ class APITester:
             self.log_result("Get Nonexistent Document", False, f"Request failed: {str(e)}")
             return False
     
-    def test_delete_document(self) -> bool:
+    def test_export_invalid_format(self) -> bool:
+        """Test export with invalid format - should return 400"""
+        if not self.test_document_id:
+            self.log_result("Export Invalid Format", False, "No test document ID available")
+            return False
+            
+        try:
+            response = self.session.post(f"{BASE_URL}/documents/{self.test_document_id}/export?format=invalid")
+            
+            if response.status_code == 400:
+                self.log_result("Export Invalid Format", True, "Correctly rejected invalid format")
+                return True
+            else:
+                self.log_result("Export Invalid Format", False, f"Expected 400, got {response.status_code}", {"response": response.text})
+                return False
+                
+        except Exception as e:
+            self.log_result("Export Invalid Format", False, f"Request failed: {str(e)}")
+            return False
+    
+    def test_get_nonexistent_document(self) -> bool:
+        """Test GET with non-existent document ID - should return 404"""
+        fake_id = "00000000-0000-0000-0000-000000000000"
+        
+        try:
+            response = self.session.get(f"{BASE_URL}/documents/{fake_id}")
+            
+            if response.status_code == 404:
+                self.log_result("Get Nonexistent Document", True, "Correctly returned 404 for invalid ID")
+                return True
+            else:
+                self.log_result("Get Nonexistent Document", False, f"Expected 404, got {response.status_code}", {"response": response.text})
+                return False
+                
+        except Exception as e:
+            self.log_result("Get Nonexistent Document", False, f"Request failed: {str(e)}")
+            return False
         """Test DELETE /api/documents/{id} - Delete document"""
         if not self.test_document_id:
             self.log_result("Delete Document", False, "No test document ID available")
