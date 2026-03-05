@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   StatusBar, Image, Alert, ActivityIndicator, Modal,
-  TextInput, Pressable, Platform, Share,
+  TextInput, Pressable, Platform, Share, FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { SignatureCanvas } from '../../components/SignatureCanvas';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 
@@ -54,9 +55,30 @@ export default function DocumentDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showRename, setShowRename] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [showSignatures, setShowSignatures] = useState(false);
+  const [showSignatureCanvas, setShowSignatureCanvas] = useState(false);
+  const [showRequestSignature, setShowRequestSignature] = useState(false);
+  const [showRequestComment, setShowRequestComment] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
+  
+  // Comment state
+  const [newComment, setNewComment] = useState('');
+  const [commentAuthor, setCommentAuthor] = useState('');
+  const [addingComment, setAddingComment] = useState(false);
+  
+  // Signature request state
+  const [signerName, setSignerName] = useState('');
+  const [signerEmail, setSignerEmail] = useState('');
+  const [requesterName, setRequesterName] = useState('');
+  const [requesterEmail, setRequesterEmail] = useState('');
+  const [requestMessage, setRequestMessage] = useState('');
+  const [sendingRequest, setSendingRequest] = useState(false);
+  
+  // Saved signatures
+  const [savedSignatures, setSavedSignatures] = useState<any[]>([]);
 
   const fetchDocument = useCallback(async () => {
     try {
@@ -72,8 +94,21 @@ export default function DocumentDetailScreen() {
     }
   }, [id]);
 
+  const fetchSignatures = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/signatures`);
+      if (res.ok) {
+        const sigs = await res.json();
+        setSavedSignatures(sigs);
+      }
+    } catch (e) {
+      console.log('Failed to fetch signatures');
+    }
+  };
+
   useEffect(() => {
     fetchDocument();
+    fetchSignatures();
   }, [fetchDocument]);
 
   const handleRename = async () => {
@@ -130,14 +165,12 @@ export default function DocumentDetailScreen() {
       if (!res.ok) throw new Error('Export failed');
       const data = await res.json();
       
-      // Save to file system
       const filename = data.filename || `document${format.ext}`;
       const fileUri = `${FileSystem.cacheDirectory}${filename}`;
       await FileSystem.writeAsStringAsync(fileUri, data.base64, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Share the file
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(fileUri, {
           mimeType: format.mime,
@@ -170,6 +203,153 @@ export default function DocumentDetailScreen() {
     router.push({ pathname: '/editor', params: { id } });
   };
 
+  // ── Comment Functions ────────────────────────────────────────────────────
+  const handleAddComment = async () => {
+    if (!newComment.trim()) return;
+    setAddingComment(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/documents/${id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          author: commentAuthor.trim() || 'Anonymous',
+          content: newComment.trim(),
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to add comment');
+      await fetchDocument();
+      setNewComment('');
+      Alert.alert('Success', 'Comment added!');
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    } finally {
+      setAddingComment(false);
+    }
+  };
+
+  const handleResolveComment = async (commentId: string) => {
+    try {
+      await fetch(`${BACKEND_URL}/api/documents/${id}/comments/${commentId}/resolve`, {
+        method: 'PUT',
+      });
+      await fetchDocument();
+    } catch (e) {
+      Alert.alert('Error', 'Failed to resolve comment');
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    try {
+      await fetch(`${BACKEND_URL}/api/documents/${id}/comments/${commentId}`, {
+        method: 'DELETE',
+      });
+      await fetchDocument();
+    } catch (e) {
+      Alert.alert('Error', 'Failed to delete comment');
+    }
+  };
+
+  // ── Signature Functions ────────────────────────────────────────────────────
+  const handleSaveSignature = async (signatureData: { name: string; image_base64: string }) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/signatures`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(signatureData),
+      });
+      if (!res.ok) throw new Error('Failed to save signature');
+      await fetchSignatures();
+      Alert.alert('Success', 'Signature saved!');
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    }
+  };
+
+  const handleAddSignatureToDocument = async (signatureId: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/documents/${id}/signatures`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          signature_id: signatureId,
+          page: 0,
+          x: 50,
+          y: 80,
+          width: 25,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to add signature');
+      await fetchDocument();
+      setShowSignatures(false);
+      Alert.alert('Success', 'Signature added to document!');
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    }
+  };
+
+  const handleRequestSignature = async () => {
+    if (!signerEmail.trim() || !signerName.trim()) {
+      Alert.alert('Error', 'Please enter signer name and email');
+      return;
+    }
+    setSendingRequest(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/documents/${id}/request-signature`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requester_name: requesterName.trim() || 'DocScan User',
+          requester_email: requesterEmail.trim() || 'user@docscan.app',
+          signer_email: signerEmail.trim(),
+          signer_name: signerName.trim(),
+          message: requestMessage.trim() || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to send request');
+      await fetchDocument();
+      setShowRequestSignature(false);
+      setSignerName('');
+      setSignerEmail('');
+      setRequestMessage('');
+      Alert.alert('Success', `Signature request sent to ${signerEmail}`);
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    } finally {
+      setSendingRequest(false);
+    }
+  };
+
+  const handleRequestComment = async () => {
+    if (!signerEmail.trim() || !signerName.trim()) {
+      Alert.alert('Error', 'Please enter reviewer name and email');
+      return;
+    }
+    setSendingRequest(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/documents/${id}/request-comment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requester_name: requesterName.trim() || 'DocScan User',
+          requester_email: requesterEmail.trim() || 'user@docscan.app',
+          reviewer_email: signerEmail.trim(),
+          reviewer_name: signerName.trim(),
+          message: requestMessage.trim() || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to send request');
+      setShowRequestComment(false);
+      setSignerName('');
+      setSignerEmail('');
+      setRequestMessage('');
+      Alert.alert('Success', `Comment request sent to ${signerEmail}`);
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    } finally {
+      setSendingRequest(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={[styles.centered, { backgroundColor: colors.background }]}>
@@ -198,6 +378,9 @@ export default function DocumentDetailScreen() {
 
   const meta = getMeta(doc.document_type);
   const confidencePct = Math.round((doc.confidence ?? 0) * 100);
+  const comments = doc.comments || [];
+  const signatures = doc.signatures || [];
+  const signatureRequests = doc.signature_requests || [];
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -205,21 +388,13 @@ export default function DocumentDetailScreen() {
 
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity
-          testID="back-btn"
-          onPress={() => router.back()}
-          style={styles.headerBtn}
-        >
+        <TouchableOpacity testID="back-btn" onPress={() => router.back()} style={styles.headerBtn}>
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
           Document Details
         </Text>
-        <TouchableOpacity
-          testID="more-btn"
-          onPress={handleDelete}
-          style={styles.headerBtn}
-        >
+        <TouchableOpacity testID="more-btn" onPress={handleDelete} style={styles.headerBtn}>
           <Ionicons name="trash-outline" size={22} color={colors.error} />
         </TouchableOpacity>
       </View>
@@ -274,7 +449,7 @@ export default function DocumentDetailScreen() {
           </View>
         </View>
 
-        {/* Action Buttons */}
+        {/* Primary Action Buttons */}
         <View style={styles.actionGrid}>
           <TouchableOpacity
             testID="edit-btn"
@@ -308,6 +483,53 @@ export default function DocumentDetailScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Secondary Action Buttons - Signatures & Comments */}
+        <View style={styles.secondaryActions}>
+          <TouchableOpacity
+            testID="signatures-btn"
+            style={[styles.secondaryBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => setShowSignatures(true)}
+          >
+            <Ionicons name="finger-print-outline" size={20} color="#2563EB" />
+            <Text style={[styles.secondaryBtnText, { color: colors.textPrimary }]}>
+              Signatures ({signatures.length})
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            testID="comments-btn"
+            style={[styles.secondaryBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => setShowComments(true)}
+          >
+            <Ionicons name="chatbubble-outline" size={20} color="#059669" />
+            <Text style={[styles.secondaryBtnText, { color: colors.textPrimary }]}>
+              Comments ({comments.length})
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Pending Signature Requests */}
+        {signatureRequests.length > 0 && (
+          <View style={[styles.section, { backgroundColor: colors.surface, ...shadows.sm }]}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="time-outline" size={18} color="#F59E0B" />
+              <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Pending Signature Requests</Text>
+            </View>
+            {signatureRequests.map((req: any, i: number) => (
+              <View key={i} style={[styles.requestRow, { borderBottomColor: colors.border }]}>
+                <View style={styles.requestInfo}>
+                  <Text style={[styles.requestName, { color: colors.textPrimary }]}>{req.signer_name}</Text>
+                  <Text style={[styles.requestEmail, { color: colors.textSecondary }]}>{req.signer_email}</Text>
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: req.status === 'signed' ? '#059669' : '#F59E0B' }]}>
+                  <Text style={styles.statusBadgeText}>{req.status}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* Summary */}
         {doc.summary && (
           <View style={[styles.section, { backgroundColor: colors.surface, ...shadows.sm }]}>
@@ -332,6 +554,29 @@ export default function DocumentDetailScreen() {
           </View>
         )}
 
+        {/* Placed Signatures */}
+        {signatures.length > 0 && (
+          <View style={[styles.section, { backgroundColor: colors.surface, ...shadows.sm }]}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="finger-print" size={18} color="#2563EB" />
+              <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Document Signatures</Text>
+            </View>
+            {signatures.map((sig: any, i: number) => (
+              <View key={i} style={[styles.signatureRow, { borderBottomColor: colors.border }]}>
+                <View style={[styles.sigPreview, { backgroundColor: '#F0F9FF' }]}>
+                  <Ionicons name="finger-print" size={24} color="#2563EB" />
+                </View>
+                <View style={styles.sigInfo}>
+                  <Text style={[styles.sigName, { color: colors.textPrimary }]}>{sig.signature_name}</Text>
+                  <Text style={[styles.sigDate, { color: colors.textTertiary }]}>
+                    Page {sig.page + 1} • Added {new Date(sig.placed_at).toLocaleDateString()}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* Tags */}
         {doc.tags?.length > 0 && (
           <View style={[styles.section, { backgroundColor: colors.surface, ...shadows.sm }]}>
@@ -351,6 +596,10 @@ export default function DocumentDetailScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* ════════════════════════════════════════════════════════════════════════
+          MODALS
+          ═══════════════════════════════════════════════════════════════════════ */}
 
       {/* Rename Modal */}
       <Modal visible={showRename} transparent animationType="fade" onRequestClose={() => setShowRename(false)}>
@@ -427,6 +676,312 @@ export default function DocumentDetailScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      {/* Comments Modal */}
+      <Modal visible={showComments} transparent animationType="slide" onRequestClose={() => setShowComments(false)}>
+        <View style={[styles.fullModal, { backgroundColor: colors.background }]}>
+          <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <TouchableOpacity onPress={() => setShowComments(false)} style={styles.headerBtn}>
+                <Ionicons name="close" size={24} color={colors.textPrimary} />
+              </TouchableOpacity>
+              <Text style={[styles.modalHeaderTitle, { color: colors.textPrimary }]}>Comments</Text>
+              <TouchableOpacity onPress={() => setShowRequestComment(true)} style={styles.headerBtn}>
+                <Ionicons name="person-add-outline" size={22} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20 }}>
+              {/* Add Comment */}
+              <View style={[styles.addCommentBox, { backgroundColor: colors.surface, ...shadows.sm }]}>
+                <TextInput
+                  style={[styles.commentAuthorInput, { backgroundColor: colors.surfaceHighlight, color: colors.textPrimary }]}
+                  placeholder="Your name (optional)"
+                  placeholderTextColor={colors.textTertiary}
+                  value={commentAuthor}
+                  onChangeText={setCommentAuthor}
+                />
+                <TextInput
+                  style={[styles.commentInput, { backgroundColor: colors.surfaceHighlight, color: colors.textPrimary }]}
+                  placeholder="Write a comment..."
+                  placeholderTextColor={colors.textTertiary}
+                  value={newComment}
+                  onChangeText={setNewComment}
+                  multiline
+                  numberOfLines={3}
+                />
+                <TouchableOpacity
+                  style={[styles.addCommentBtn, { backgroundColor: colors.primary }]}
+                  onPress={handleAddComment}
+                  disabled={addingComment || !newComment.trim()}
+                >
+                  {addingComment ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="send" size={16} color="#FFF" />
+                      <Text style={styles.addCommentBtnText}>Add Comment</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {/* Comments List */}
+              {comments.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="chatbubbles-outline" size={48} color={colors.textTertiary} />
+                  <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>No comments yet</Text>
+                </View>
+              ) : (
+                comments.map((comment: any, i: number) => (
+                  <View key={i} style={[styles.commentCard, { backgroundColor: colors.surface, ...shadows.sm }]}>
+                    <View style={styles.commentHeader}>
+                      <View style={[styles.commentAvatar, { backgroundColor: colors.primary + '20' }]}>
+                        <Text style={[styles.commentAvatarText, { color: colors.primary }]}>
+                          {comment.author?.charAt(0)?.toUpperCase() || 'A'}
+                        </Text>
+                      </View>
+                      <View style={styles.commentMeta}>
+                        <Text style={[styles.commentAuthor, { color: colors.textPrimary }]}>{comment.author}</Text>
+                        <Text style={[styles.commentDate, { color: colors.textTertiary }]}>
+                          {new Date(comment.created_at).toLocaleDateString()}
+                        </Text>
+                      </View>
+                      {comment.resolved && (
+                        <View style={[styles.resolvedBadge, { backgroundColor: '#059669' }]}>
+                          <Text style={styles.resolvedBadgeText}>Resolved</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={[styles.commentContent, { color: colors.textPrimary }]}>{comment.content}</Text>
+                    <View style={styles.commentActions}>
+                      {!comment.resolved && (
+                        <TouchableOpacity
+                          style={styles.commentActionBtn}
+                          onPress={() => handleResolveComment(comment.id)}
+                        >
+                          <Ionicons name="checkmark-circle-outline" size={18} color="#059669" />
+                          <Text style={[styles.commentActionText, { color: '#059669' }]}>Resolve</Text>
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity
+                        style={styles.commentActionBtn}
+                        onPress={() => handleDeleteComment(comment.id)}
+                      >
+                        <Ionicons name="trash-outline" size={18} color={colors.error} />
+                        <Text style={[styles.commentActionText, { color: colors.error }]}>Delete</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </SafeAreaView>
+        </View>
+      </Modal>
+
+      {/* Signatures Modal */}
+      <Modal visible={showSignatures} transparent animationType="slide" onRequestClose={() => setShowSignatures(false)}>
+        <View style={[styles.fullModal, { backgroundColor: colors.background }]}>
+          <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <TouchableOpacity onPress={() => setShowSignatures(false)} style={styles.headerBtn}>
+                <Ionicons name="close" size={24} color={colors.textPrimary} />
+              </TouchableOpacity>
+              <Text style={[styles.modalHeaderTitle, { color: colors.textPrimary }]}>Signatures</Text>
+              <TouchableOpacity onPress={() => setShowRequestSignature(true)} style={styles.headerBtn}>
+                <Ionicons name="mail-outline" size={22} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20 }}>
+              {/* Create New Signature */}
+              <TouchableOpacity
+                style={[styles.createSignatureBtn, { backgroundColor: colors.primary }]}
+                onPress={() => setShowSignatureCanvas(true)}
+              >
+                <Ionicons name="create-outline" size={22} color="#FFF" />
+                <Text style={styles.createSignatureBtnText}>Draw New Signature</Text>
+              </TouchableOpacity>
+
+              {/* Saved Signatures */}
+              <Text style={[styles.sigSectionTitle, { color: colors.textSecondary }]}>Saved Signatures</Text>
+              {savedSignatures.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="finger-print-outline" size={48} color={colors.textTertiary} />
+                  <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>No saved signatures</Text>
+                </View>
+              ) : (
+                savedSignatures.map((sig: any, i: number) => (
+                  <TouchableOpacity
+                    key={i}
+                    style={[styles.savedSigCard, { backgroundColor: colors.surface, ...shadows.sm }]}
+                    onPress={() => handleAddSignatureToDocument(sig.id)}
+                  >
+                    <View style={[styles.sigPreviewLarge, { backgroundColor: '#F8FAFC' }]}>
+                      <Ionicons name="finger-print" size={32} color="#2563EB" />
+                    </View>
+                    <View style={styles.sigCardInfo}>
+                      <Text style={[styles.sigCardName, { color: colors.textPrimary }]}>{sig.name}</Text>
+                      <Text style={[styles.sigCardDate, { color: colors.textTertiary }]}>
+                        Created {new Date(sig.created_at).toLocaleDateString()}
+                      </Text>
+                    </View>
+                    <View style={[styles.addSigBadge, { backgroundColor: colors.primary }]}>
+                      <Ionicons name="add" size={18} color="#FFF" />
+                    </View>
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+          </SafeAreaView>
+        </View>
+      </Modal>
+
+      {/* Signature Canvas */}
+      <SignatureCanvas
+        visible={showSignatureCanvas}
+        onClose={() => setShowSignatureCanvas(false)}
+        onSave={handleSaveSignature}
+      />
+
+      {/* Request Signature Modal */}
+      <Modal visible={showRequestSignature} transparent animationType="fade" onRequestClose={() => setShowRequestSignature(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setShowRequestSignature(false)}>
+          <View style={[styles.requestModal, { backgroundColor: colors.surface, ...shadows.lg }]} onStartShouldSetResponder={() => true}>
+            <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Request Signature</Text>
+            <Text style={[styles.requestSubtitle, { color: colors.textSecondary }]}>
+              Send an email request for someone to sign this document
+            </Text>
+            <TextInput
+              style={[styles.requestInput, { backgroundColor: colors.surfaceHighlight, color: colors.textPrimary }]}
+              placeholder="Your name"
+              placeholderTextColor={colors.textTertiary}
+              value={requesterName}
+              onChangeText={setRequesterName}
+            />
+            <TextInput
+              style={[styles.requestInput, { backgroundColor: colors.surfaceHighlight, color: colors.textPrimary }]}
+              placeholder="Your email"
+              placeholderTextColor={colors.textTertiary}
+              value={requesterEmail}
+              onChangeText={setRequesterEmail}
+              keyboardType="email-address"
+            />
+            <TextInput
+              style={[styles.requestInput, { backgroundColor: colors.surfaceHighlight, color: colors.textPrimary }]}
+              placeholder="Signer's name *"
+              placeholderTextColor={colors.textTertiary}
+              value={signerName}
+              onChangeText={setSignerName}
+            />
+            <TextInput
+              style={[styles.requestInput, { backgroundColor: colors.surfaceHighlight, color: colors.textPrimary }]}
+              placeholder="Signer's email *"
+              placeholderTextColor={colors.textTertiary}
+              value={signerEmail}
+              onChangeText={setSignerEmail}
+              keyboardType="email-address"
+            />
+            <TextInput
+              style={[styles.requestInput, styles.requestMessageInput, { backgroundColor: colors.surfaceHighlight, color: colors.textPrimary }]}
+              placeholder="Message (optional)"
+              placeholderTextColor={colors.textTertiary}
+              value={requestMessage}
+              onChangeText={setRequestMessage}
+              multiline
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.cancelBtn, { borderColor: colors.border }]}
+                onPress={() => setShowRequestSignature(false)}
+              >
+                <Text style={[styles.cancelBtnText, { color: colors.textSecondary }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.saveModalBtn, { backgroundColor: colors.primary }]}
+                onPress={handleRequestSignature}
+                disabled={sendingRequest}
+              >
+                {sendingRequest ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <Text style={styles.saveBtnText}>Send Request</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Request Comment Modal */}
+      <Modal visible={showRequestComment} transparent animationType="fade" onRequestClose={() => setShowRequestComment(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setShowRequestComment(false)}>
+          <View style={[styles.requestModal, { backgroundColor: colors.surface, ...shadows.lg }]} onStartShouldSetResponder={() => true}>
+            <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Request Comment</Text>
+            <Text style={[styles.requestSubtitle, { color: colors.textSecondary }]}>
+              Send an email request for someone to review this document
+            </Text>
+            <TextInput
+              style={[styles.requestInput, { backgroundColor: colors.surfaceHighlight, color: colors.textPrimary }]}
+              placeholder="Your name"
+              placeholderTextColor={colors.textTertiary}
+              value={requesterName}
+              onChangeText={setRequesterName}
+            />
+            <TextInput
+              style={[styles.requestInput, { backgroundColor: colors.surfaceHighlight, color: colors.textPrimary }]}
+              placeholder="Your email"
+              placeholderTextColor={colors.textTertiary}
+              value={requesterEmail}
+              onChangeText={setRequesterEmail}
+              keyboardType="email-address"
+            />
+            <TextInput
+              style={[styles.requestInput, { backgroundColor: colors.surfaceHighlight, color: colors.textPrimary }]}
+              placeholder="Reviewer's name *"
+              placeholderTextColor={colors.textTertiary}
+              value={signerName}
+              onChangeText={setSignerName}
+            />
+            <TextInput
+              style={[styles.requestInput, { backgroundColor: colors.surfaceHighlight, color: colors.textPrimary }]}
+              placeholder="Reviewer's email *"
+              placeholderTextColor={colors.textTertiary}
+              value={signerEmail}
+              onChangeText={setSignerEmail}
+              keyboardType="email-address"
+            />
+            <TextInput
+              style={[styles.requestInput, styles.requestMessageInput, { backgroundColor: colors.surfaceHighlight, color: colors.textPrimary }]}
+              placeholder="Message (optional)"
+              placeholderTextColor={colors.textTertiary}
+              value={requestMessage}
+              onChangeText={setRequestMessage}
+              multiline
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.cancelBtn, { borderColor: colors.border }]}
+                onPress={() => setShowRequestComment(false)}
+              >
+                <Text style={[styles.cancelBtnText, { color: colors.textSecondary }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.saveModalBtn, { backgroundColor: colors.primary }]}
+                onPress={handleRequestComment}
+                disabled={sendingRequest}
+              >
+                {sendingRequest ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <Text style={styles.saveBtnText}>Send Request</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -470,11 +1025,31 @@ const styles = StyleSheet.create({
   actionIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   actionLabel: { fontSize: 13, fontWeight: '600' },
 
+  secondaryActions: { marginTop: 16, gap: 10 },
+  secondaryBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    padding: 16, borderRadius: 14, borderWidth: 1,
+  },
+  secondaryBtnText: { flex: 1, fontSize: 15, fontWeight: '500' },
+
   section: { borderRadius: 16, padding: 16, marginTop: 16 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   sectionTitle: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
   summaryText: { fontSize: 14, lineHeight: 21 },
   contentText: { fontSize: 13, lineHeight: 20 },
+
+  requestRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 0.5 },
+  requestInfo: { flex: 1 },
+  requestName: { fontSize: 14, fontWeight: '600' },
+  requestEmail: { fontSize: 12, marginTop: 2 },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  statusBadgeText: { color: '#FFF', fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
+
+  signatureRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 0.5 },
+  sigPreview: { width: 48, height: 48, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  sigInfo: { flex: 1 },
+  sigName: { fontSize: 14, fontWeight: '600' },
+  sigDate: { fontSize: 12, marginTop: 2 },
 
   tagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tagChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
@@ -499,4 +1074,55 @@ const styles = StyleSheet.create({
   exportInfo: { flex: 1 },
   exportLabel: { fontSize: 15, fontWeight: '600' },
   exportExt: { fontSize: 12, marginTop: 2 },
+
+  fullModal: { flex: 1 },
+  modalHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 12, paddingVertical: 12, borderBottomWidth: 0.5,
+  },
+  modalHeaderTitle: { fontSize: 17, fontWeight: '600' },
+
+  addCommentBox: { borderRadius: 16, padding: 16, marginBottom: 20 },
+  commentAuthorInput: { borderRadius: 10, padding: 12, fontSize: 14, marginBottom: 10 },
+  commentInput: { borderRadius: 10, padding: 12, fontSize: 14, minHeight: 80, textAlignVertical: 'top', marginBottom: 12 },
+  addCommentBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingVertical: 12, borderRadius: 10,
+  },
+  addCommentBtnText: { color: '#FFF', fontSize: 14, fontWeight: '600' },
+
+  emptyState: { alignItems: 'center', paddingVertical: 40, gap: 12 },
+  emptyStateText: { fontSize: 14 },
+
+  commentCard: { borderRadius: 14, padding: 16, marginBottom: 12 },
+  commentHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  commentAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  commentAvatarText: { fontSize: 16, fontWeight: '700' },
+  commentMeta: { flex: 1 },
+  commentAuthor: { fontSize: 14, fontWeight: '600' },
+  commentDate: { fontSize: 11, marginTop: 2 },
+  resolvedBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  resolvedBadgeText: { color: '#FFF', fontSize: 10, fontWeight: '700' },
+  commentContent: { fontSize: 14, lineHeight: 20 },
+  commentActions: { flexDirection: 'row', gap: 16, marginTop: 12, paddingTop: 12, borderTopWidth: 0.5, borderTopColor: 'rgba(0,0,0,0.1)' },
+  commentActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  commentActionText: { fontSize: 12, fontWeight: '600' },
+
+  createSignatureBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    paddingVertical: 16, borderRadius: 14, marginBottom: 24,
+  },
+  createSignatureBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  sigSectionTitle: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
+  savedSigCard: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: 14, marginBottom: 10 },
+  sigPreviewLarge: { width: 60, height: 50, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  sigCardInfo: { flex: 1 },
+  sigCardName: { fontSize: 15, fontWeight: '600' },
+  sigCardDate: { fontSize: 12, marginTop: 2 },
+  addSigBadge: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+
+  requestModal: { width: '90%', borderRadius: 20, padding: 24 },
+  requestSubtitle: { fontSize: 13, marginBottom: 16 },
+  requestInput: { borderRadius: 10, padding: 14, fontSize: 15, marginBottom: 12 },
+  requestMessageInput: { minHeight: 80, textAlignVertical: 'top' },
 });
