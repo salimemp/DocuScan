@@ -143,6 +143,7 @@ export default function HistoryScreen() {
       <TouchableOpacity
         testID={`history-doc-${item.id}`}
         activeOpacity={0.78}
+        onPress={onPress}
         style={[styles.listCard, { backgroundColor: colors.surface, ...shadows.sm }]}
       >
         {item.image_thumbnail ? (
