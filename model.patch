@@ -1,51 +1,125 @@
+diff --git a/model.patch b/model.patch
+index 937c693..e69de29 100644
+--- a/model.patch
++++ b/model.patch
+@@ -1,51 +0,0 @@
+-diff --git a/test_result.md b/test_result.md
+-index ecaeff9..ce91948 100644
+---- a/test_result.md
+-+++ b/test_result.md
+-@@ -171,15 +171,18 @@ backend:
+- 
+-   - task: "POST /api/scan - Gemini AI document scan"
+-     implemented: true
+--    working: true
+-+    working: false
+-     file: "/app/backend/server.py"
+--    stuck_count: 0
+-+    stuck_count: 1
+-     priority: "high"
+-     needs_retesting: false
+-     status_history:
+-       - working: true
+-         agent: "main"
+-         comment: "Multi-page scanning with Gemini AI working"
+-+      - working: false
+-+        agent: "testing"
+-+        comment: "AI scan endpoint failing due to Gemini API quota exceeded (HTTP 429). Error: 'You exceeded your current quota, please check your plan and billing details'. This is an external service limitation, not a code issue. The endpoint implementation is correct but requires valid API quota."
+- 
+-   - task: "POST /api/documents/{id}/export - Export document"
+-     implemented: true
+-@@ -187,11 +190,14 @@ backend:
+-     file: "/app/backend/server.py"
+-     stuck_count: 0
+-     priority: "high"
+--    needs_retesting: true
+-+    needs_retesting: false
+-     status_history:
+-       - working: true
+-         agent: "main"
+-         comment: "Export to PDF, DOCX, PPTX, PNG, JPEG, TXT implemented"
+-+      - working: true
+-+        agent: "testing"
+-+        comment: "All export formats tested successfully: PDF (2713 bytes), TXT (1066 chars), DOCX (36951 bytes), PPTX (31126 bytes), PNG (11999 bytes), JPEG (30555 bytes). Base64 encoding working correctly. Error handling for invalid formats working (returns 400)."
+- 
+- frontend:
+-   - task: "Dashboard screen"
+-@@ -295,4 +301,6 @@ test_plan:
+- 
+- agent_communication:
+-   - agent: "main"
+--    message: "Implemented Phase 3 features: multi-page scanning, document detail screen, editor, and export. Ready for backend testing."
+-\ No newline at end of file
+-+    message: "Implemented Phase 3 features: multi-page scanning, document detail screen, editor, and export. Ready for backend testing."
+-+  - agent: "testing"
+-+    message: "Backend testing completed. All CRUD operations working perfectly (11/11 tests passed). All export formats (PDF, TXT, DOCX, PPTX, PNG, JPEG) working correctly with proper base64 encoding. Error handling validated. Only issue: AI scan endpoint failing due to Gemini API quota exceeded (external service limitation, not code issue). Backend API is production-ready except for AI quota constraint."
+-\ No newline at end of file
 diff --git a/test_result.md b/test_result.md
-index ecaeff9..ce91948 100644
+index ce91948..a7f3aba 100644
 --- a/test_result.md
 +++ b/test_result.md
-@@ -171,15 +171,18 @@ backend:
+@@ -199,6 +199,54 @@ backend:
+         agent: "testing"
+         comment: "All export formats tested successfully: PDF (2713 bytes), TXT (1066 chars), DOCX (36951 bytes), PPTX (31126 bytes), PNG (11999 bytes), JPEG (30555 bytes). Base64 encoding working correctly. Error handling for invalid formats working (returns 400)."
  
-   - task: "POST /api/scan - Gemini AI document scan"
-     implemented: true
--    working: true
-+    working: false
-     file: "/app/backend/server.py"
--    stuck_count: 0
-+    stuck_count: 1
-     priority: "high"
-     needs_retesting: false
-     status_history:
-       - working: true
-         agent: "main"
-         comment: "Multi-page scanning with Gemini AI working"
-+      - working: false
-+        agent: "testing"
-+        comment: "AI scan endpoint failing due to Gemini API quota exceeded (HTTP 429). Error: 'You exceeded your current quota, please check your plan and billing details'. This is an external service limitation, not a code issue. The endpoint implementation is correct but requires valid API quota."
- 
-   - task: "POST /api/documents/{id}/export - Export document"
-     implemented: true
-@@ -187,11 +190,14 @@ backend:
-     file: "/app/backend/server.py"
-     stuck_count: 0
-     priority: "high"
--    needs_retesting: true
++  - task: "Password Protection - Set/Verify/Remove password"
++    implemented: true
++    working: true
++    file: "/app/backend/server.py"
++    stuck_count: 0
++    priority: "high"
 +    needs_retesting: false
-     status_history:
-       - working: true
-         agent: "main"
-         comment: "Export to PDF, DOCX, PPTX, PNG, JPEG, TXT implemented"
++    status_history:
 +      - working: true
 +        agent: "testing"
-+        comment: "All export formats tested successfully: PDF (2713 bytes), TXT (1066 chars), DOCX (36951 bytes), PPTX (31126 bytes), PNG (11999 bytes), JPEG (30555 bytes). Base64 encoding working correctly. Error handling for invalid formats working (returns 400)."
- 
++        comment: "Password protection fully functional. Set password (POST /password), verify correct password (returns verified: true), reject wrong password (403 Forbidden), password hashing with SHA-256 working correctly."
++
++  - task: "Comments System - Add/Resolve/Reply to comments"
++    implemented: true
++    working: true
++    file: "/app/backend/server.py"
++    stuck_count: 0
++    priority: "high"
++    needs_retesting: false
++    status_history:
++      - working: true
++        agent: "testing"
++        comment: "Comments system fully functional. Add comments (POST /comments), resolve comments (PUT /resolve), comments properly stored in document, comment IDs generated correctly, author and content fields working."
++
++  - task: "Signatures System - Create/List/Add to documents"
++    implemented: true
++    working: true
++    file: "/app/backend/server.py"
++    stuck_count: 0
++    priority: "high"
++    needs_retesting: false
++    status_history:
++      - working: true
++        agent: "testing"
++        comment: "Signatures system fully functional. Create signatures (POST /signatures), list signatures (GET /signatures), add signatures to documents with positioning (x, y, width, page), signature base64 storage working, cleanup functionality working."
++
++  - task: "Signature Requests - Request signatures via email"
++    implemented: true
++    working: true
++    file: "/app/backend/server.py"
++    stuck_count: 0
++    priority: "high"
++    needs_retesting: false
++    status_history:
++      - working: true
++        agent: "testing"
++        comment: "Signature request system working. POST /request-signature accepts requester/signer details, background email task queued successfully, request tracking implemented. Email sending is mocked but request flow is complete."
++
  frontend:
    - task: "Dashboard screen"
-@@ -295,4 +301,6 @@ test_plan:
- 
- agent_communication:
+     implemented: true
+@@ -303,4 +351,6 @@ agent_communication:
    - agent: "main"
--    message: "Implemented Phase 3 features: multi-page scanning, document detail screen, editor, and export. Ready for backend testing."
+     message: "Implemented Phase 3 features: multi-page scanning, document detail screen, editor, and export. Ready for backend testing."
+   - agent: "testing"
+-    message: "Backend testing completed. All CRUD operations working perfectly (11/11 tests passed). All export formats (PDF, TXT, DOCX, PPTX, PNG, JPEG) working correctly with proper base64 encoding. Error handling validated. Only issue: AI scan endpoint failing due to Gemini API quota exceeded (external service limitation, not code issue). Backend API is production-ready except for AI quota constraint."
 \ No newline at end of file
-+    message: "Implemented Phase 3 features: multi-page scanning, document detail screen, editor, and export. Ready for backend testing."
-+  - agent: "testing"
 +    message: "Backend testing completed. All CRUD operations working perfectly (11/11 tests passed). All export formats (PDF, TXT, DOCX, PPTX, PNG, JPEG) working correctly with proper base64 encoding. Error handling validated. Only issue: AI scan endpoint failing due to Gemini API quota exceeded (external service limitation, not code issue). Backend API is production-ready except for AI quota constraint."
++  - agent: "testing"
++    message: "Comprehensive testing of new features completed successfully. All 16 backend API tests passed including: Root endpoint (API v4), password protection (set/verify/reject), comments (add/resolve/verify), signatures (create/list/add to document), signature requests, document CRUD operations, export functionality (PDF/TXT), and error handling. New features (signatures, comments, password protection) are fully functional and production-ready."
 \ No newline at end of file
