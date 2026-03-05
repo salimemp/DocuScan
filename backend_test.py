@@ -301,7 +301,213 @@ class APITester:
             self.log_result("Export TXT", False, f"Request failed: {str(e)}")
             return False
     
-    def test_export_invalid_format(self) -> bool:
+    def test_password_protection(self) -> bool:
+        """Test password protection endpoints"""
+        if not self.test_document_id:
+            self.log_result("Password Protection", False, "No test document ID available")
+            return False
+            
+        try:
+            # Set password
+            password_data = {"password": "test1234"}
+            response = self.session.post(f"{BASE_URL}/documents/{self.test_document_id}/password", json=password_data)
+            
+            if response.status_code != 200:
+                self.log_result("Set Password", False, f"HTTP {response.status_code}", {"response": response.text})
+                return False
+                
+            set_result = response.json()
+            if not set_result.get("is_locked"):
+                self.log_result("Set Password", False, "Document not marked as locked", {"response": set_result})
+                return False
+                
+            self.log_result("Set Password", True, "Password set successfully")
+            
+            # Verify correct password
+            verify_data = {"password": "test1234"}
+            response = self.session.post(f"{BASE_URL}/documents/{self.test_document_id}/verify-password", json=verify_data)
+            
+            if response.status_code == 200:
+                verify_result = response.json()
+                if verify_result.get("verified"):
+                    self.log_result("Verify Correct Password", True, "Correct password verified")
+                else:
+                    self.log_result("Verify Correct Password", False, "Password verification failed", {"response": verify_result})
+                    return False
+            else:
+                self.log_result("Verify Correct Password", False, f"HTTP {response.status_code}", {"response": response.text})
+                return False
+                
+            # Verify wrong password
+            wrong_data = {"password": "wrong_password"}
+            response = self.session.post(f"{BASE_URL}/documents/{self.test_document_id}/verify-password", json=wrong_data)
+            
+            if response.status_code == 403:
+                self.log_result("Verify Wrong Password", True, "Wrong password correctly rejected (403)")
+                return True
+            else:
+                self.log_result("Verify Wrong Password", False, f"Expected 403, got {response.status_code}", {"response": response.text})
+                return False
+                
+        except Exception as e:
+            self.log_result("Password Protection", False, f"Request failed: {str(e)}")
+            return False
+    
+    def test_comments(self) -> bool:
+        """Test comment endpoints"""
+        if not self.test_document_id:
+            self.log_result("Comments", False, "No test document ID available")
+            return False
+            
+        try:
+            # Add comment
+            comment_data = {
+                "author": "Test User",
+                "author_email": "test@example.com",
+                "content": "This is a test comment for API validation"
+            }
+            
+            response = self.session.post(f"{BASE_URL}/documents/{self.test_document_id}/comments", json=comment_data)
+            
+            if response.status_code != 200:
+                self.log_result("Add Comment", False, f"HTTP {response.status_code}", {"response": response.text})
+                return False
+                
+            comment_result = response.json()
+            self.test_comment_id = comment_result.get("comment", {}).get("id")
+            
+            if not self.test_comment_id:
+                self.log_result("Add Comment", False, "No comment ID returned", {"response": comment_result})
+                return False
+                
+            self.log_result("Add Comment", True, f"Comment added with ID: {self.test_comment_id}")
+            
+            # Verify comment is in document
+            response = self.session.get(f"{BASE_URL}/documents/{self.test_document_id}")
+            
+            if response.status_code == 200:
+                doc_data = response.json()
+                comments = doc_data.get("comments", [])
+                
+                if any(c.get("id") == self.test_comment_id for c in comments):
+                    self.log_result("Verify Comment in Document", True, "Comment found in document")
+                else:
+                    self.log_result("Verify Comment in Document", False, "Comment not found in document", {"comments": comments})
+                    return False
+            else:
+                self.log_result("Verify Comment in Document", False, f"HTTP {response.status_code}", {"response": response.text})
+                return False
+                
+            # Resolve comment
+            response = self.session.put(f"{BASE_URL}/documents/{self.test_document_id}/comments/{self.test_comment_id}/resolve")
+            
+            if response.status_code == 200:
+                self.log_result("Resolve Comment", True, "Comment resolved successfully")
+                return True
+            else:
+                self.log_result("Resolve Comment", False, f"HTTP {response.status_code}", {"response": response.text})
+                return False
+                
+        except Exception as e:
+            self.log_result("Comments", False, f"Request failed: {str(e)}")
+            return False
+    
+    def test_signatures(self) -> bool:
+        """Test signature endpoints"""
+        try:
+            # Create signature
+            signature_data = {
+                "name": "John Doe",
+                "image_base64": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCI+PHRleHQgeD0iMTAiIHk9IjUwIj5Kb2huIERvZTwvdGV4dD48L3N2Zz4="
+            }
+            
+            response = self.session.post(f"{BASE_URL}/signatures", json=signature_data)
+            
+            if response.status_code != 200:
+                self.log_result("Create Signature", False, f"HTTP {response.status_code}", {"response": response.text})
+                return False
+                
+            sig_result = response.json()
+            self.test_signature_id = sig_result.get("signature", {}).get("id")
+            
+            if not self.test_signature_id:
+                self.log_result("Create Signature", False, "No signature ID returned", {"response": sig_result})
+                return False
+                
+            self.log_result("Create Signature", True, f"Signature created with ID: {self.test_signature_id}")
+            
+            # List signatures
+            response = self.session.get(f"{BASE_URL}/signatures")
+            
+            if response.status_code == 200:
+                signatures = response.json()
+                if any(s.get("id") == self.test_signature_id for s in signatures):
+                    self.log_result("List Signatures", True, f"Signature found in list ({len(signatures)} total)")
+                else:
+                    self.log_result("List Signatures", False, "Signature not found in list", {"signatures": signatures})
+                    return False
+            else:
+                self.log_result("List Signatures", False, f"HTTP {response.status_code}", {"response": response.text})
+                return False
+                
+            # Add signature to document
+            if self.test_document_id:
+                placement_data = {
+                    "signature_id": self.test_signature_id,
+                    "page": 0,
+                    "x": 50.0,
+                    "y": 80.0,
+                    "width": 20.0
+                }
+                
+                response = self.session.post(f"{BASE_URL}/documents/{self.test_document_id}/signatures", json=placement_data)
+                
+                if response.status_code == 200:
+                    self.log_result("Add Signature to Document", True, "Signature added to document")
+                    return True
+                else:
+                    self.log_result("Add Signature to Document", False, f"HTTP {response.status_code}", {"response": response.text})
+                    return False
+            else:
+                self.log_result("Add Signature to Document", False, "No test document available")
+                return False
+            
+        except Exception as e:
+            self.log_result("Signatures", False, f"Request failed: {str(e)}")
+            return False
+    
+    def test_signature_request(self) -> bool:
+        """Test signature request endpoint"""
+        if not self.test_document_id:
+            self.log_result("Signature Request", False, "No test document ID available")
+            return False
+            
+        try:
+            request_data = {
+                "requester_name": "Alice Smith",
+                "requester_email": "alice@example.com",
+                "signer_email": "bob@example.com",
+                "signer_name": "Bob Johnson",
+                "message": "Please sign this test document"
+            }
+            
+            response = self.session.post(f"{BASE_URL}/documents/{self.test_document_id}/request-signature", json=request_data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get("request"):
+                    self.log_result("Signature Request", True, "Signature request sent successfully")
+                    return True
+                else:
+                    self.log_result("Signature Request", False, "No request data returned", {"response": result})
+                    return False
+            else:
+                self.log_result("Signature Request", False, f"HTTP {response.status_code}", {"response": response.text})
+                return False
+                
+        except Exception as e:
+            self.log_result("Signature Request", False, f"Request failed: {str(e)}")
+            return False
         """Test export with invalid format - should return 400"""
         if not self.test_document_id:
             self.log_result("Export Invalid Format", False, "No test document ID available")
