@@ -1,0 +1,409 @@
+import React, { useState, useRef } from 'react';
+import {
+  View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Platform,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { setScanImage } from '../utils/scanStore';
+import { useTheme } from '../hooks/useTheme';
+
+export default function ScanScreen() {
+  const router = useRouter();
+  const { colors } = useTheme();
+  const [permission, requestPermission] = useCameraPermissions();
+  const [facing, setFacing] = useState<'back' | 'front'>('back');
+  const [flash, setFlash] = useState<'off' | 'on'>('off');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const cameraRef = useRef<CameraView>(null);
+
+  const processAndNavigate = async (uri: string) => {
+    setIsProcessing(true);
+    try {
+      // Compress main image for AI analysis (max 1024px wide)
+      const compressed = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 1024 } }],
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+      // Generate small thumbnail for storage (300px wide)
+      const thumbnail = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 300 } }],
+        { compress: 0.65, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+      setScanImage(compressed.base64!, thumbnail.base64!, uri);
+      router.push('/preview');
+    } catch {
+      Alert.alert('Error', 'Failed to process image. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const takePicture = async () => {
+    if (!cameraRef.current || isProcessing) return;
+    try {
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.9 });
+      if (photo?.uri) await processAndNavigate(photo.uri);
+    } catch {
+      Alert.alert('Error', 'Failed to capture photo.');
+    }
+  };
+
+  const pickFromGallery = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow photo library access in Settings.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.9,
+    });
+    if (!result.canceled && result.assets[0]?.uri) {
+      await processAndNavigate(result.assets[0].uri);
+    }
+  };
+
+  // Permission not yet determined
+  if (!permission) {
+    return <View style={{ flex: 1, backgroundColor: '#000' }} />;
+  }
+
+  // Permission denied — show request UI
+  if (!permission.granted) {
+    return (
+      <View style={[styles.container, { backgroundColor: '#0A0A0A' }]}>
+        <SafeAreaView style={styles.permissionSafe}>
+          <View style={styles.permissionContent}>
+            <View style={styles.permissionIconWrap}>
+              <Ionicons name="camera-outline" size={56} color="#FFFFFF" />
+            </View>
+            <Text style={styles.permissionTitle}>Camera Access</Text>
+            <Text style={styles.permissionSubtitle}>
+              DocScan Pro needs camera access to scan documents. Your photos are processed securely.
+            </Text>
+            <TouchableOpacity
+              testID="grant-camera-btn"
+              style={[styles.grantBtn, { backgroundColor: colors.primary }]}
+              onPress={requestPermission}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="camera" size={20} color="#FFF" />
+              <Text style={styles.grantBtnText}>Enable Camera</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID="cancel-permission-btn"
+              style={styles.cancelPermBtn}
+              onPress={() => router.back()}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.cancelPermText}>Maybe Later</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {/* Camera View */}
+      <CameraView
+        style={StyleSheet.absoluteFill}
+        facing={facing}
+        flash={flash}
+        ref={cameraRef}
+      />
+
+      {/* Dark overlay — top & bottom bands */}
+      <View style={styles.overlayTop} />
+      <View style={styles.overlayBottom} />
+      <View style={styles.overlaySideLeft} />
+      <View style={styles.overlaySideRight} />
+
+      {/* Scan frame corners */}
+      <View style={styles.frameWrap} pointerEvents="none">
+        <View style={[styles.corner, styles.cornerTL]} />
+        <View style={[styles.corner, styles.cornerTR]} />
+        <View style={[styles.corner, styles.cornerBL]} />
+        <View style={[styles.corner, styles.cornerBR]} />
+      </View>
+
+      {/* Top Controls */}
+      <SafeAreaView edges={['top']} style={styles.topSafe}>
+        <View style={styles.topBar}>
+          <TouchableOpacity
+            testID="scan-close-btn"
+            style={styles.ctrlBtn}
+            onPress={() => router.back()}
+            activeOpacity={0.8}
+            accessibilityLabel="Close scanner"
+          >
+            <Ionicons name="close" size={26} color="#FFF" />
+          </TouchableOpacity>
+
+          <Text style={styles.topTitle}>Scan Document</Text>
+
+          <TouchableOpacity
+            testID="scan-flash-btn"
+            style={styles.ctrlBtn}
+            onPress={() => setFlash(f => f === 'off' ? 'on' : 'off')}
+            activeOpacity={0.8}
+            accessibilityLabel="Toggle flash"
+          >
+            <Ionicons
+              name={flash === 'on' ? 'flash' : 'flash-off'}
+              size={22}
+              color={flash === 'on' ? '#FBBF24' : '#FFF'}
+            />
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+
+      {/* Center instruction */}
+      <View style={styles.centerInstruction}>
+        <Text style={styles.instructionText}>
+          Align document within the frame
+        </Text>
+      </View>
+
+      {/* Bottom Controls */}
+      <SafeAreaView edges={['bottom']} style={styles.bottomSafe}>
+        <View style={styles.bottomBar}>
+          {/* Gallery */}
+          <TouchableOpacity
+            testID="gallery-import-btn"
+            style={styles.sideAction}
+            onPress={pickFromGallery}
+            activeOpacity={0.8}
+            accessibilityLabel="Import from gallery"
+          >
+            <View style={styles.sideActionIcon}>
+              <Ionicons name="images-outline" size={26} color="#FFF" />
+            </View>
+            <Text style={styles.sideActionLabel}>Gallery</Text>
+          </TouchableOpacity>
+
+          {/* Shutter */}
+          <TouchableOpacity
+            testID="shutter-btn"
+            style={[styles.shutterBtn, isProcessing && { opacity: 0.5 }]}
+            onPress={takePicture}
+            disabled={isProcessing}
+            activeOpacity={0.85}
+            accessibilityLabel="Take photo"
+          >
+            {isProcessing
+              ? <ActivityIndicator color="#FFF" size="small" />
+              : <View style={styles.shutterInner} />}
+          </TouchableOpacity>
+
+          {/* Flip */}
+          <TouchableOpacity
+            testID="flip-camera-btn"
+            style={styles.sideAction}
+            onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}
+            activeOpacity={0.8}
+            accessibilityLabel="Flip camera"
+          >
+            <View style={styles.sideActionIcon}>
+              <Ionicons name="camera-reverse-outline" size={26} color="#FFF" />
+            </View>
+            <Text style={styles.sideActionLabel}>Flip</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+
+      {/* Processing overlay */}
+      {isProcessing && (
+        <View style={styles.processingOverlay}>
+          <View style={styles.processingCard}>
+            <ActivityIndicator color={colors.primary} size="large" />
+            <Text style={styles.processingText}>Processing image...</Text>
+            <Text style={styles.processingSubtext}>Preparing for AI analysis</Text>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const FRAME_W = 280;
+const FRAME_H = 370;
+const CORNER_SIZE = 28;
+const CORNER_THICKNESS = 3;
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#000' },
+
+  // Overlay bands that darken outside the scan frame
+  overlayTop: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    height: '20%',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  overlayBottom: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    height: '25%',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  overlaySideLeft: {
+    position: 'absolute',
+    top: '20%', bottom: '25%',
+    left: 0,
+    width: '10%',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  overlaySideRight: {
+    position: 'absolute',
+    top: '20%', bottom: '25%',
+    right: 0,
+    width: '10%',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+
+  // Scan frame corners
+  frameWrap: {
+    position: 'absolute',
+    alignSelf: 'center',
+    top: '20%',
+    width: FRAME_W,
+    height: FRAME_H,
+  },
+  corner: {
+    position: 'absolute',
+    width: CORNER_SIZE,
+    height: CORNER_SIZE,
+    borderColor: '#FFFFFF',
+  },
+  cornerTL: {
+    top: 0, left: 0,
+    borderTopWidth: CORNER_THICKNESS,
+    borderLeftWidth: CORNER_THICKNESS,
+    borderTopLeftRadius: 3,
+  },
+  cornerTR: {
+    top: 0, right: 0,
+    borderTopWidth: CORNER_THICKNESS,
+    borderRightWidth: CORNER_THICKNESS,
+    borderTopRightRadius: 3,
+  },
+  cornerBL: {
+    bottom: 0, left: 0,
+    borderBottomWidth: CORNER_THICKNESS,
+    borderLeftWidth: CORNER_THICKNESS,
+    borderBottomLeftRadius: 3,
+  },
+  cornerBR: {
+    bottom: 0, right: 0,
+    borderBottomWidth: CORNER_THICKNESS,
+    borderRightWidth: CORNER_THICKNESS,
+    borderBottomRightRadius: 3,
+  },
+
+  // Top bar
+  topSafe: { position: 'absolute', top: 0, left: 0, right: 0 },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  ctrlBtn: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  topTitle: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+
+  // Center instruction
+  centerInstruction: {
+    position: 'absolute',
+    bottom: '28%',
+    alignSelf: 'center',
+  },
+  instructionText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+
+  // Bottom bar
+  bottomSafe: { position: 'absolute', bottom: 0, left: 0, right: 0 },
+  bottomBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingHorizontal: 24,
+    paddingBottom: Platform.OS === 'ios' ? 8 : 20,
+    paddingTop: 16,
+  },
+  sideAction: { alignItems: 'center', gap: 6, width: 72 },
+  sideActionIcon: {
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  sideActionLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '500' },
+  shutterBtn: {
+    width: 78, height: 78, borderRadius: 39,
+    borderWidth: 4, borderColor: '#FFF',
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  shutterInner: {
+    width: 60, height: 60, borderRadius: 30,
+    backgroundColor: '#FFFFFF',
+  },
+
+  // Processing
+  processingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  processingCard: {
+    backgroundColor: 'rgba(30,30,30,0.95)',
+    borderRadius: 20,
+    padding: 32,
+    alignItems: 'center',
+    gap: 14,
+  },
+  processingText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  processingSubtext: { color: 'rgba(255,255,255,0.6)', fontSize: 13 },
+
+  // Permission
+  permissionSafe: { flex: 1 },
+  permissionContent: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 36, gap: 16,
+  },
+  permissionIconWrap: {
+    width: 96, height: 96, borderRadius: 48,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 8,
+  },
+  permissionTitle: { color: '#FFF', fontSize: 24, fontWeight: '700', textAlign: 'center' },
+  permissionSubtitle: {
+    color: 'rgba(255,255,255,0.65)', fontSize: 15,
+    textAlign: 'center', lineHeight: 22,
+  },
+  grantBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 36, paddingVertical: 15,
+    borderRadius: 16, marginTop: 8,
+  },
+  grantBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  cancelPermBtn: { paddingVertical: 12, paddingHorizontal: 24 },
+  cancelPermText: { color: 'rgba(255,255,255,0.5)', fontSize: 15 },
+});
