@@ -304,3 +304,5 @@ agent_communication:
     message: "Implemented Phase 3 features: multi-page scanning, document detail screen, editor, and export. Ready for backend testing."
   - agent: "testing"
     message: "Backend testing completed. All CRUD operations working perfectly (11/11 tests passed). All export formats (PDF, TXT, DOCX, PPTX, PNG, JPEG) working correctly with proper base64 encoding. Error handling validated. Only issue: AI scan endpoint failing due to Gemini API quota exceeded (external service limitation, not code issue). Backend API is production-ready except for AI quota constraint."
+  - agent: "testing"
+    message: "Comprehensive testing of new features completed successfully. All 16 backend API tests passed including: Root endpoint (API v4), password protection (set/verify/reject), comments (add/resolve/verify), signatures (create/list/add to document), signature requests, document CRUD operations, export functionality (PDF/TXT), and error handling. New features (signatures, comments, password protection) are fully functional and production-ready."
