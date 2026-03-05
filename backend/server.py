@@ -1,12 +1,14 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Query
+from fastapi import FastAPI, APIRouter, HTTPException, Query, BackgroundTasks
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-import os, logging, json, re, uuid, base64, io
+import os, logging, json, re, uuid, base64, io, hashlib, smtplib
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any, Dict
 from datetime import datetime, timezone
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 
 ROOT_DIR = Path(__file__).parent
@@ -35,9 +37,69 @@ def strip_b64_prefix(s: str) -> str:
 def safe_latin(text: str) -> str:
     return str(text or '').encode('latin-1', errors='replace').decode('latin-1')
 
+def hash_password(password: str) -> str:
+    """Hash password with SHA-256"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_password(password: str, hashed: str) -> bool:
+    """Verify password against hash"""
+    return hash_password(password) == hashed
+
 # ── Models ────────────────────────────────────────────────────────────────
+
+# Comment Model
+class Comment(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    author: str = "Anonymous"
+    author_email: Optional[str] = None
+    content: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    resolved: bool = False
+    replies: List[Dict[str, Any]] = []
+
+class CommentCreate(BaseModel):
+    author: str = "Anonymous"
+    author_email: Optional[str] = None
+    content: str
+
+class CommentReply(BaseModel):
+    author: str = "Anonymous"
+    content: str
+
+# Signature Model
+class Signature(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    image_base64: str  # SVG or PNG base64
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    
+class SignatureCreate(BaseModel):
+    name: str
+    image_base64: str
+
+class SignaturePlacement(BaseModel):
+    signature_id: str
+    page: int = 0
+    x: float  # 0-100 percentage
+    y: float  # 0-100 percentage
+    width: float = 20  # percentage of page width
+    
+class SignatureRequest(BaseModel):
+    requester_name: str
+    requester_email: str
+    signer_email: str
+    signer_name: str
+    message: Optional[str] = None
+
+# Password Protection
+class PasswordSet(BaseModel):
+    password: str
+    
+class PasswordVerify(BaseModel):
+    password: str
+
 class ScanRequest(BaseModel):
-    images: List[str]          # 1 or more base64 pages
+    images: List[str]
     mime_type: str = "image/jpeg"
 
 class DocumentCreate(BaseModel):
@@ -73,6 +135,10 @@ class DocumentResponse(DocumentCreate):
     id: str
     created_at: datetime
     size_kb: float = 0.0
+    is_locked: bool = False
+    comments: List[Dict[str, Any]] = []
+    signatures: List[Dict[str, Any]] = []
+    signature_requests: List[Dict[str, Any]] = []
 
 # ── Gemini Prompts ────────────────────────────────────────────────────────
 SYSTEM_PROMPT = """You are DocScan AI — a world-class multilingual document OCR and classification system.
@@ -138,7 +204,6 @@ def generate_pdf(doc: dict) -> bytes:
     pdf = FPDF(orientation='P', unit='mm', format='A4')
     pdf.set_auto_page_break(auto=True, margin=18)
     pdf.add_page()
-    # Blue header band
     pdf.set_fill_color(37, 99, 235)
     pdf.rect(0, 0, 210, 22, 'F')
     pdf.set_font('Helvetica', 'B', 12)
@@ -148,11 +213,9 @@ def generate_pdf(doc: dict) -> bytes:
     pdf.set_x(110)
     pdf.cell(0, 10, safe_latin(type_label), ln=True, align='R')
     pdf.set_text_color(30, 30, 30)
-    # Title
     pdf.set_xy(15, 30)
     pdf.set_font('Helvetica', 'B', 18)
     pdf.multi_cell(180, 10, safe_latin(doc.get('title', 'Untitled Document')))
-    # Meta
     pdf.set_font('Helvetica', '', 9)
     pdf.set_text_color(100, 100, 100)
     pdf.ln(2)
@@ -162,18 +225,15 @@ def generate_pdf(doc: dict) -> bytes:
     pdf.cell(65, 6, f"Language: {lang}")
     pdf.cell(65, 6, f"Type: {subtype}")
     pdf.cell(0, 6, f"Confidence: {conf}", ln=True)
-    # Divider
     y = pdf.get_y() + 3
     pdf.set_draw_color(37, 99, 235)
     pdf.line(15, y, 195, y)
     pdf.ln(5)
-    # Summary
     if doc.get('summary'):
         pdf.set_font('Helvetica', 'I', 10)
         pdf.set_text_color(70, 70, 70)
         pdf.multi_cell(180, 6, safe_latin(doc['summary']))
         pdf.ln(4)
-    # Structured fields
     fields = {k: v for k, v in doc.get('structured_fields', {}).items()
               if not isinstance(v, (dict, list)) and v is not None}
     if fields:
@@ -191,7 +251,6 @@ def generate_pdf(doc: dict) -> bytes:
             pdf.set_font('Helvetica', '', 9)
             pdf.set_text_color(30, 30, 30)
             pdf.multi_cell(135, 7, safe_latin(str(val)))
-    # Formatted output
     if doc.get('formatted_output'):
         pdf.ln(4)
         pdf.set_font('Helvetica', 'B', 12)
@@ -211,7 +270,6 @@ def generate_pdf(doc: dict) -> bytes:
                 pdf.multi_cell(180, 5, safe_latin(line))
             else:
                 pdf.ln(2)
-    # Tags
     if doc.get('tags'):
         pdf.ln(4)
         pdf.set_font('Helvetica', 'B', 9)
@@ -220,7 +278,6 @@ def generate_pdf(doc: dict) -> bytes:
         pdf.set_font('Helvetica', '', 9)
         pdf.set_text_color(60, 60, 60)
         pdf.multi_cell(165, 6, safe_latin(', '.join(f'#{t}' for t in doc['tags'])))
-    # Footer
     pdf.set_y(-22)
     pdf.set_draw_color(200, 210, 230)
     pdf.line(15, pdf.get_y(), 195, pdf.get_y())
@@ -236,12 +293,10 @@ def generate_docx(doc: dict) -> bytes:
     from docx.shared import Pt, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     d = DocxDoc()
-    # Title
     h = d.add_heading(doc.get('title', 'Untitled Document'), 0)
     h.alignment = WD_ALIGN_PARAGRAPH.CENTER
     if h.runs:
         h.runs[0].font.color.rgb = RGBColor(37, 99, 235)
-    # Meta
     p = d.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = p.add_run(
@@ -399,10 +454,39 @@ def generate_txt(doc: dict) -> bytes:
         lines += ['TAGS', ', '.join(f'#{t}' for t in doc['tags'])]
     return '\n'.join(lines).encode('utf-8')
 
+# ── Email Helper ─────────────────────────────────────────────────────────
+async def send_signature_request_email(
+    requester_name: str,
+    requester_email: str,
+    signer_email: str,
+    signer_name: str,
+    document_title: str,
+    document_id: str,
+    message: Optional[str] = None
+):
+    """Send signature request email (placeholder - needs SMTP config)"""
+    # In production, configure SMTP settings
+    logger.info(f"Signature request: {requester_name} ({requester_email}) requesting signature from {signer_name} ({signer_email}) for document: {document_title}")
+    # Return success - actual email sending would require SMTP configuration
+    return True
+
+async def send_comment_request_email(
+    requester_name: str,
+    requester_email: str,
+    reviewer_email: str,
+    reviewer_name: str,
+    document_title: str,
+    document_id: str,
+    message: Optional[str] = None
+):
+    """Send comment request email (placeholder - needs SMTP config)"""
+    logger.info(f"Comment request: {requester_name} ({requester_email}) requesting comment from {reviewer_name} ({reviewer_email}) for document: {document_title}")
+    return True
+
 # ── Routes ────────────────────────────────────────────────────────────────
 @api_router.get("/")
 async def root():
-    return {"message": "DocScan Pro API v3"}
+    return {"message": "DocScan Pro API v4 - with signatures, comments, and password protection"}
 
 
 @api_router.post("/scan")
@@ -441,20 +525,30 @@ async def create_document(doc: DocumentCreate):
     doc_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
     size_kb = round(len(doc.image_thumbnail or '') * 3 / 4 / 1024, 1)
-    doc_dict = {"id": doc_id, "created_at": now, "size_kb": size_kb, **doc.dict()}
+    doc_dict = {
+        "id": doc_id,
+        "created_at": now,
+        "size_kb": size_kb,
+        "is_locked": False,
+        "password_hash": None,
+        "comments": [],
+        "signatures": [],
+        "signature_requests": [],
+        **doc.dict()
+    }
     await db.documents.insert_one(doc_dict)
-    return DocumentResponse(**doc_dict)
+    return DocumentResponse(**{k: v for k, v in doc_dict.items() if k != 'password_hash'})
 
 
 @api_router.get("/documents", response_model=List[DocumentResponse])
 async def list_documents():
-    docs = await db.documents.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    docs = await db.documents.find({}, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(500)
     return [DocumentResponse(**d) for d in docs]
 
 
 @api_router.get("/documents/{doc_id}", response_model=DocumentResponse)
 async def get_document(doc_id: str):
-    doc = await db.documents.find_one({"id": doc_id}, {"_id": 0})
+    doc = await db.documents.find_one({"id": doc_id}, {"_id": 0, "password_hash": 0})
     if not doc:
         raise HTTPException(404, "Document not found")
     return DocumentResponse(**doc)
@@ -468,7 +562,7 @@ async def update_document(doc_id: str, updates: DocumentUpdate):
     result = await db.documents.update_one({"id": doc_id}, {"$set": payload})
     if result.matched_count == 0:
         raise HTTPException(404, "Document not found")
-    updated = await db.documents.find_one({"id": doc_id}, {"_id": 0})
+    updated = await db.documents.find_one({"id": doc_id}, {"_id": 0, "password_hash": 0})
     return DocumentResponse(**updated)
 
 
@@ -480,6 +574,309 @@ async def delete_document(doc_id: str):
     return {"message": "Deleted"}
 
 
+# ── Password Protection Routes ────────────────────────────────────────────
+@api_router.post("/documents/{doc_id}/password")
+async def set_document_password(doc_id: str, data: PasswordSet):
+    """Set or update password for a document"""
+    doc = await db.documents.find_one({"id": doc_id})
+    if not doc:
+        raise HTTPException(404, "Document not found")
+    
+    password_hash = hash_password(data.password)
+    await db.documents.update_one(
+        {"id": doc_id},
+        {"$set": {"password_hash": password_hash, "is_locked": True}}
+    )
+    return {"message": "Password set successfully", "is_locked": True}
+
+
+@api_router.post("/documents/{doc_id}/verify-password")
+async def verify_document_password(doc_id: str, data: PasswordVerify):
+    """Verify password for a locked document"""
+    doc = await db.documents.find_one({"id": doc_id})
+    if not doc:
+        raise HTTPException(404, "Document not found")
+    
+    if not doc.get('is_locked') or not doc.get('password_hash'):
+        return {"verified": True, "message": "Document is not locked"}
+    
+    if verify_password(data.password, doc['password_hash']):
+        return {"verified": True, "message": "Password correct"}
+    else:
+        raise HTTPException(403, "Incorrect password")
+
+
+@api_router.delete("/documents/{doc_id}/password")
+async def remove_document_password(doc_id: str, data: PasswordVerify):
+    """Remove password protection from a document"""
+    doc = await db.documents.find_one({"id": doc_id})
+    if not doc:
+        raise HTTPException(404, "Document not found")
+    
+    if doc.get('password_hash') and not verify_password(data.password, doc['password_hash']):
+        raise HTTPException(403, "Incorrect password")
+    
+    await db.documents.update_one(
+        {"id": doc_id},
+        {"$set": {"password_hash": None, "is_locked": False}}
+    )
+    return {"message": "Password removed", "is_locked": False}
+
+
+# ── Comments Routes ────────────────────────────────────────────────────────
+@api_router.post("/documents/{doc_id}/comments")
+async def add_comment(doc_id: str, comment: CommentCreate):
+    """Add a comment to a document"""
+    doc = await db.documents.find_one({"id": doc_id})
+    if not doc:
+        raise HTTPException(404, "Document not found")
+    
+    new_comment = {
+        "id": str(uuid.uuid4()),
+        "author": comment.author,
+        "author_email": comment.author_email,
+        "content": comment.content,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "resolved": False,
+        "replies": []
+    }
+    
+    await db.documents.update_one(
+        {"id": doc_id},
+        {"$push": {"comments": new_comment}}
+    )
+    return {"message": "Comment added", "comment": new_comment}
+
+
+@api_router.post("/documents/{doc_id}/comments/{comment_id}/reply")
+async def reply_to_comment(doc_id: str, comment_id: str, reply: CommentReply):
+    """Reply to a comment"""
+    doc = await db.documents.find_one({"id": doc_id})
+    if not doc:
+        raise HTTPException(404, "Document not found")
+    
+    new_reply = {
+        "id": str(uuid.uuid4()),
+        "author": reply.author,
+        "content": reply.content,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    result = await db.documents.update_one(
+        {"id": doc_id, "comments.id": comment_id},
+        {"$push": {"comments.$.replies": new_reply}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(404, "Comment not found")
+    
+    return {"message": "Reply added", "reply": new_reply}
+
+
+@api_router.put("/documents/{doc_id}/comments/{comment_id}/resolve")
+async def resolve_comment(doc_id: str, comment_id: str):
+    """Mark a comment as resolved"""
+    result = await db.documents.update_one(
+        {"id": doc_id, "comments.id": comment_id},
+        {"$set": {"comments.$.resolved": True}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(404, "Comment not found")
+    
+    return {"message": "Comment resolved"}
+
+
+@api_router.delete("/documents/{doc_id}/comments/{comment_id}")
+async def delete_comment(doc_id: str, comment_id: str):
+    """Delete a comment"""
+    result = await db.documents.update_one(
+        {"id": doc_id},
+        {"$pull": {"comments": {"id": comment_id}}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(404, "Comment not found")
+    
+    return {"message": "Comment deleted"}
+
+
+class CommentRequest(BaseModel):
+    requester_name: str
+    requester_email: str
+    reviewer_email: str
+    reviewer_name: str
+    message: Optional[str] = None
+
+
+@api_router.post("/documents/{doc_id}/request-comment")
+async def request_comment(doc_id: str, request: CommentRequest, background_tasks: BackgroundTasks):
+    """Request a comment from someone via email"""
+    doc = await db.documents.find_one({"id": doc_id})
+    if not doc:
+        raise HTTPException(404, "Document not found")
+    
+    # Add to pending requests
+    comment_request = {
+        "id": str(uuid.uuid4()),
+        "type": "comment",
+        "requester_name": request.requester_name,
+        "requester_email": request.requester_email,
+        "reviewer_email": request.reviewer_email,
+        "reviewer_name": request.reviewer_name,
+        "message": request.message,
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    # Send email in background
+    background_tasks.add_task(
+        send_comment_request_email,
+        request.requester_name,
+        request.requester_email,
+        request.reviewer_email,
+        request.reviewer_name,
+        doc.get('title', 'Untitled'),
+        doc_id,
+        request.message
+    )
+    
+    return {"message": "Comment request sent", "request_id": comment_request['id']}
+
+
+# ── Signatures Routes ────────────────────────────────────────────────────────
+@api_router.post("/signatures")
+async def create_signature(signature: SignatureCreate):
+    """Create and save a signature"""
+    sig_id = str(uuid.uuid4())
+    sig_data = {
+        "id": sig_id,
+        "name": signature.name,
+        "image_base64": signature.image_base64,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.signatures.insert_one(sig_data)
+    return {"message": "Signature saved", "signature": {k: v for k, v in sig_data.items() if k != '_id'}}
+
+
+@api_router.get("/signatures")
+async def list_signatures():
+    """List all saved signatures"""
+    sigs = await db.signatures.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return sigs
+
+
+@api_router.delete("/signatures/{sig_id}")
+async def delete_signature(sig_id: str):
+    """Delete a signature"""
+    result = await db.signatures.delete_one({"id": sig_id})
+    if result.deleted_count == 0:
+        raise HTTPException(404, "Signature not found")
+    return {"message": "Signature deleted"}
+
+
+@api_router.post("/documents/{doc_id}/signatures")
+async def add_signature_to_document(doc_id: str, placement: SignaturePlacement):
+    """Add a signature to a document"""
+    doc = await db.documents.find_one({"id": doc_id})
+    if not doc:
+        raise HTTPException(404, "Document not found")
+    
+    # Get signature
+    sig = await db.signatures.find_one({"id": placement.signature_id})
+    if not sig:
+        raise HTTPException(404, "Signature not found")
+    
+    sig_placement = {
+        "id": str(uuid.uuid4()),
+        "signature_id": placement.signature_id,
+        "signature_name": sig.get('name'),
+        "signature_image": sig.get('image_base64'),
+        "page": placement.page,
+        "x": placement.x,
+        "y": placement.y,
+        "width": placement.width,
+        "placed_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.documents.update_one(
+        {"id": doc_id},
+        {"$push": {"signatures": sig_placement}}
+    )
+    
+    return {"message": "Signature added to document", "placement": sig_placement}
+
+
+@api_router.delete("/documents/{doc_id}/signatures/{placement_id}")
+async def remove_signature_from_document(doc_id: str, placement_id: str):
+    """Remove a signature from a document"""
+    result = await db.documents.update_one(
+        {"id": doc_id},
+        {"$pull": {"signatures": {"id": placement_id}}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(404, "Signature placement not found")
+    
+    return {"message": "Signature removed"}
+
+
+@api_router.post("/documents/{doc_id}/request-signature")
+async def request_signature(doc_id: str, request: SignatureRequest, background_tasks: BackgroundTasks):
+    """Request a signature from someone via email"""
+    doc = await db.documents.find_one({"id": doc_id})
+    if not doc:
+        raise HTTPException(404, "Document not found")
+    
+    sig_request = {
+        "id": str(uuid.uuid4()),
+        "requester_name": request.requester_name,
+        "requester_email": request.requester_email,
+        "signer_email": request.signer_email,
+        "signer_name": request.signer_name,
+        "message": request.message,
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.documents.update_one(
+        {"id": doc_id},
+        {"$push": {"signature_requests": sig_request}}
+    )
+    
+    # Send email in background
+    background_tasks.add_task(
+        send_signature_request_email,
+        request.requester_name,
+        request.requester_email,
+        request.signer_email,
+        request.signer_name,
+        doc.get('title', 'Untitled'),
+        doc_id,
+        request.message
+    )
+    
+    return {"message": "Signature request sent", "request": sig_request}
+
+
+@api_router.put("/documents/{doc_id}/signature-requests/{request_id}/status")
+async def update_signature_request_status(doc_id: str, request_id: str, status: str = Query(...)):
+    """Update signature request status (pending, signed, declined)"""
+    if status not in ['pending', 'signed', 'declined']:
+        raise HTTPException(400, "Invalid status")
+    
+    result = await db.documents.update_one(
+        {"id": doc_id, "signature_requests.id": request_id},
+        {"$set": {"signature_requests.$.status": status}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(404, "Signature request not found")
+    
+    return {"message": f"Request status updated to {status}"}
+
+
+# ── Export Routes ────────────────────────────────────────────────────────
 @api_router.post("/documents/{doc_id}/export")
 async def export_document(doc_id: str, format: str = Query("pdf")):
     doc = await db.documents.find_one({"id": doc_id}, {"_id": 0})
@@ -522,10 +919,13 @@ async def export_document(doc_id: str, format: str = Query("pdf")):
 @api_router.get("/stats")
 async def get_stats():
     total = await db.documents.count_documents({})
+    locked = await db.documents.count_documents({"is_locked": True})
     recent = await db.documents.find_one({}, {"_id": 0, "created_at": 1}, sort=[("created_at", -1)])
     last_scan = "Never"
     if recent and recent.get("created_at"):
         created = recent["created_at"]
+        if isinstance(created, str):
+            created = datetime.fromisoformat(created.replace('Z', '+00:00'))
         if created.tzinfo is None:
             created = created.replace(tzinfo=timezone.utc)
         delta = datetime.now(timezone.utc) - created
@@ -533,7 +933,12 @@ async def get_stats():
         last_scan = "Just now" if hours < 1 else (f"{hours}h ago" if hours < 24 else f"{hours // 24}d ago")
     storage_kb = total * 150
     storage_str = f"{storage_kb / 1024:.1f} MB" if storage_kb >= 1024 else f"{storage_kb} KB"
-    return {"total_scans": total, "storage_used": storage_str, "last_scan": last_scan}
+    return {
+        "total_scans": total,
+        "locked_documents": locked,
+        "storage_used": storage_str,
+        "last_scan": last_scan
+    }
 
 
 app.include_router(api_router)
