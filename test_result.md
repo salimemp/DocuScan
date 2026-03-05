@@ -171,15 +171,18 @@ backend:
 
   - task: "POST /api/scan - Gemini AI document scan"
     implemented: true
-    working: true
+    working: false
     file: "/app/backend/server.py"
-    stuck_count: 0
+    stuck_count: 1
     priority: "high"
     needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "Multi-page scanning with Gemini AI working"
+      - working: false
+        agent: "testing"
+        comment: "AI scan endpoint failing due to Gemini API quota exceeded (HTTP 429). Error: 'You exceeded your current quota, please check your plan and billing details'. This is an external service limitation, not a code issue. The endpoint implementation is correct but requires valid API quota."
 
   - task: "POST /api/documents/{id}/export - Export document"
     implemented: true
