@@ -113,11 +113,13 @@ export default function HistoryScreen() {
 
   const renderItem = ({ item }: { item: any }) => {
     const meta = getMeta(item.document_type);
+    const onPress = () => router.push({ pathname: '/document/[id]', params: { id: item.id } });
     if (isGrid) {
       return (
         <TouchableOpacity
           testID={`history-doc-${item.id}`}
           activeOpacity={0.78}
+          onPress={onPress}
           style={[styles.gridCard, { backgroundColor: colors.surface, ...shadows.sm }]}
         >
           {item.image_thumbnail ? (
