@@ -199,6 +199,7 @@ export default function DashboardScreen() {
                   key={doc.id}
                   testID={`recent-doc-${doc.id}`}
                   activeOpacity={0.8}
+                  onPress={() => router.push({ pathname: '/document/[id]', params: { id: doc.id } })}
                   style={[styles.recentCard, { backgroundColor: colors.surface, ...shadows.md }]}
                 >
                   {doc.image_thumbnail ? (
