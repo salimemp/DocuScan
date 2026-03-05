@@ -16,6 +16,14 @@ export default function RootLayout() {
             name="preview"
             options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
           />
+          <Stack.Screen
+            name="document/[id]"
+            options={{ animation: 'slide_from_right' }}
+          />
+          <Stack.Screen
+            name="editor"
+            options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+          />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>
