@@ -24,46 +24,43 @@ Build a React Native + Expo application utilizing Expo's latest SDK. Create a si
 ## What's Been Implemented (Feb 2026 → Mar 2026)
 
 ### Mar 5, 2026 — Initial Build
-- **Root layout** (`app/_layout.tsx`): GestureHandlerRootView + SafeAreaProvider + Stack
-- **Index redirect** (`app/index.tsx`): Redirects `/` → `/dashboard`
-- **Tab layout** (`app/(tabs)/_layout.tsx`): Dashboard + History tabs with Ionicons
-- **Dashboard screen** (`app/(tabs)/dashboard.tsx`):
-  - Header: greeting (time-of-day), "DocScan Pro" title, date, settings button
-  - Stats row: Total Scans (24), Storage Used (48.3 MB), Last Scan (2h ago)
-  - Scan CTA: Large blue prominent button
-  - Quick Actions: Import Photo, Share Doc, New Folder, Cloud Backup (2×2 grid)
-  - Recent Scans: Horizontal scroll with 5 document cards
-- **History screen** (`app/(tabs)/history.tsx`):
-  - Search bar with live filtering
-  - Filter chips: All, PDF, JPG, PNG, DOCX, XLSX
-  - Sort modal: Latest, Oldest, A–Z, Z–A, Size
-  - List/Grid toggle (2-column grid)
-  - Empty state when no results
-- **DocumentCard component** (`components/DocumentCard.tsx`): Grid + List variants
-- **Theme hook** (`hooks/useTheme.ts`): Light/dark color palettes + shadows
-- **Mock data** (`data/mockDocuments.ts`): 12 sample documents (PDF, JPG, PNG, DOCX, XLSX)
+- **Root layout** + **Index redirect** + **Tab layout** (Dashboard + History)
+- **Dashboard screen**: greeting, real-time stats (API-driven), blue Scan CTA, Quick Actions, Recent Scans
+- **History screen**: search, filter chips, sort modal, list/grid toggle, empty state
+- **DocumentCard component**, **Theme hook** (auto dark/light), **Mock data** (12 docs)
+
+### Mar 5, 2026 — Camera + Gemini AI OCR
+- **Backend scan endpoint** (`POST /api/scan`): Gemini 2.0 Flash image analysis, multilingual OCR, structured JSON output for 18 document types
+- **Backend document CRUD** (`/api/documents`, `/api/stats`): MongoDB persistence, soft delete
+- **Scan screen** (`app/scan.tsx`): Full camera UI with scan frame, flash toggle, flip camera, gallery import
+- **Preview screen** (`app/preview.tsx`): AI analysis display, confidence bar, formatted output renderer (line-by-line parser), structured fields, entity extraction (dates/amounts/names), tags, Save/Discard actions
+- **Floating FAB** visible on all tabs (Dashboard + History)
+- **Dashboard**: now loads live stats + recent docs from API, wired scan buttons
+- **History**: loads real documents from MongoDB, pull-to-refresh, delete, thumbnail display
+- **scanStore utility**: singleton for passing large base64 image between scan→preview without URL params
+- **Packages**: expo-camera@17, expo-image-picker@17, expo-image-manipulator@14 (SDK 54 compatible)
+- **app.json**: Camera + photo library permissions for iOS/Android
 
 ## Prioritized Backlog
 
-### P0 (Core Functionality — Next)
-- Camera integration for actual document scanning
-- Image processing / edge detection UI
-- Save scanned documents to local storage / MongoDB
+### P0 (Requires user action — Gemini API Key)
+- User must add their own `GEMINI_API_KEY=<key>` to `/app/backend/.env` to use real scanning
+  - Currently uses `EMERGENT_LLM_KEY` as fallback (works with Emergent credits)
 
-### P1 (Important Features)
+### P1 (Important Features — Next)
 - Document detail screen (full-screen preview, rename, share, delete)
-- PDF export generation
-- Folder/category management
-- Cloud sync
+- Multi-page scan stitching (scan multiple pages → single document)
+- PDF export from scanned documents
+- Document sharing (native share sheet)
 
 ### P2 (Nice to Have)
-- OCR text extraction
-- Multi-page scan stitching
-- Dark mode polish + micro-animations
+- Folder/category management
+- Cloud sync
+- Offline mode with queue
 - Push notifications for backup reminders
 
 ## Next Tasks List
-1. Implement camera scanning screen (`app/scan.tsx`) with live viewfinder
-2. Add document detail/preview screen
-3. Connect to backend for persistence (MongoDB)
-4. Add document sharing + PDF export
+1. User to add `GEMINI_API_KEY=<your-google-key>` to `/app/backend/.env` to enable real scanning
+2. Build document detail/view screen
+3. Add PDF export
+4. Implement document sharing
