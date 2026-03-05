@@ -587,10 +587,18 @@ class APITester:
             self.test_create_document,
             self.test_get_document,
             self.test_update_document,
+            # New feature tests
+            self.test_password_protection,
+            self.test_comments,
+            self.test_signatures,
+            self.test_signature_request,
+            # Export tests
             self.test_export_pdf,
             self.test_export_txt,
             self.test_export_invalid_format,
+            # Error handling tests
             self.test_get_nonexistent_document,
+            # Cleanup
             self.test_delete_document
         ]
         
