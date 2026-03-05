@@ -1,84 +1,161 @@
 {
-  "timestamp": "2026-03-05T11:41:50.395139",
+  "timestamp": "2026-03-05T18:12:54.167915",
   "base_url": "https://gemini-scanner.preview.emergentagent.com/api",
   "overall_success": true,
   "results": [
     {
       "test": "Root Endpoint",
       "success": true,
-      "message": "API version: DocScan Pro API v3",
+      "message": "API version: DocScan Pro API v4 - with signatures, comments, and password protection",
       "details": {},
-      "timestamp": "2026-03-05T11:41:48.881600"
+      "timestamp": "2026-03-05T18:12:52.172366"
     },
     {
       "test": "Stats Endpoint",
       "success": true,
       "message": "Stats: 0 scans, 0 KB storage",
       "details": {},
-      "timestamp": "2026-03-05T11:41:48.943805"
+      "timestamp": "2026-03-05T18:12:52.266107"
     },
     {
       "test": "List Documents",
       "success": true,
       "message": "Retrieved 0 documents",
       "details": {},
-      "timestamp": "2026-03-05T11:41:49.004194"
+      "timestamp": "2026-03-05T18:12:52.337972"
     },
     {
       "test": "Create Document",
       "success": true,
-      "message": "Created document with ID: 0d1f74e9-6fac-4b92-a46c-567dd72c4f47",
+      "message": "Created document with ID: c884ec9b-7390-449d-8c2f-455d51ff5390",
       "details": {},
-      "timestamp": "2026-03-05T11:41:49.075648"
+      "timestamp": "2026-03-05T18:12:52.406688"
     },
     {
       "test": "Get Document",
       "success": true,
       "message": "Retrieved document: Sample Business Invoice #INV-2024-001",
       "details": {},
-      "timestamp": "2026-03-05T11:41:49.137865"
+      "timestamp": "2026-03-05T18:12:52.474407"
     },
     {
       "test": "Update Document",
       "success": true,
       "message": "Updated title to: Updated Business Invoice #INV-2024-001 [PAID]",
       "details": {},
-      "timestamp": "2026-03-05T11:41:49.192815"
+      "timestamp": "2026-03-05T18:12:52.531120"
+    },
+    {
+      "test": "Set Password",
+      "success": true,
+      "message": "Password set successfully",
+      "details": {},
+      "timestamp": "2026-03-05T18:12:52.618262"
+    },
+    {
+      "test": "Verify Correct Password",
+      "success": true,
+      "message": "Correct password verified",
+      "details": {},
+      "timestamp": "2026-03-05T18:12:52.680043"
+    },
+    {
+      "test": "Verify Wrong Password",
+      "success": true,
+      "message": "Wrong password correctly rejected (403)",
+      "details": {},
+      "timestamp": "2026-03-05T18:12:52.748659"
+    },
+    {
+      "test": "Add Comment",
+      "success": true,
+      "message": "Comment added with ID: b922ff1f-6461-4968-81a0-e299f4c72a55",
+      "details": {},
+      "timestamp": "2026-03-05T18:12:52.810348"
+    },
+    {
+      "test": "Verify Comment in Document",
+      "success": true,
+      "message": "Comment found in document",
+      "details": {},
+      "timestamp": "2026-03-05T18:12:52.872423"
+    },
+    {
+      "test": "Resolve Comment",
+      "success": true,
+      "message": "Comment resolved successfully",
+      "details": {},
+      "timestamp": "2026-03-05T18:12:52.935149"
+    },
+    {
+      "test": "Create Signature",
+      "success": true,
+      "message": "Signature created with ID: 1ae11d01-003d-4e84-b329-09961c32ef22",
+      "details": {},
+      "timestamp": "2026-03-05T18:12:53.022947"
+    },
+    {
+      "test": "List Signatures",
+      "success": true,
+      "message": "Signature found in list (1 total)",
+      "details": {},
+      "timestamp": "2026-03-05T18:12:53.084363"
+    },
+    {
+      "test": "Add Signature to Document",
+      "success": true,
+      "message": "Signature added to document",
+      "details": {},
+      "timestamp": "2026-03-05T18:12:53.144720"
+    },
+    {
+      "test": "Signature Request",
+      "success": true,
+      "message": "Signature request sent successfully",
+      "details": {},
+      "timestamp": "2026-03-05T18:12:53.211265"
     },
     {
       "test": "Export PDF",
       "success": true,
       "message": "PDF exported: Updated_Business_Invoice_INV-2024-001_PA.pdf (2713 bytes)",
       "details": {},
-      "timestamp": "2026-03-05T11:41:50.184047"
+      "timestamp": "2026-03-05T18:12:53.825181"
     },
     {
       "test": "Export TXT",
       "success": true,
       "message": "TXT exported: Updated_Business_Invoice_INV-2024-001_PA.txt (1066 chars)",
       "details": {},
-      "timestamp": "2026-03-05T11:41:50.238805"
+      "timestamp": "2026-03-05T18:12:53.894226"
     },
     {
       "test": "Export Invalid Format",
       "success": true,
       "message": "Correctly rejected invalid format",
       "details": {},
-      "timestamp": "2026-03-05T11:41:50.290590"
+      "timestamp": "2026-03-05T18:12:53.959374"
     },
     {
       "test": "Get Nonexistent Document",
       "success": true,
       "message": "Correctly returned 404 for invalid ID",
       "details": {},
-      "timestamp": "2026-03-05T11:41:50.343361"
+      "timestamp": "2026-03-05T18:12:54.019920"
     },
     {
       "test": "Delete Document",
       "success": true,
-      "message": "Document deleted: 0d1f74e9-6fac-4b92-a46c-567dd72c4f47",
+      "message": "Document deleted: c884ec9b-7390-449d-8c2f-455d51ff5390",
       "details": {},
-      "timestamp": "2026-03-05T11:41:50.395034"
+      "timestamp": "2026-03-05T18:12:54.103478"
+    },
+    {
+      "test": "Cleanup Signature",
+      "success": true,
+      "message": "Test signature deleted: 1ae11d01-003d-4e84-b329-09961c32ef22",
+      "details": {},
+      "timestamp": "2026-03-05T18:12:54.167805"
     }
   ]
 }
