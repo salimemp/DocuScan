@@ -1,15 +1,16 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Query, BackgroundTasks
+from fastapi import FastAPI, APIRouter, HTTPException, Query, BackgroundTasks, UploadFile, File
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-import os, logging, json, re, uuid, base64, io, hashlib, smtplib
+import os, logging, json, re, uuid, base64, io, hashlib, cv2, numpy as np
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any, Dict
 from datetime import datetime, timezone
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+import resend
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -18,17 +19,20 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+# Initialize Resend
+resend.api_key = os.environ.get('RESEND_API_KEY', '')
+
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# ── API Key ────────────────────────────────────────────────────────────────
+# ── Helpers ────────────────────────────────────────────────────────────────
 def get_api_key() -> str:
     key = os.environ.get('GEMINI_API_KEY') or os.environ.get('EMERGENT_LLM_KEY')
     if not key:
-        raise HTTPException(500, "No AI API key configured. Add GEMINI_API_KEY to backend/.env")
+        raise HTTPException(500, "No AI API key configured")
     return key
 
 def strip_b64_prefix(s: str) -> str:
@@ -38,16 +42,398 @@ def safe_latin(text: str) -> str:
     return str(text or '').encode('latin-1', errors='replace').decode('latin-1')
 
 def hash_password(password: str) -> str:
-    """Hash password with SHA-256"""
     return hashlib.sha256(password.encode()).hexdigest()
 
 def verify_password(password: str, hashed: str) -> bool:
-    """Verify password against hash"""
     return hash_password(password) == hashed
 
-# ── Models ────────────────────────────────────────────────────────────────
+def b64_to_cv2(b64_string: str) -> np.ndarray:
+    """Convert base64 to OpenCV image"""
+    img_data = base64.b64decode(strip_b64_prefix(b64_string))
+    nparr = np.frombuffer(img_data, np.uint8)
+    return cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-# Comment Model
+def cv2_to_b64(img: np.ndarray, fmt: str = 'JPEG') -> str:
+    """Convert OpenCV image to base64"""
+    _, buffer = cv2.imencode(f'.{fmt.lower()}', img)
+    return base64.b64encode(buffer).decode()
+
+def pil_to_b64(img: Image.Image, fmt: str = 'JPEG') -> str:
+    """Convert PIL image to base64"""
+    buf = io.BytesIO()
+    img.save(buf, format=fmt, quality=90)
+    return base64.b64encode(buf.getvalue()).decode()
+
+def b64_to_pil(b64_string: str) -> Image.Image:
+    """Convert base64 to PIL image"""
+    img_data = base64.b64decode(strip_b64_prefix(b64_string))
+    return Image.open(io.BytesIO(img_data))
+
+# ── Email Templates ────────────────────────────────────────────────────────
+def get_email_template(template_type: str, data: dict) -> tuple:
+    """Generate professional HTML email templates"""
+    
+    base_style = """
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background: #F3F4F6; }
+        .container { max-width: 600px; margin: 0 auto; background: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); padding: 32px; text-align: center; }
+        .header h1 { color: #FFFFFF; font-size: 24px; margin: 0; }
+        .header p { color: rgba(255,255,255,0.9); font-size: 14px; margin: 8px 0 0 0; }
+        .content { padding: 32px; }
+        .content h2 { color: #1F2937; font-size: 20px; margin: 0 0 16px 0; }
+        .content p { color: #4B5563; font-size: 15px; line-height: 1.6; margin: 0 0 16px 0; }
+        .btn { display: inline-block; background: #2563EB; color: #FFFFFF; text-decoration: none; padding: 14px 28px; border-radius: 10px; font-weight: 600; font-size: 15px; }
+        .btn:hover { background: #1D4ED8; }
+        .info-box { background: #F0F9FF; border-left: 4px solid #2563EB; padding: 16px; border-radius: 0 8px 8px 0; margin: 20px 0; }
+        .info-box p { margin: 0; color: #1E40AF; }
+        .footer { background: #F9FAFB; padding: 24px 32px; text-align: center; border-top: 1px solid #E5E7EB; }
+        .footer p { color: #9CA3AF; font-size: 12px; margin: 0; }
+        .document-card { background: #F9FAFB; border-radius: 12px; padding: 20px; margin: 20px 0; }
+        .document-card h3 { color: #1F2937; font-size: 16px; margin: 0 0 8px 0; }
+        .document-card span { color: #6B7280; font-size: 13px; }
+    </style>
+    """
+    
+    if template_type == 'signature_request':
+        subject = f"✍️ Signature Request: {data.get('document_title', 'Document')}"
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>{base_style}</head>
+        <body>
+            <div style="padding: 20px;">
+                <div class="container">
+                    <div class="header">
+                        <h1>📝 DocScan Pro</h1>
+                        <p>Signature Request</p>
+                    </div>
+                    <div class="content">
+                        <h2>Hello {data.get('signer_name', 'there')}!</h2>
+                        <p><strong>{data.get('requester_name', 'Someone')}</strong> has requested your signature on a document.</p>
+                        
+                        <div class="document-card">
+                            <h3>📄 {data.get('document_title', 'Untitled Document')}</h3>
+                            <span>Requested on {datetime.now().strftime('%B %d, %Y')}</span>
+                        </div>
+                        
+                        {f'<div class="info-box"><p><strong>Message:</strong> {data.get("message")}</p></div>' if data.get('message') else ''}
+                        
+                        <p>Please review and sign the document at your earliest convenience.</p>
+                        
+                        <p style="text-align: center; margin-top: 24px;">
+                            <a href="{data.get('action_url', '#')}" class="btn">Review & Sign Document</a>
+                        </p>
+                    </div>
+                    <div class="footer">
+                        <p>This email was sent by DocScan Pro on behalf of {data.get('requester_email', 'a user')}.</p>
+                        <p style="margin-top: 8px;">© {datetime.now().year} DocScan Pro. All rights reserved.</p>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        return subject, html
+    
+    elif template_type == 'comment_request':
+        subject = f"💬 Review Request: {data.get('document_title', 'Document')}"
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>{base_style}</head>
+        <body>
+            <div style="padding: 20px;">
+                <div class="container">
+                    <div class="header" style="background: linear-gradient(135deg, #059669 0%, #047857 100%);">
+                        <h1>📝 DocScan Pro</h1>
+                        <p>Review Request</p>
+                    </div>
+                    <div class="content">
+                        <h2>Hello {data.get('reviewer_name', 'there')}!</h2>
+                        <p><strong>{data.get('requester_name', 'Someone')}</strong> has requested your review and comments on a document.</p>
+                        
+                        <div class="document-card">
+                            <h3>📄 {data.get('document_title', 'Untitled Document')}</h3>
+                            <span>Review requested on {datetime.now().strftime('%B %d, %Y')}</span>
+                        </div>
+                        
+                        {f'<div class="info-box" style="border-color: #059669;"><p style="color: #047857;"><strong>Message:</strong> {data.get("message")}</p></div>' if data.get('message') else ''}
+                        
+                        <p>Please review the document and add your comments.</p>
+                        
+                        <p style="text-align: center; margin-top: 24px;">
+                            <a href="{data.get('action_url', '#')}" class="btn" style="background: #059669;">Review Document</a>
+                        </p>
+                    </div>
+                    <div class="footer">
+                        <p>This email was sent by DocScan Pro on behalf of {data.get('requester_email', 'a user')}.</p>
+                        <p style="margin-top: 8px;">© {datetime.now().year} DocScan Pro. All rights reserved.</p>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        return subject, html
+    
+    elif template_type == 'document_shared':
+        subject = f"📎 Document Shared: {data.get('document_title', 'Document')}"
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>{base_style}</head>
+        <body>
+            <div style="padding: 20px;">
+                <div class="container">
+                    <div class="header" style="background: linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%);">
+                        <h1>📝 DocScan Pro</h1>
+                        <p>Document Shared With You</p>
+                    </div>
+                    <div class="content">
+                        <h2>Hello {data.get('recipient_name', 'there')}!</h2>
+                        <p><strong>{data.get('sender_name', 'Someone')}</strong> has shared a document with you.</p>
+                        
+                        <div class="document-card">
+                            <h3>📄 {data.get('document_title', 'Untitled Document')}</h3>
+                            <span>Shared on {datetime.now().strftime('%B %d, %Y at %I:%M %p')}</span>
+                        </div>
+                        
+                        {f'<div class="info-box" style="border-color: #7C3AED;"><p style="color: #6D28D9;"><strong>Note:</strong> {data.get("message")}</p></div>' if data.get('message') else ''}
+                        
+                        <p style="text-align: center; margin-top: 24px;">
+                            <a href="{data.get('action_url', '#')}" class="btn" style="background: #7C3AED;">View Document</a>
+                        </p>
+                    </div>
+                    <div class="footer">
+                        <p>This email was sent by DocScan Pro on behalf of {data.get('sender_email', 'a user')}.</p>
+                        <p style="margin-top: 8px;">© {datetime.now().year} DocScan Pro. All rights reserved.</p>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        return subject, html
+    
+    return "DocScan Pro Notification", "<p>You have a new notification from DocScan Pro.</p>"
+
+async def send_email(to_email: str, template_type: str, data: dict):
+    """Send email using Resend"""
+    try:
+        subject, html = get_email_template(template_type, data)
+        
+        params = {
+            "from": "DocScan Pro <onboarding@resend.dev>",
+            "to": [to_email],
+            "subject": subject,
+            "html": html,
+        }
+        
+        email_response = resend.Emails.send(params)
+        logger.info(f"Email sent successfully to {to_email}: {email_response}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send email to {to_email}: {e}")
+        return False
+
+# ── Image Processing Functions ────────────────────────────────────────────
+def straighten_document(img: np.ndarray) -> np.ndarray:
+    """Auto-straighten/deskew a document image"""
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    gray = cv2.bitwise_not(gray)
+    
+    # Find coordinates of non-zero pixels
+    coords = np.column_stack(np.where(gray > 0))
+    
+    if len(coords) < 10:
+        return img
+    
+    # Get the minimum area rectangle
+    angle = cv2.minAreaRect(coords)[-1]
+    
+    if angle < -45:
+        angle = -(90 + angle)
+    else:
+        angle = -angle
+    
+    # Limit rotation to reasonable angles
+    if abs(angle) > 15:
+        angle = 0
+    
+    (h, w) = img.shape[:2]
+    center = (w // 2, h // 2)
+    M = cv2.getRotationMatrix2D(center, angle, 1.0)
+    rotated = cv2.warpAffine(img, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+    
+    return rotated
+
+def enhance_document(img: np.ndarray) -> np.ndarray:
+    """Enhance document image for better readability"""
+    # Convert to LAB color space
+    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    
+    # Apply CLAHE to L channel
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    cl = clahe.apply(l)
+    
+    # Merge channels
+    enhanced_lab = cv2.merge((cl, a, b))
+    enhanced = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2BGR)
+    
+    # Sharpen
+    kernel = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
+    enhanced = cv2.filter2D(enhanced, -1, kernel)
+    
+    return enhanced
+
+def detect_document_edges(img: np.ndarray) -> list:
+    """Detect document edges and return corner points"""
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    edges = cv2.Canny(blur, 50, 150)
+    
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
+    if not contours:
+        return []
+    
+    # Find the largest contour
+    largest = max(contours, key=cv2.contourArea)
+    
+    # Approximate the contour to a polygon
+    epsilon = 0.02 * cv2.arcLength(largest, True)
+    approx = cv2.approxPolyDP(largest, epsilon, True)
+    
+    if len(approx) == 4:
+        return approx.reshape(4, 2).tolist()
+    
+    return []
+
+def apply_perspective_transform(img: np.ndarray, points: list) -> np.ndarray:
+    """Apply perspective transform to flatten document"""
+    if len(points) != 4:
+        return img
+    
+    pts = np.array(points, dtype=np.float32)
+    
+    # Order points: top-left, top-right, bottom-right, bottom-left
+    rect = np.zeros((4, 2), dtype=np.float32)
+    s = pts.sum(axis=1)
+    rect[0] = pts[np.argmin(s)]
+    rect[2] = pts[np.argmax(s)]
+    diff = np.diff(pts, axis=1)
+    rect[1] = pts[np.argmin(diff)]
+    rect[3] = pts[np.argmax(diff)]
+    
+    # Calculate dimensions
+    width_a = np.linalg.norm(rect[2] - rect[3])
+    width_b = np.linalg.norm(rect[1] - rect[0])
+    max_width = max(int(width_a), int(width_b))
+    
+    height_a = np.linalg.norm(rect[1] - rect[2])
+    height_b = np.linalg.norm(rect[0] - rect[3])
+    max_height = max(int(height_a), int(height_b))
+    
+    dst = np.array([
+        [0, 0],
+        [max_width - 1, 0],
+        [max_width - 1, max_height - 1],
+        [0, max_height - 1]
+    ], dtype=np.float32)
+    
+    M = cv2.getPerspectiveTransform(rect, dst)
+    warped = cv2.warpPerspective(img, M, (max_width, max_height))
+    
+    return warped
+
+def add_watermark(img: Image.Image, text: str, opacity: float = 0.3) -> Image.Image:
+    """Add text watermark to image"""
+    watermark = Image.new('RGBA', img.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(watermark)
+    
+    # Calculate font size based on image size
+    font_size = min(img.size) // 10
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size)
+    except:
+        font = ImageFont.load_default()
+    
+    # Get text size
+    bbox = draw.textbbox((0, 0), text, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    
+    # Position diagonally across image
+    x = (img.size[0] - text_width) // 2
+    y = (img.size[1] - text_height) // 2
+    
+    # Draw text with opacity
+    alpha = int(255 * opacity)
+    draw.text((x, y), text, font=font, fill=(128, 128, 128, alpha))
+    
+    # Rotate watermark
+    watermark = watermark.rotate(45, expand=False, center=(img.size[0]//2, img.size[1]//2))
+    
+    # Composite
+    if img.mode != 'RGBA':
+        img = img.convert('RGBA')
+    
+    return Image.alpha_composite(img, watermark)
+
+def add_blur_region(img: Image.Image, x: int, y: int, width: int, height: int, intensity: int = 20) -> Image.Image:
+    """Blur a specific region of the image"""
+    # Crop the region
+    region = img.crop((x, y, x + width, y + height))
+    
+    # Apply blur
+    blurred = region.filter(ImageFilter.GaussianBlur(radius=intensity))
+    
+    # Paste back
+    result = img.copy()
+    result.paste(blurred, (x, y))
+    
+    return result
+
+# ── Models ────────────────────────────────────────────────────────────────
+class ScanRequest(BaseModel):
+    images: List[str]
+    mime_type: str = "image/jpeg"
+
+class ImageProcessRequest(BaseModel):
+    image: str  # base64
+    operations: List[str] = []  # ['straighten', 'enhance', 'detect_edges']
+
+class WatermarkRequest(BaseModel):
+    image: str
+    text: str
+    opacity: float = 0.3
+
+class BlurRequest(BaseModel):
+    image: str
+    x: int
+    y: int
+    width: int
+    height: int
+    intensity: int = 20
+
+class AIAssistantRequest(BaseModel):
+    document_id: Optional[str] = None
+    message: str
+    context: Optional[str] = None
+
+class CloudSyncRequest(BaseModel):
+    provider: str  # google_drive, dropbox, onedrive, box, icloud
+    action: str  # upload, download, list
+    document_id: Optional[str] = None
+    folder_path: Optional[str] = None
+
+class MeasurementRequest(BaseModel):
+    image: str
+    mode: str  # count, area
+    points: Optional[List[Dict[str, float]]] = None
+
 class Comment(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     author: str = "Anonymous"
@@ -66,13 +452,12 @@ class CommentReply(BaseModel):
     author: str = "Anonymous"
     content: str
 
-# Signature Model
 class Signature(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
-    image_base64: str  # SVG or PNG base64
+    image_base64: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    
+
 class SignatureCreate(BaseModel):
     name: str
     image_base64: str
@@ -80,10 +465,10 @@ class SignatureCreate(BaseModel):
 class SignaturePlacement(BaseModel):
     signature_id: str
     page: int = 0
-    x: float  # 0-100 percentage
-    y: float  # 0-100 percentage
-    width: float = 20  # percentage of page width
-    
+    x: float
+    y: float
+    width: float = 20
+
 class SignatureRequest(BaseModel):
     requester_name: str
     requester_email: str
@@ -91,16 +476,25 @@ class SignatureRequest(BaseModel):
     signer_name: str
     message: Optional[str] = None
 
-# Password Protection
+class CommentRequest(BaseModel):
+    requester_name: str
+    requester_email: str
+    reviewer_email: str
+    reviewer_name: str
+    message: Optional[str] = None
+
+class ShareDocumentRequest(BaseModel):
+    sender_name: str
+    sender_email: str
+    recipient_email: str
+    recipient_name: str
+    message: Optional[str] = None
+
 class PasswordSet(BaseModel):
     password: str
-    
+
 class PasswordVerify(BaseModel):
     password: str
-
-class ScanRequest(BaseModel):
-    images: List[str]
-    mime_type: str = "image/jpeg"
 
 class DocumentCreate(BaseModel):
     document_type: str = "general_document"
@@ -130,6 +524,7 @@ class DocumentUpdate(BaseModel):
     tags: Optional[List[str]] = None
     editor_data: Optional[List[Dict[str, Any]]] = None
     is_edited: Optional[bool] = None
+    pages_data: Optional[List[Dict[str, Any]]] = None
 
 class DocumentResponse(DocumentCreate):
     id: str
@@ -139,54 +534,40 @@ class DocumentResponse(DocumentCreate):
     comments: List[Dict[str, Any]] = []
     signatures: List[Dict[str, Any]] = []
     signature_requests: List[Dict[str, Any]] = []
+    pages_data: List[Dict[str, Any]] = []
 
 # ── Gemini Prompts ────────────────────────────────────────────────────────
 SYSTEM_PROMPT = """You are DocScan AI — a world-class multilingual document OCR and classification system.
-You support ALL world languages including Arabic (RTL), Chinese, Japanese, Korean, Hindi, Russian, Hebrew, Thai, Persian, and more.
-Extract ALL visible text EXACTLY as written — preserve the original language and script. Do NOT translate.
-Respond ONLY with a valid JSON object. No markdown, no code blocks — PURE JSON only."""
+You support ALL world languages. Extract ALL visible text EXACTLY as written — preserve the original language.
+Respond ONLY with valid JSON. No markdown, no code blocks."""
 
 USER_PROMPT = """Analyze this document image and extract ALL information.
+Identify the document_type: passport, national_id, drivers_license, invoice, receipt, business_card, contract, bank_statement, medical_record, prescription, handwritten_note, certificate, legal_document, academic_transcript, tax_document, insurance_document, utility_bill, general_document
 
-Identify the document_type (pick exactly one):
-passport, national_id, drivers_license, invoice, receipt, business_card, contract, bank_statement, medical_record, prescription, handwritten_note, certificate, legal_document, academic_transcript, tax_document, insurance_document, utility_bill, general_document
-
-Return ONLY valid JSON (no markdown, no code fences):
+Return ONLY valid JSON:
 {
   "document_type": "...",
   "document_subtype": "...",
   "detected_language": "...",
   "confidence": 0.0-1.0,
   "title": "...",
-  "structured_fields": {
-    // passport: surname, given_names, nationality, date_of_birth, gender, place_of_birth, date_of_issue, date_of_expiry, passport_number, issuing_country, mrz_line1, mrz_line2
-    // national_id: surname, given_names, date_of_birth, id_number, nationality, address, date_of_issue, date_of_expiry
-    // drivers_license: surname, given_names, date_of_birth, license_number, address, issue_date, expiry_date, categories, issuing_authority
-    // invoice: invoice_number, invoice_date, due_date, vendor_name, vendor_address, client_name, client_address, currency, line_items:[{description,quantity,unit_price,total}], subtotal, tax_rate, tax_amount, total_amount, payment_terms
-    // receipt: store_name, store_address, date, time, items:[{name,quantity,price}], subtotal, tax, total, payment_method, change
-    // business_card: full_name, job_title, company, email, phone_numbers:[...], address, website, social_media:{}
-    // contract: title, parties:[{name,role}], effective_date, expiry_date, governing_law, key_terms:[...], signature_date
-    // bank_statement: bank_name, account_holder, account_number, iban, statement_period, opening_balance, closing_balance, currency, transactions:[{date,description,debit,credit,balance}]
-    // medical_record/prescription: patient_name, date_of_birth, doctor_name, facility, date, diagnosis:[...], medications:[{name,dosage,frequency,duration}], instructions
-    // certificate: certificate_type, recipient_name, issuing_organization, date_issued, certificate_number, subject_matter
-    // academic_transcript: student_name, institution, degree, graduation_date, gpa, courses:[{name,grade,credits}]
-    // handwritten_note: full_transcription, detected_script, estimated_date
-    // tax_document: taxpayer_name, tax_id, tax_year, gross_income, taxable_income, tax_due, tax_paid, refund_amount
-    // insurance_document: policy_number, policy_holder, insurer, policy_type, coverage_amount, premium, start_date, end_date
-    // utility_bill: account_holder, account_number, service_address, billing_period, total_amount, due_date, service_provider
-    // general_document: all relevant key-value pairs
-  },
-  "formatted_output": "beautifully formatted multi-line string with document emoji header, ━━━ dividers, LABEL: value pairs, ▸ list items",
-  "tags": ["up to 8 lowercase tags"],
-  "raw_text": "all extracted text with newlines",
-  "summary": "1-2 sentence summary",
-  "extracted_dates": ["all dates found"],
-  "extracted_amounts": ["all monetary values with currency"],
-  "extracted_names": ["all person and organization names"]
+  "structured_fields": {...},
+  "formatted_output": "formatted text with sections",
+  "tags": ["tags"],
+  "raw_text": "all text",
+  "summary": "1-2 sentences",
+  "extracted_dates": ["dates"],
+  "extracted_amounts": ["amounts"],
+  "extracted_names": ["names"]
 }"""
 
+AI_ASSISTANT_PROMPT = """You are DocScan AI Assistant — a helpful document analysis assistant.
+You help users understand, analyze, summarize, and extract information from their documents.
+Be concise but thorough. If you need to reference specific parts of the document, quote them.
+Always be helpful and professional."""
+
 def get_multi_prompt(n: int) -> str:
-    return f"This document has {n} pages. Analyze ALL {n} pages together as one complete document, combining all information from every page.\n\n" + USER_PROMPT
+    return f"This document has {n} pages. Analyze ALL pages together.\n\n" + USER_PROMPT
 
 # ── Export Generators ─────────────────────────────────────────────────────
 def generate_pdf(doc: dict) -> bytes:
@@ -220,10 +601,8 @@ def generate_pdf(doc: dict) -> bytes:
     pdf.set_text_color(100, 100, 100)
     pdf.ln(2)
     lang = safe_latin(doc.get('detected_language', 'Unknown'))
-    subtype = safe_latin(doc.get('document_subtype') or type_label)
     conf = f"{int(doc.get('confidence', 0) * 100)}%"
     pdf.cell(65, 6, f"Language: {lang}")
-    pdf.cell(65, 6, f"Type: {subtype}")
     pdf.cell(0, 6, f"Confidence: {conf}", ln=True)
     y = pdf.get_y() + 3
     pdf.set_draw_color(37, 99, 235)
@@ -234,260 +613,85 @@ def generate_pdf(doc: dict) -> bytes:
         pdf.set_text_color(70, 70, 70)
         pdf.multi_cell(180, 6, safe_latin(doc['summary']))
         pdf.ln(4)
-    fields = {k: v for k, v in doc.get('structured_fields', {}).items()
-              if not isinstance(v, (dict, list)) and v is not None}
-    if fields:
-        pdf.set_font('Helvetica', 'B', 12)
-        pdf.set_text_color(37, 99, 235)
-        pdf.cell(0, 8, 'Document Fields', ln=True)
-        pdf.set_draw_color(180, 200, 240)
-        pdf.line(15, pdf.get_y(), 195, pdf.get_y())
-        pdf.ln(3)
-        pdf.set_text_color(30, 30, 30)
-        for key, val in fields.items():
-            pdf.set_font('Helvetica', 'B', 9)
-            pdf.set_text_color(90, 90, 90)
-            pdf.cell(55, 7, safe_latin(key.replace('_', ' ').title()) + ':')
-            pdf.set_font('Helvetica', '', 9)
-            pdf.set_text_color(30, 30, 30)
-            pdf.multi_cell(135, 7, safe_latin(str(val)))
     if doc.get('formatted_output'):
-        pdf.ln(4)
         pdf.set_font('Helvetica', 'B', 12)
         pdf.set_text_color(37, 99, 235)
         pdf.cell(0, 8, 'Extracted Content', ln=True)
-        pdf.set_draw_color(180, 200, 240)
-        pdf.line(15, pdf.get_y(), 195, pdf.get_y())
         pdf.ln(3)
         pdf.set_font('Courier', '', 8)
         pdf.set_text_color(40, 40, 40)
-        for line in doc['formatted_output'].split('\n'):
-            if re.match(r'^[━─=]+$', line.strip()):
-                pdf.set_draw_color(160, 160, 160)
-                pdf.line(15, pdf.get_y() + 2, 195, pdf.get_y() + 2)
-                pdf.ln(4)
-            elif line.strip():
+        for line in doc['formatted_output'].split('\n')[:100]:
+            if line.strip():
                 pdf.multi_cell(180, 5, safe_latin(line))
             else:
                 pdf.ln(2)
-    if doc.get('tags'):
-        pdf.ln(4)
-        pdf.set_font('Helvetica', 'B', 9)
-        pdf.set_text_color(37, 99, 235)
-        pdf.cell(15, 6, 'Tags:')
-        pdf.set_font('Helvetica', '', 9)
-        pdf.set_text_color(60, 60, 60)
-        pdf.multi_cell(165, 6, safe_latin(', '.join(f'#{t}' for t in doc['tags'])))
-    pdf.set_y(-22)
-    pdf.set_draw_color(200, 210, 230)
-    pdf.line(15, pdf.get_y(), 195, pdf.get_y())
-    pdf.set_font('Helvetica', 'I', 8)
-    pdf.set_text_color(150, 150, 150)
-    created = str(doc.get('created_at', ''))[:10]
-    pdf.cell(0, 8, safe_latin(f'Scanned with DocScan Pro on {created}'), align='C')
     return bytes(pdf.output())
-
-
-def generate_docx(doc: dict) -> bytes:
-    from docx import Document as DocxDoc
-    from docx.shared import Pt, RGBColor
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
-    d = DocxDoc()
-    h = d.add_heading(doc.get('title', 'Untitled Document'), 0)
-    h.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    if h.runs:
-        h.runs[0].font.color.rgb = RGBColor(37, 99, 235)
-    p = d.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p.add_run(
-        f"Type: {doc.get('document_type','').replace('_',' ').title()} | "
-        f"Language: {doc.get('detected_language','Unknown')} | "
-        f"Confidence: {int(doc.get('confidence',0)*100)}%"
-    )
-    run.font.size = Pt(9)
-    run.font.color.rgb = RGBColor(100, 100, 100)
-    d.add_paragraph()
-    if doc.get('summary'):
-        p = d.add_paragraph(doc['summary'])
-        p.runs[0].italic = True
-        d.add_paragraph()
-    fields = {k: v for k, v in doc.get('structured_fields', {}).items()
-              if not isinstance(v, (dict, list)) and v is not None}
-    if fields:
-        d.add_heading('Document Fields', 1)
-        table = d.add_table(rows=0, cols=2)
-        table.style = 'Table Grid'
-        for key, val in fields.items():
-            row = table.add_row()
-            r = row.cells[0].paragraphs[0].add_run(key.replace('_', ' ').title() + ':')
-            r.bold = True
-            r.font.color.rgb = RGBColor(90, 90, 90)
-            row.cells[1].paragraphs[0].add_run(str(val) if val else '—')
-        d.add_paragraph()
-    if doc.get('formatted_output'):
-        d.add_heading('Extracted Content', 1)
-        for line in doc['formatted_output'].split('\n'):
-            if re.match(r'^[━─=]+$', line.strip()):
-                d.add_paragraph('─' * 50)
-            elif re.match(r'^(.+):\s+(.+)$', line.strip()):
-                m = re.match(r'^(.+):\s+(.+)$', line.strip())
-                p2 = d.add_paragraph()
-                p2.add_run(m.group(1) + ': ').bold = True
-                p2.add_run(m.group(2))
-            elif line.strip():
-                d.add_paragraph(line)
-    if doc.get('tags'):
-        d.add_heading('Tags', 2)
-        d.add_paragraph(', '.join(f'#{t}' for t in doc['tags']))
-    buf = io.BytesIO()
-    d.save(buf)
-    return buf.getvalue()
-
-
-def generate_pptx(doc: dict) -> bytes:
-    from pptx import Presentation
-    from pptx.util import Inches, Pt
-    from pptx.dml.color import RGBColor as PptxRGB
-    BLUE = PptxRGB(37, 99, 235)
-    prs = Presentation()
-    prs.slide_width = Inches(13.33)
-    prs.slide_height = Inches(7.5)
-
-    def add_title_slide(title, subtitle):
-        sl = prs.slides.add_slide(prs.slide_layouts[0])
-        sl.shapes.title.text = title
-        for run in sl.shapes.title.text_frame.paragraphs[0].runs:
-            run.font.color.rgb = BLUE
-            run.font.size = Pt(36)
-        sl.placeholders[1].text = subtitle
-        return sl
-
-    def add_content_slide(heading, body_text):
-        sl = prs.slides.add_slide(prs.slide_layouts[1])
-        sl.shapes.title.text = heading
-        for run in sl.shapes.title.text_frame.paragraphs[0].runs:
-            run.font.color.rgb = BLUE
-        sl.placeholders[1].text = body_text[:2000]
-        return sl
-
-    add_title_slide(
-        doc.get('title', 'Document'),
-        f"{doc.get('document_type','').replace('_',' ').title()} | "
-        f"{doc.get('detected_language','Unknown')} | "
-        f"Confidence: {int(doc.get('confidence',0)*100)}%"
-    )
-    if doc.get('summary'):
-        add_content_slide('Summary', doc['summary'])
-    fields = [(k, str(v)) for k, v in doc.get('structured_fields', {}).items()
-              if not isinstance(v, (dict, list)) and v is not None]
-    for i in range(0, len(fields), 10):
-        chunk = fields[i:i + 10]
-        body = '\n'.join(f"{k.replace('_',' ').title()}: {v}" for k, v in chunk)
-        add_content_slide('Document Fields', body)
-    if doc.get('formatted_output'):
-        lines = [l for l in doc['formatted_output'].split('\n') if l.strip()]
-        for i in range(0, min(len(lines), 40), 15):
-            add_content_slide('Extracted Content', '\n'.join(lines[i:i + 15]))
-    if doc.get('tags'):
-        add_content_slide('Tags', ' • '.join(f'#{t}' for t in doc['tags']))
-    buf = io.BytesIO()
-    prs.save(buf)
-    return buf.getvalue()
-
-
-def generate_image_export(doc: dict, fmt: str) -> bytes:
-    from PIL import Image, ImageDraw
-    W, H = 900, 1200
-    img = Image.new('RGB', (W, H), color=(255, 255, 255))
-    draw = ImageDraw.Draw(img)
-    draw.rectangle([0, 0, W, 70], fill=(37, 99, 235))
-    type_label = doc.get('document_type', 'document').replace('_', ' ').upper()
-    draw.text((W // 2, 35), f'DocScan Pro  |  {type_label}', fill=(255, 255, 255), anchor='mm')
-    draw.text((W // 2, 100), (doc.get('title', '') or '')[:70], fill=(20, 20, 20), anchor='mt')
-    draw.line([40, 130, W - 40, 130], fill=(37, 99, 235), width=2)
-    y = 150
-    meta = (f"Language: {doc.get('detected_language','Unknown')}   |   "
-            f"Confidence: {int(doc.get('confidence',0)*100)}%")
-    draw.text((40, y), meta, fill=(100, 100, 100))
-    y += 35
-    fields = {k: v for k, v in doc.get('structured_fields', {}).items()
-              if not isinstance(v, (dict, list)) and v is not None}
-    for key, val in list(fields.items())[:18]:
-        label = key.replace('_', ' ').title() + ':'
-        value = str(val)[:55] if val else '—'
-        draw.text((40, y), label, fill=(100, 100, 100))
-        draw.text((260, y), value, fill=(30, 30, 30))
-        y += 24
-        if y > H - 120:
-            break
-    draw.line([40, H - 50, W - 40, H - 50], fill=(200, 200, 200), width=1)
-    draw.text((W // 2, H - 25), 'Generated by DocScan Pro', fill=(150, 150, 150), anchor='mm')
-    buf = io.BytesIO()
-    quality_kwargs = {'quality': 92} if fmt.upper() == 'JPEG' else {}
-    img.save(buf, format=fmt.upper(), **quality_kwargs)
-    return buf.getvalue()
-
 
 def generate_txt(doc: dict) -> bytes:
     lines = ['DocScan Pro — Document Export', '=' * 60,
              f"Title:      {doc.get('title', '')}",
              f"Type:       {doc.get('document_type', '').replace('_', ' ').title()}",
-             f"Subtype:    {doc.get('document_subtype', '')}",
              f"Language:   {doc.get('detected_language', '')}",
-             f"Confidence: {int(doc.get('confidence', 0) * 100)}%",
-             f"Pages:      {doc.get('pages_count', 1)}",
-             '']
+             f"Confidence: {int(doc.get('confidence', 0) * 100)}%", '']
     if doc.get('summary'):
         lines += ['SUMMARY', '-' * 40, doc['summary'], '']
-    fields = {k: v for k, v in doc.get('structured_fields', {}).items()
-              if not isinstance(v, (dict, list))}
-    if fields:
-        lines += ['DOCUMENT FIELDS', '-' * 40]
-        for k, v in fields.items():
-            lines.append(f"{k.replace('_', ' ').title():<30} {v}")
-        lines.append('')
     if doc.get('formatted_output'):
-        lines += ['EXTRACTED CONTENT', '-' * 40, doc['formatted_output'], '']
-    if doc.get('raw_text'):
-        lines += ['RAW TEXT', '-' * 40, doc['raw_text'], '']
-    if doc.get('tags'):
-        lines += ['TAGS', ', '.join(f'#{t}' for t in doc['tags'])]
+        lines += ['CONTENT', '-' * 40, doc['formatted_output'], '']
     return '\n'.join(lines).encode('utf-8')
 
-# ── Email Helper ─────────────────────────────────────────────────────────
-async def send_signature_request_email(
-    requester_name: str,
-    requester_email: str,
-    signer_email: str,
-    signer_name: str,
-    document_title: str,
-    document_id: str,
-    message: Optional[str] = None
-):
-    """Send signature request email (placeholder - needs SMTP config)"""
-    # In production, configure SMTP settings
-    logger.info(f"Signature request: {requester_name} ({requester_email}) requesting signature from {signer_name} ({signer_email}) for document: {document_title}")
-    # Return success - actual email sending would require SMTP configuration
-    return True
+def generate_docx(doc: dict) -> bytes:
+    from docx import Document as DocxDoc
+    d = DocxDoc()
+    d.add_heading(doc.get('title', 'Untitled'), 0)
+    if doc.get('summary'):
+        p = d.add_paragraph(doc['summary'])
+        p.runs[0].italic = True
+    if doc.get('formatted_output'):
+        d.add_heading('Content', 1)
+        for line in doc['formatted_output'].split('\n'):
+            if line.strip():
+                d.add_paragraph(line)
+    buf = io.BytesIO()
+    d.save(buf)
+    return buf.getvalue()
 
-async def send_comment_request_email(
-    requester_name: str,
-    requester_email: str,
-    reviewer_email: str,
-    reviewer_name: str,
-    document_title: str,
-    document_id: str,
-    message: Optional[str] = None
-):
-    """Send comment request email (placeholder - needs SMTP config)"""
-    logger.info(f"Comment request: {requester_name} ({requester_email}) requesting comment from {reviewer_name} ({reviewer_email}) for document: {document_title}")
-    return True
+def generate_pptx(doc: dict) -> bytes:
+    from pptx import Presentation
+    from pptx.util import Inches
+    prs = Presentation()
+    sl = prs.slides.add_slide(prs.slide_layouts[0])
+    sl.shapes.title.text = doc.get('title', 'Document')
+    sl.placeholders[1].text = doc.get('summary', '')
+    if doc.get('formatted_output'):
+        sl2 = prs.slides.add_slide(prs.slide_layouts[1])
+        sl2.shapes.title.text = 'Content'
+        sl2.placeholders[1].text = doc['formatted_output'][:2000]
+    buf = io.BytesIO()
+    prs.save(buf)
+    return buf.getvalue()
+
+def generate_image_export(doc: dict, fmt: str) -> bytes:
+    W, H = 900, 1200
+    img = Image.new('RGB', (W, H), color=(255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([0, 0, W, 70], fill=(37, 99, 235))
+    draw.text((W // 2, 35), 'DocScan Pro', fill=(255, 255, 255), anchor='mm')
+    draw.text((W // 2, 100), (doc.get('title', '') or '')[:70], fill=(20, 20, 20), anchor='mt')
+    y = 150
+    if doc.get('formatted_output'):
+        for line in doc['formatted_output'].split('\n')[:30]:
+            draw.text((40, y), line[:80], fill=(60, 60, 60))
+            y += 20
+            if y > H - 100:
+                break
+    buf = io.BytesIO()
+    img.save(buf, format=fmt.upper(), quality=92 if fmt.upper() == 'JPEG' else None)
+    return buf.getvalue()
 
 # ── Routes ────────────────────────────────────────────────────────────────
 @api_router.get("/")
 async def root():
-    return {"message": "DocScan Pro API v4 - with signatures, comments, and password protection"}
-
+    return {"message": "DocScan Pro API v5 - Full Featured Document Management"}
 
 @api_router.post("/scan")
 async def scan_document(request: ScanRequest):
@@ -495,11 +699,7 @@ async def scan_document(request: ScanRequest):
     images = [strip_b64_prefix(img) for img in request.images]
     n = len(images)
     try:
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=str(uuid.uuid4()),
-            system_message=SYSTEM_PROMPT
-        ).with_model("gemini", "gemini-2.0-flash")
+        chat = LlmChat(api_key=api_key, session_id=str(uuid.uuid4()), system_message=SYSTEM_PROMPT).with_model("gemini", "gemini-2.0-flash")
         file_contents = [ImageContent(image_base64=img) for img in images]
         prompt = get_multi_prompt(n) if n > 1 else USER_PROMPT
         response = await chat.send_message(UserMessage(text=prompt, file_contents=file_contents))
@@ -519,32 +719,226 @@ async def scan_document(request: ScanRequest):
         logger.error(f"Scan error: {e}")
         raise HTTPException(500, f"AI analysis failed: {str(e)}")
 
+# ── Image Processing Routes ────────────────────────────────────────────────
+@api_router.post("/process-image")
+async def process_image(request: ImageProcessRequest):
+    """Process image with various operations"""
+    try:
+        img = b64_to_cv2(request.image)
+        
+        for op in request.operations:
+            if op == 'straighten':
+                img = straighten_document(img)
+            elif op == 'enhance':
+                img = enhance_document(img)
+        
+        result_b64 = cv2_to_b64(img)
+        
+        edges = []
+        if 'detect_edges' in request.operations:
+            edges = detect_document_edges(img)
+        
+        return {
+            "image": result_b64,
+            "edges": edges
+        }
+    except Exception as e:
+        logger.error(f"Image processing error: {e}")
+        raise HTTPException(500, f"Image processing failed: {str(e)}")
 
+@api_router.post("/perspective-transform")
+async def perspective_transform(image: str, points: List[List[float]]):
+    """Apply perspective transform to flatten document"""
+    try:
+        img = b64_to_cv2(image)
+        transformed = apply_perspective_transform(img, points)
+        return {"image": cv2_to_b64(transformed)}
+    except Exception as e:
+        raise HTTPException(500, f"Transform failed: {str(e)}")
+
+@api_router.post("/add-watermark")
+async def add_watermark_route(request: WatermarkRequest):
+    """Add watermark to image"""
+    try:
+        img = b64_to_pil(request.image)
+        result = add_watermark(img, request.text, request.opacity)
+        return {"image": pil_to_b64(result.convert('RGB'))}
+    except Exception as e:
+        raise HTTPException(500, f"Watermark failed: {str(e)}")
+
+@api_router.post("/add-blur")
+async def add_blur_route(request: BlurRequest):
+    """Blur a region of the image"""
+    try:
+        img = b64_to_pil(request.image)
+        result = add_blur_region(img, request.x, request.y, request.width, request.height, request.intensity)
+        return {"image": pil_to_b64(result)}
+    except Exception as e:
+        raise HTTPException(500, f"Blur failed: {str(e)}")
+
+# ── AI Assistant Route ─────────────────────────────────────────────────────
+@api_router.post("/ai-assistant")
+async def ai_assistant(request: AIAssistantRequest):
+    """AI assistant for document questions"""
+    api_key = get_api_key()
+    
+    context = request.context or ""
+    
+    # If document_id provided, fetch document context
+    if request.document_id:
+        doc = await db.documents.find_one({"id": request.document_id})
+        if doc:
+            context = f"Document: {doc.get('title', 'Untitled')}\nType: {doc.get('document_type', 'Unknown')}\nContent: {doc.get('formatted_output', '')[:2000]}\n\n"
+    
+    try:
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=str(uuid.uuid4()),
+            system_message=AI_ASSISTANT_PROMPT
+        ).with_model("gemini", "gemini-2.0-flash")
+        
+        full_message = f"{context}User question: {request.message}"
+        response = await chat.send_message(UserMessage(text=full_message))
+        
+        return {"response": response}
+    except Exception as e:
+        logger.error(f"AI Assistant error: {e}")
+        raise HTTPException(500, f"AI Assistant failed: {str(e)}")
+
+# ── OCR Text Recognition ───────────────────────────────────────────────────
+@api_router.post("/recognize-text")
+async def recognize_text(image: str = "", region: Optional[Dict[str, int]] = None):
+    """Recognize text in image or specific region using AI"""
+    api_key = get_api_key()
+    
+    try:
+        img_data = strip_b64_prefix(image)
+        
+        # If region specified, crop the image
+        if region:
+            pil_img = b64_to_pil(image)
+            cropped = pil_img.crop((region['x'], region['y'], region['x'] + region['width'], region['y'] + region['height']))
+            buf = io.BytesIO()
+            cropped.save(buf, format='JPEG', quality=90)
+            img_data = base64.b64encode(buf.getvalue()).decode()
+        
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=str(uuid.uuid4()),
+            system_message="Extract all text from this image exactly as shown. Return only the text, no formatting."
+        ).with_model("gemini", "gemini-2.0-flash")
+        
+        response = await chat.send_message(UserMessage(
+            text="Extract all text from this image:",
+            file_contents=[ImageContent(image_base64=img_data)]
+        ))
+        
+        return {"text": response}
+    except Exception as e:
+        raise HTTPException(500, f"Text recognition failed: {str(e)}")
+
+# ── Measurement Modes ──────────────────────────────────────────────────────
+@api_router.post("/measure")
+async def measure(request: MeasurementRequest):
+    """Count objects or measure areas in document"""
+    api_key = get_api_key()
+    
+    try:
+        if request.mode == 'count':
+            # Use AI to count items
+            chat = LlmChat(
+                api_key=api_key,
+                session_id=str(uuid.uuid4()),
+                system_message="You are a counting assistant. Count the specified items in images."
+            ).with_model("gemini", "gemini-2.0-flash")
+            
+            response = await chat.send_message(UserMessage(
+                text="Count all distinct items/objects in this image. Return JSON: {\"count\": number, \"items\": [list of items]}",
+                file_contents=[ImageContent(image_base64=strip_b64_prefix(request.image))]
+            ))
+            
+            try:
+                result = json.loads(response)
+            except:
+                result = {"count": 0, "raw_response": response}
+            
+            return result
+            
+        elif request.mode == 'area':
+            # Calculate area from points
+            if request.points and len(request.points) >= 3:
+                # Shoelace formula for polygon area
+                n = len(request.points)
+                area = 0.0
+                for i in range(n):
+                    j = (i + 1) % n
+                    area += request.points[i]['x'] * request.points[j]['y']
+                    area -= request.points[j]['x'] * request.points[i]['y']
+                area = abs(area) / 2.0
+                return {"area_pixels": area, "points": request.points}
+            
+            return {"error": "Need at least 3 points for area calculation"}
+        
+        return {"error": f"Unknown mode: {request.mode}"}
+    except Exception as e:
+        raise HTTPException(500, f"Measurement failed: {str(e)}")
+
+# ── Cloud Storage Routes ───────────────────────────────────────────────────
+@api_router.post("/cloud/connect")
+async def cloud_connect(provider: str):
+    """Get OAuth URL for cloud provider"""
+    # This would normally return OAuth URLs for each provider
+    providers = {
+        'google_drive': {'name': 'Google Drive', 'icon': 'logo-google'},
+        'dropbox': {'name': 'Dropbox', 'icon': 'cloud-outline'},
+        'onedrive': {'name': 'OneDrive', 'icon': 'logo-microsoft'},
+        'box': {'name': 'Box', 'icon': 'cube-outline'},
+        'icloud': {'name': 'iCloud', 'icon': 'logo-apple'},
+    }
+    
+    if provider not in providers:
+        raise HTTPException(400, f"Unknown provider: {provider}")
+    
+    # In production, return actual OAuth URL
+    return {
+        "provider": provider,
+        "auth_url": f"https://oauth.{provider}.com/authorize",
+        "status": "oauth_required"
+    }
+
+@api_router.get("/cloud/providers")
+async def list_cloud_providers():
+    """List available cloud storage providers"""
+    return {
+        "providers": [
+            {"id": "google_drive", "name": "Google Drive", "icon": "logo-google", "connected": False},
+            {"id": "dropbox", "name": "Dropbox", "icon": "cloud-outline", "connected": False},
+            {"id": "onedrive", "name": "OneDrive", "icon": "logo-microsoft", "connected": False},
+            {"id": "box", "name": "Box", "icon": "cube-outline", "connected": False},
+            {"id": "icloud", "name": "iCloud", "icon": "logo-apple", "connected": False},
+        ]
+    }
+
+# ── Document CRUD ──────────────────────────────────────────────────────────
 @api_router.post("/documents", response_model=DocumentResponse)
 async def create_document(doc: DocumentCreate):
     doc_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
     size_kb = round(len(doc.image_thumbnail or '') * 3 / 4 / 1024, 1)
     doc_dict = {
-        "id": doc_id,
-        "created_at": now,
-        "size_kb": size_kb,
-        "is_locked": False,
-        "password_hash": None,
-        "comments": [],
-        "signatures": [],
-        "signature_requests": [],
+        "id": doc_id, "created_at": now, "size_kb": size_kb,
+        "is_locked": False, "password_hash": None,
+        "comments": [], "signatures": [], "signature_requests": [],
+        "pages_data": [],
         **doc.dict()
     }
     await db.documents.insert_one(doc_dict)
     return DocumentResponse(**{k: v for k, v in doc_dict.items() if k != 'password_hash'})
 
-
 @api_router.get("/documents", response_model=List[DocumentResponse])
 async def list_documents():
     docs = await db.documents.find({}, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(500)
     return [DocumentResponse(**d) for d in docs]
-
 
 @api_router.get("/documents/{doc_id}", response_model=DocumentResponse)
 async def get_document(doc_id: str):
@@ -552,7 +946,6 @@ async def get_document(doc_id: str):
     if not doc:
         raise HTTPException(404, "Document not found")
     return DocumentResponse(**doc)
-
 
 @api_router.put("/documents/{doc_id}", response_model=DocumentResponse)
 async def update_document(doc_id: str, updates: DocumentUpdate):
@@ -565,7 +958,6 @@ async def update_document(doc_id: str, updates: DocumentUpdate):
     updated = await db.documents.find_one({"id": doc_id}, {"_id": 0, "password_hash": 0})
     return DocumentResponse(**updated)
 
-
 @api_router.delete("/documents/{doc_id}")
 async def delete_document(doc_id: str):
     result = await db.documents.delete_one({"id": doc_id})
@@ -573,64 +965,43 @@ async def delete_document(doc_id: str):
         raise HTTPException(404, "Document not found")
     return {"message": "Deleted"}
 
-
-# ── Password Protection Routes ────────────────────────────────────────────
+# ── Password Protection ────────────────────────────────────────────────────
 @api_router.post("/documents/{doc_id}/password")
 async def set_document_password(doc_id: str, data: PasswordSet):
-    """Set or update password for a document"""
     doc = await db.documents.find_one({"id": doc_id})
     if not doc:
         raise HTTPException(404, "Document not found")
-    
     password_hash = hash_password(data.password)
-    await db.documents.update_one(
-        {"id": doc_id},
-        {"$set": {"password_hash": password_hash, "is_locked": True}}
-    )
-    return {"message": "Password set successfully", "is_locked": True}
-
+    await db.documents.update_one({"id": doc_id}, {"$set": {"password_hash": password_hash, "is_locked": True}})
+    return {"message": "Password set", "is_locked": True}
 
 @api_router.post("/documents/{doc_id}/verify-password")
 async def verify_document_password(doc_id: str, data: PasswordVerify):
-    """Verify password for a locked document"""
     doc = await db.documents.find_one({"id": doc_id})
     if not doc:
         raise HTTPException(404, "Document not found")
-    
     if not doc.get('is_locked') or not doc.get('password_hash'):
-        return {"verified": True, "message": "Document is not locked"}
-    
+        return {"verified": True}
     if verify_password(data.password, doc['password_hash']):
-        return {"verified": True, "message": "Password correct"}
-    else:
-        raise HTTPException(403, "Incorrect password")
-
+        return {"verified": True}
+    raise HTTPException(403, "Incorrect password")
 
 @api_router.delete("/documents/{doc_id}/password")
 async def remove_document_password(doc_id: str, data: PasswordVerify):
-    """Remove password protection from a document"""
     doc = await db.documents.find_one({"id": doc_id})
     if not doc:
         raise HTTPException(404, "Document not found")
-    
     if doc.get('password_hash') and not verify_password(data.password, doc['password_hash']):
         raise HTTPException(403, "Incorrect password")
-    
-    await db.documents.update_one(
-        {"id": doc_id},
-        {"$set": {"password_hash": None, "is_locked": False}}
-    )
+    await db.documents.update_one({"id": doc_id}, {"$set": {"password_hash": None, "is_locked": False}})
     return {"message": "Password removed", "is_locked": False}
 
-
-# ── Comments Routes ────────────────────────────────────────────────────────
+# ── Comments ───────────────────────────────────────────────────────────────
 @api_router.post("/documents/{doc_id}/comments")
 async def add_comment(doc_id: str, comment: CommentCreate):
-    """Add a comment to a document"""
     doc = await db.documents.find_one({"id": doc_id})
     if not doc:
         raise HTTPException(404, "Document not found")
-    
     new_comment = {
         "id": str(uuid.uuid4()),
         "author": comment.author,
@@ -640,114 +1011,68 @@ async def add_comment(doc_id: str, comment: CommentCreate):
         "resolved": False,
         "replies": []
     }
-    
-    await db.documents.update_one(
-        {"id": doc_id},
-        {"$push": {"comments": new_comment}}
-    )
+    await db.documents.update_one({"id": doc_id}, {"$push": {"comments": new_comment}})
     return {"message": "Comment added", "comment": new_comment}
-
 
 @api_router.post("/documents/{doc_id}/comments/{comment_id}/reply")
 async def reply_to_comment(doc_id: str, comment_id: str, reply: CommentReply):
-    """Reply to a comment"""
-    doc = await db.documents.find_one({"id": doc_id})
-    if not doc:
-        raise HTTPException(404, "Document not found")
-    
     new_reply = {
         "id": str(uuid.uuid4()),
         "author": reply.author,
         "content": reply.content,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    
     result = await db.documents.update_one(
         {"id": doc_id, "comments.id": comment_id},
         {"$push": {"comments.$.replies": new_reply}}
     )
-    
     if result.modified_count == 0:
         raise HTTPException(404, "Comment not found")
-    
     return {"message": "Reply added", "reply": new_reply}
-
 
 @api_router.put("/documents/{doc_id}/comments/{comment_id}/resolve")
 async def resolve_comment(doc_id: str, comment_id: str):
-    """Mark a comment as resolved"""
     result = await db.documents.update_one(
         {"id": doc_id, "comments.id": comment_id},
         {"$set": {"comments.$.resolved": True}}
     )
-    
     if result.modified_count == 0:
         raise HTTPException(404, "Comment not found")
-    
     return {"message": "Comment resolved"}
-
 
 @api_router.delete("/documents/{doc_id}/comments/{comment_id}")
 async def delete_comment(doc_id: str, comment_id: str):
-    """Delete a comment"""
-    result = await db.documents.update_one(
-        {"id": doc_id},
-        {"$pull": {"comments": {"id": comment_id}}}
-    )
-    
+    result = await db.documents.update_one({"id": doc_id}, {"$pull": {"comments": {"id": comment_id}}})
     if result.modified_count == 0:
         raise HTTPException(404, "Comment not found")
-    
     return {"message": "Comment deleted"}
-
-
-class CommentRequest(BaseModel):
-    requester_name: str
-    requester_email: str
-    reviewer_email: str
-    reviewer_name: str
-    message: Optional[str] = None
-
 
 @api_router.post("/documents/{doc_id}/request-comment")
 async def request_comment(doc_id: str, request: CommentRequest, background_tasks: BackgroundTasks):
-    """Request a comment from someone via email"""
     doc = await db.documents.find_one({"id": doc_id})
     if not doc:
         raise HTTPException(404, "Document not found")
     
-    # Add to pending requests
-    comment_request = {
-        "id": str(uuid.uuid4()),
-        "type": "comment",
-        "requester_name": request.requester_name,
-        "requester_email": request.requester_email,
-        "reviewer_email": request.reviewer_email,
-        "reviewer_name": request.reviewer_name,
-        "message": request.message,
-        "status": "pending",
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    
-    # Send email in background
+    # Send email via Resend
     background_tasks.add_task(
-        send_comment_request_email,
-        request.requester_name,
-        request.requester_email,
+        send_email,
         request.reviewer_email,
-        request.reviewer_name,
-        doc.get('title', 'Untitled'),
-        doc_id,
-        request.message
+        'comment_request',
+        {
+            'reviewer_name': request.reviewer_name,
+            'requester_name': request.requester_name,
+            'requester_email': request.requester_email,
+            'document_title': doc.get('title', 'Untitled'),
+            'message': request.message,
+            'action_url': f"https://docscan.app/document/{doc_id}"
+        }
     )
     
-    return {"message": "Comment request sent", "request_id": comment_request['id']}
+    return {"message": f"Comment request sent to {request.reviewer_email}"}
 
-
-# ── Signatures Routes ────────────────────────────────────────────────────────
+# ── Signatures ─────────────────────────────────────────────────────────────
 @api_router.post("/signatures")
 async def create_signature(signature: SignatureCreate):
-    """Create and save a signature"""
     sig_id = str(uuid.uuid4())
     sig_data = {
         "id": sig_id,
@@ -758,35 +1083,26 @@ async def create_signature(signature: SignatureCreate):
     await db.signatures.insert_one(sig_data)
     return {"message": "Signature saved", "signature": {k: v for k, v in sig_data.items() if k != '_id'}}
 
-
 @api_router.get("/signatures")
 async def list_signatures():
-    """List all saved signatures"""
     sigs = await db.signatures.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
     return sigs
 
-
 @api_router.delete("/signatures/{sig_id}")
 async def delete_signature(sig_id: str):
-    """Delete a signature"""
     result = await db.signatures.delete_one({"id": sig_id})
     if result.deleted_count == 0:
         raise HTTPException(404, "Signature not found")
     return {"message": "Signature deleted"}
 
-
 @api_router.post("/documents/{doc_id}/signatures")
 async def add_signature_to_document(doc_id: str, placement: SignaturePlacement):
-    """Add a signature to a document"""
     doc = await db.documents.find_one({"id": doc_id})
     if not doc:
         raise HTTPException(404, "Document not found")
-    
-    # Get signature
     sig = await db.signatures.find_one({"id": placement.signature_id})
     if not sig:
         raise HTTPException(404, "Signature not found")
-    
     sig_placement = {
         "id": str(uuid.uuid4()),
         "signature_id": placement.signature_id,
@@ -798,32 +1114,18 @@ async def add_signature_to_document(doc_id: str, placement: SignaturePlacement):
         "width": placement.width,
         "placed_at": datetime.now(timezone.utc).isoformat()
     }
-    
-    await db.documents.update_one(
-        {"id": doc_id},
-        {"$push": {"signatures": sig_placement}}
-    )
-    
-    return {"message": "Signature added to document", "placement": sig_placement}
-
+    await db.documents.update_one({"id": doc_id}, {"$push": {"signatures": sig_placement}})
+    return {"message": "Signature added", "placement": sig_placement}
 
 @api_router.delete("/documents/{doc_id}/signatures/{placement_id}")
 async def remove_signature_from_document(doc_id: str, placement_id: str):
-    """Remove a signature from a document"""
-    result = await db.documents.update_one(
-        {"id": doc_id},
-        {"$pull": {"signatures": {"id": placement_id}}}
-    )
-    
+    result = await db.documents.update_one({"id": doc_id}, {"$pull": {"signatures": {"id": placement_id}}})
     if result.modified_count == 0:
         raise HTTPException(404, "Signature placement not found")
-    
     return {"message": "Signature removed"}
-
 
 @api_router.post("/documents/{doc_id}/request-signature")
 async def request_signature(doc_id: str, request: SignatureRequest, background_tasks: BackgroundTasks):
-    """Request a signature from someone via email"""
     doc = await db.documents.find_one({"id": doc_id})
     if not doc:
         raise HTTPException(404, "Document not found")
@@ -839,44 +1141,50 @@ async def request_signature(doc_id: str, request: SignatureRequest, background_t
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
-    await db.documents.update_one(
-        {"id": doc_id},
-        {"$push": {"signature_requests": sig_request}}
-    )
+    await db.documents.update_one({"id": doc_id}, {"$push": {"signature_requests": sig_request}})
     
-    # Send email in background
+    # Send email via Resend
     background_tasks.add_task(
-        send_signature_request_email,
-        request.requester_name,
-        request.requester_email,
+        send_email,
         request.signer_email,
-        request.signer_name,
-        doc.get('title', 'Untitled'),
-        doc_id,
-        request.message
+        'signature_request',
+        {
+            'signer_name': request.signer_name,
+            'requester_name': request.requester_name,
+            'requester_email': request.requester_email,
+            'document_title': doc.get('title', 'Untitled'),
+            'message': request.message,
+            'action_url': f"https://docscan.app/sign/{doc_id}"
+        }
     )
     
     return {"message": "Signature request sent", "request": sig_request}
 
-
-@api_router.put("/documents/{doc_id}/signature-requests/{request_id}/status")
-async def update_signature_request_status(doc_id: str, request_id: str, status: str = Query(...)):
-    """Update signature request status (pending, signed, declined)"""
-    if status not in ['pending', 'signed', 'declined']:
-        raise HTTPException(400, "Invalid status")
+# ── Share Document ─────────────────────────────────────────────────────────
+@api_router.post("/documents/{doc_id}/share")
+async def share_document(doc_id: str, request: ShareDocumentRequest, background_tasks: BackgroundTasks):
+    doc = await db.documents.find_one({"id": doc_id})
+    if not doc:
+        raise HTTPException(404, "Document not found")
     
-    result = await db.documents.update_one(
-        {"id": doc_id, "signature_requests.id": request_id},
-        {"$set": {"signature_requests.$.status": status}}
+    # Send email via Resend
+    background_tasks.add_task(
+        send_email,
+        request.recipient_email,
+        'document_shared',
+        {
+            'recipient_name': request.recipient_name,
+            'sender_name': request.sender_name,
+            'sender_email': request.sender_email,
+            'document_title': doc.get('title', 'Untitled'),
+            'message': request.message,
+            'action_url': f"https://docscan.app/document/{doc_id}"
+        }
     )
     
-    if result.modified_count == 0:
-        raise HTTPException(404, "Signature request not found")
-    
-    return {"message": f"Request status updated to {status}"}
+    return {"message": f"Document shared with {request.recipient_email}"}
 
-
-# ── Export Routes ────────────────────────────────────────────────────────
+# ── Export ─────────────────────────────────────────────────────────────────
 @api_router.post("/documents/{doc_id}/export")
 async def export_document(doc_id: str, format: str = Query("pdf")):
     doc = await db.documents.find_one({"id": doc_id}, {"_id": 0})
@@ -885,25 +1193,19 @@ async def export_document(doc_id: str, format: str = Query("pdf")):
     fmt = format.lower().lstrip('.')
     try:
         if fmt == "pdf":
-            data = generate_pdf(doc)
-            mime, ext = "application/pdf", "pdf"
+            data, mime, ext = generate_pdf(doc), "application/pdf", "pdf"
         elif fmt in ("jpeg", "jpg"):
-            data = generate_image_export(doc, "JPEG")
-            mime, ext = "image/jpeg", "jpg"
+            data, mime, ext = generate_image_export(doc, "JPEG"), "image/jpeg", "jpg"
         elif fmt == "png":
-            data = generate_image_export(doc, "PNG")
-            mime, ext = "image/png", "png"
+            data, mime, ext = generate_image_export(doc, "PNG"), "image/png", "png"
         elif fmt in ("docx", "doc"):
             data = generate_docx(doc)
-            mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            ext = "docx"
+            mime, ext = "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx"
         elif fmt == "pptx":
             data = generate_pptx(doc)
-            mime = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-            ext = "pptx"
+            mime, ext = "application/vnd.openxmlformats-officedocument.presentationml.presentation", "pptx"
         elif fmt == "txt":
-            data = generate_txt(doc)
-            mime, ext = "text/plain", "txt"
+            data, mime, ext = generate_txt(doc), "text/plain", "txt"
         else:
             raise HTTPException(400, f"Unsupported format: {fmt}")
         safe_title = re.sub(r'[^\w\s-]', '', doc.get('title', 'document')).strip()[:40]
@@ -914,7 +1216,6 @@ async def export_document(doc_id: str, format: str = Query("pdf")):
     except Exception as e:
         logger.error(f"Export error: {e}")
         raise HTTPException(500, f"Export failed: {str(e)}")
-
 
 @api_router.get("/stats")
 async def get_stats():
@@ -933,13 +1234,7 @@ async def get_stats():
         last_scan = "Just now" if hours < 1 else (f"{hours}h ago" if hours < 24 else f"{hours // 24}d ago")
     storage_kb = total * 150
     storage_str = f"{storage_kb / 1024:.1f} MB" if storage_kb >= 1024 else f"{storage_kb} KB"
-    return {
-        "total_scans": total,
-        "locked_documents": locked,
-        "storage_used": storage_str,
-        "last_scan": last_scan
-    }
-
+    return {"total_scans": total, "locked_documents": locked, "storage_used": storage_str, "last_scan": last_scan}
 
 app.include_router(api_router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
