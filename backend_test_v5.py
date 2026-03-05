@@ -85,6 +85,16 @@ class DocScanV5Tester:
                 else:
                     self.log_result("AI Assistant", False, 
                                   "AI response was empty", data)
+            elif response.status_code == 500:
+                # Check if it's a Gemini model issue
+                error_text = response.text
+                if "gemini-2.0-flash is no longer available" in error_text:
+                    self.log_result("AI Assistant", False, 
+                                  "Gemini 2.0 Flash model deprecated - needs model update", 
+                                  {"error": "Model deprecated", "suggestion": "Update to gemini-1.5-flash or gemini-2.5-flash"})
+                else:
+                    self.log_result("AI Assistant", False, 
+                                  f"HTTP {response.status_code}: {response.text}")
             else:
                 self.log_result("AI Assistant", False, 
                               f"HTTP {response.status_code}: {response.text}")
