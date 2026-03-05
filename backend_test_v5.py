@@ -266,8 +266,11 @@ class DocScanV5Tester:
         
         # Test count measurement mode
         try:
+            # Create a simple 1x1 pixel PNG image in base64
+            simple_png_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+            
             payload = {
-                "image": "base64_placeholder",
+                "image": simple_png_b64,
                 "mode": "count"
             }
             
@@ -290,6 +293,20 @@ class DocScanV5Tester:
                     else:
                         self.log_result("Measurement API (Count)", False, 
                                       "No count or raw_response in response", data)
+            elif response.status_code == 500:
+                # Check if it's a Gemini model issue
+                error_text = response.text
+                if "gemini-2.0-flash is no longer available" in error_text:
+                    self.log_result("Measurement API (Count)", False, 
+                                  "Gemini 2.0 Flash model deprecated - needs model update", 
+                                  {"error": "Model deprecated", "suggestion": "Update to gemini-1.5-flash or gemini-2.5-flash"})
+                elif "Base64 decoding failed" in error_text:
+                    self.log_result("Measurement API (Count)", False, 
+                                  "Base64 image validation failed", 
+                                  {"error": "Invalid base64", "suggestion": "Use proper base64 encoded image"})
+                else:
+                    self.log_result("Measurement API (Count)", False, 
+                                  f"HTTP {response.status_code}: {response.text}")
             else:
                 self.log_result("Measurement API (Count)", False, 
                               f"HTTP {response.status_code}: {response.text}")
