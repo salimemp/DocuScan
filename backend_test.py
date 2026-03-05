@@ -573,6 +573,28 @@ class APITester:
             self.log_result("Delete Document", False, f"Request failed: {str(e)}")
             return False
     
+    def cleanup_test_data(self) -> bool:
+        """Clean up test signature if it exists"""
+        if not self.test_signature_id:
+            return True
+            
+        try:
+            response = self.session.delete(f"{BASE_URL}/signatures/{self.test_signature_id}")
+            
+            if response.status_code == 200:
+                self.log_result("Cleanup Signature", True, f"Test signature deleted: {self.test_signature_id}")
+                return True
+            elif response.status_code == 404:
+                self.log_result("Cleanup Signature", True, "Signature already deleted")
+                return True
+            else:
+                self.log_result("Cleanup Signature", False, f"HTTP {response.status_code}", {"response": response.text})
+                return False
+                
+        except Exception as e:
+            self.log_result("Cleanup Signature", False, f"Request failed: {str(e)}")
+            return False
+    
     def run_all_tests(self):
         """Run all API tests in sequence"""
         print(f"🚀 Starting DocScan Pro Backend API Tests")
