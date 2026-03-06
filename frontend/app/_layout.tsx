@@ -1,6 +1,8 @@
 import { Stack } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { I18nextProvider } from 'react-i18next';
+import i18n from '../i18n/i18n';
 
 export default function RootLayout() {
   return (
