@@ -1101,6 +1101,23 @@ const ar: TranslationKeys = {
   exportFailed: 'فشل التصدير',
   saveFailed: 'فشل الحفظ',
   networkError: 'خطأ في الشبكة',
+  skip: 'تخطي', next: 'التالي', getStarted: 'ابدأ',
+  cookieConsentTitle: 'خصوصيتك مهمة', cookieConsentDesc: 'نستخدم ملفات تعريف الارتباط.',
+  privacyPolicy: 'سياسة الخصوصية', termsOfService: 'شروط الخدمة',
+  managePreferences: 'إدارة', acceptAll: 'قبول الكل',
+  cookiePreferences: 'تفضيلات ملفات تعريف الارتباط', essentialCookies: 'أساسية',
+  essentialCookiesDesc: 'مطلوبة للتشغيل', functionalCookies: 'وظيفية',
+  functionalCookiesDesc: 'تذكر تفضيلاتك', analyticsCookies: 'تحليلية',
+  analyticsCookiesDesc: 'ساعدنا على التحسين', alwaysOn: 'دائماً مفعل',
+  savePreferences: 'حفظ', cameraAccess: 'الوصول للكاميرا',
+  cameraPermissionDesc: 'يحتاج التطبيق الوصول للكاميرا.',
+  enableCamera: 'تفعيل الكاميرا', maybeLater: 'لاحقاً',
+  alignDocument: 'محاذاة المستند في الإطار', addMorePagesOrContinue: 'أضف صفحات أو تابع',
+  gallery: 'المعرض', continue: 'متابعة', flip: 'قلب',
+  documentPreview: 'معاينة المستند', discard: 'تجاهل',
+  saving: 'جاري الحفظ...', saveToHistory: 'حفظ في السجل',
+  loadingEditor: 'جاري تحميل المحرر...', editDocument: 'تعديل المستند',
+  page: 'صفحة', of: 'من',
 };
 
 const zh: TranslationKeys = {
