@@ -810,6 +810,13 @@ def generate_html(doc: dict) -> bytes:
 
 def generate_json_export(doc: dict) -> bytes:
     """Generate JSON export"""
+    # Convert datetime objects to ISO strings
+    created_at = doc.get('created_at', '')
+    if hasattr(created_at, 'isoformat'):
+        created_at = created_at.isoformat()
+    elif created_at and not isinstance(created_at, str):
+        created_at = str(created_at)
+    
     export_data = {
         "document": {
             "title": doc.get('title', ''),
@@ -817,7 +824,7 @@ def generate_json_export(doc: dict) -> bytes:
             "language": doc.get('detected_language', ''),
             "confidence": doc.get('confidence', 0),
             "pages_count": doc.get('pages_count', 1),
-            "created_at": doc.get('created_at', ''),
+            "created_at": created_at,
         },
         "content": {
             "summary": doc.get('summary', ''),
