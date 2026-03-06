@@ -1,159 +1,109 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import React, { memo } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../hooks/useTheme';
-import { Document } from '../data/mockDocuments';
+import { LazyImage } from './LazyImage';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const GRID_CARD_WIDTH = (SCREEN_WIDTH - 20 * 2 - 12) / 2;
-
-interface Props {
-  doc: Document;
-  isGrid: boolean;
-  testID?: string;
+interface DocumentCardProps {
+  document: {
+    id: string;
+    title: string;
+    doc_type: string;
+    scannedAt: string;
+    pages?: any[];
+    is_locked?: boolean;
+  };
+  meta: { emoji: string; color: string };
+  onPress: () => void;
 }
 
-export function DocumentCard({ doc, isGrid, testID }: Props) {
+export const DocumentCard = memo(function DocumentCard({
+  document,
+  meta,
+  onPress,
+}: DocumentCardProps) {
   const { colors, shadows } = useTheme();
-
-  if (isGrid) {
-    return (
-      <TouchableOpacity
-        testID={testID}
-        activeOpacity={0.75}
-        style={[styles.gridCard, { backgroundColor: colors.surface, width: GRID_CARD_WIDTH, ...shadows.sm }]}
-      >
-        <View style={[styles.gridThumb, { backgroundColor: doc.color + '18' }]}>
-          <Ionicons name={doc.icon as any} size={34} color={doc.color} />
-        </View>
-        <Text style={[styles.gridTitle, { color: colors.textPrimary }]} numberOfLines={2}>
-          {doc.name}
-        </Text>
-        <Text style={[styles.gridDate, { color: colors.textSecondary }]}>{doc.date}</Text>
-        <View style={styles.gridFooter}>
-          <View style={[styles.badge, { backgroundColor: doc.color + '18' }]}>
-            <Text style={[styles.badgeText, { color: doc.color }]}>{doc.type}</Text>
-          </View>
-          <Text style={[styles.sizeText, { color: colors.textTertiary }]}>{doc.size}</Text>
-        </View>
-      </TouchableOpacity>
-    );
-  }
+  const hasImage = document.pages?.[0]?.image;
 
   return (
     <TouchableOpacity
-      testID={testID}
-      activeOpacity={0.75}
-      style={[styles.listCard, { backgroundColor: colors.surface, ...shadows.sm }]}
+      style={[styles.card, { backgroundColor: colors.surface, ...shadows.sm }]}
+      onPress={onPress}
+      activeOpacity={0.85}
     >
-      <View style={[styles.listThumb, { backgroundColor: doc.color + '18' }]}>
-        <Ionicons name={doc.icon as any} size={28} color={doc.color} />
-      </View>
-      <View style={styles.listInfo}>
-        <Text style={[styles.listTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-          {doc.name}
-        </Text>
-        <Text style={[styles.listDate, { color: colors.textSecondary }]}>{doc.date}</Text>
-        <View style={styles.listMeta}>
-          <View style={[styles.badge, { backgroundColor: doc.color + '18' }]}>
-            <Text style={[styles.badgeText, { color: doc.color }]}>{doc.type}</Text>
+      <View style={[styles.thumbnail, { backgroundColor: meta.color + '15' }]}>
+        {hasImage ? (
+          <LazyImage
+            source={{ uri: document.pages[0].image }}
+            style={styles.thumbnailImage}
+            containerStyle={styles.thumbnailContainer}
+            resizeMode="cover"
+          />
+        ) : (
+          <Text style={styles.emoji}>{meta.emoji}</Text>
+        )}
+        {document.is_locked && (
+          <View style={[styles.lockBadge, { backgroundColor: colors.primary }]}>
+            <Ionicons name="lock-closed" size={10} color="#FFF" />
           </View>
-          <Text style={[styles.sizeText, { color: colors.textTertiary }]}>{doc.size}</Text>
-          {doc.pages && (
-            <Text style={[styles.sizeText, { color: colors.textTertiary }]}>{doc.pages}p</Text>
-          )}
-        </View>
+        )}
       </View>
-      <TouchableOpacity
-        testID={`${testID}-menu`}
-        activeOpacity={0.7}
-        style={styles.menuBtn}
-        accessibilityLabel="Document options"
-      >
-        <Ionicons name="ellipsis-vertical" size={18} color={colors.textTertiary} />
-      </TouchableOpacity>
+      <Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={2}>
+        {document.title}
+      </Text>
+      <Text style={[styles.date, { color: colors.textTertiary }]}>
+        {new Date(document.scannedAt).toLocaleDateString()}
+      </Text>
     </TouchableOpacity>
   );
-}
+});
 
 const styles = StyleSheet.create({
-  gridCard: {
+  card: {
     borderRadius: 16,
-    padding: 12,
-    marginBottom: 12,
-    flex: 1,
+    padding: 14,
+    width: 148,
+    gap: 6,
   },
-  gridThumb: {
-    height: 90,
+  thumbnail: {
+    height: 96,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 4,
+    position: 'relative',
+    overflow: 'hidden',
   },
-  gridTitle: {
+  thumbnailContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
+  },
+  emoji: {
+    fontSize: 30,
+  },
+  lockBadge: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 5,
+  },
+  title: {
     fontSize: 13,
     fontWeight: '600',
-    marginBottom: 3,
-    lineHeight: 18,
+    lineHeight: 17,
   },
-  gridDate: {
-    fontSize: 11,
-    marginBottom: 8,
-  },
-  gridFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  listCard: {
-    borderRadius: 14,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-    gap: 12,
-  },
-  listThumb: {
-    width: 54,
-    height: 54,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  listInfo: {
-    flex: 1,
-    gap: 3,
-  },
-  listTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  listDate: {
-    fontSize: 12,
-  },
-  listMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 2,
-  },
-  menuBtn: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  sizeText: {
+  date: {
     fontSize: 11,
   },
 });
+
+export default DocumentCard;
