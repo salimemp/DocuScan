@@ -139,17 +139,6 @@ export default function OnboardingScreen() {
               </View>
             </View>
           </View>
-          
-          {/* Floating elements */}
-          <View style={[styles.floatingBadge, styles.floatingBadge1, { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
-            <Ionicons name="checkmark" size={16} color="#FFF" />
-          </View>
-          <View style={[styles.floatingBadge, styles.floatingBadge2, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-            <Ionicons name="star" size={14} color="#FFF" />
-          </View>
-          <View style={[styles.floatingBadge, styles.floatingBadge3, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
-            <Ionicons name="flash" size={12} color="#FFF" />
-          </View>
         </View>
 
         {/* Text Content */}
