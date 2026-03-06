@@ -1569,6 +1569,23 @@ const pt: TranslationKeys = {
   exportFailed: 'Falha na exportação',
   saveFailed: 'Falha ao salvar',
   networkError: 'Erro de rede',
+  skip: 'Pular', next: 'Próximo', getStarted: 'Começar',
+  cookieConsentTitle: 'Sua privacidade importa', cookieConsentDesc: 'Usamos cookies para melhorar sua experiência.',
+  privacyPolicy: 'Política de Privacidade', termsOfService: 'Termos de Serviço',
+  managePreferences: 'Gerenciar', acceptAll: 'Aceitar Tudo',
+  cookiePreferences: 'Preferências de Cookies', essentialCookies: 'Essenciais',
+  essentialCookiesDesc: 'Necessários para funcionar', functionalCookies: 'Funcionais',
+  functionalCookiesDesc: 'Lembrar suas preferências', analyticsCookies: 'Analíticos',
+  analyticsCookiesDesc: 'Ajude-nos a melhorar', alwaysOn: 'Sempre Ativo',
+  savePreferences: 'Salvar', cameraAccess: 'Acesso à Câmera',
+  cameraPermissionDesc: 'Precisamos da câmera para digitalizar.',
+  enableCamera: 'Ativar Câmera', maybeLater: 'Depois',
+  alignDocument: 'Alinhe o documento no quadro', addMorePagesOrContinue: 'Adicione páginas ou continue',
+  gallery: 'Galeria', continue: 'Continuar', flip: 'Virar',
+  documentPreview: 'Visualização', discard: 'Descartar',
+  saving: 'Salvando...', saveToHistory: 'Salvar no Histórico',
+  loadingEditor: 'Carregando editor...', editDocument: 'Editar Documento',
+  page: 'Página', of: 'de',
 };
 
 const hi: TranslationKeys = {
