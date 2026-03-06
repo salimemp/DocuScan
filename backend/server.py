@@ -699,7 +699,7 @@ async def scan_document(request: ScanRequest):
     images = [strip_b64_prefix(img) for img in request.images]
     n = len(images)
     try:
-        chat = LlmChat(api_key=api_key, session_id=str(uuid.uuid4()), system_message=SYSTEM_PROMPT).with_model("gemini", "gemini-3.1-flash-lite-preview")
+        chat = LlmChat(api_key=api_key, session_id=str(uuid.uuid4()), system_message=SYSTEM_PROMPT).with_model("gemini", "models/gemini-3.1-flash-lite-preview")
         file_contents = [ImageContent(image_base64=img) for img in images]
         prompt = get_multi_prompt(n) if n > 1 else USER_PROMPT
         response = await chat.send_message(UserMessage(text=prompt, file_contents=file_contents))
@@ -795,7 +795,7 @@ async def ai_assistant(request: AIAssistantRequest):
             api_key=api_key,
             session_id=str(uuid.uuid4()),
             system_message=AI_ASSISTANT_PROMPT
-        ).with_model("gemini", "gemini-3.1-flash-lite-preview")
+        ).with_model("gemini", "models/gemini-3.1-flash-lite-preview")
         
         full_message = f"{context}User question: {request.message}"
         response = await chat.send_message(UserMessage(text=full_message))
@@ -826,7 +826,7 @@ async def recognize_text(image: str = "", region: Optional[Dict[str, int]] = Non
             api_key=api_key,
             session_id=str(uuid.uuid4()),
             system_message="Extract all text from this image exactly as shown. Return only the text, no formatting."
-        ).with_model("gemini", "gemini-3.1-flash-lite-preview")
+        ).with_model("gemini", "models/gemini-3.1-flash-lite-preview")
         
         response = await chat.send_message(UserMessage(
             text="Extract all text from this image:",
@@ -850,7 +850,7 @@ async def measure(request: MeasurementRequest):
                 api_key=api_key,
                 session_id=str(uuid.uuid4()),
                 system_message="You are a counting assistant. Count the specified items in images."
-            ).with_model("gemini", "gemini-3.1-flash-lite-preview")
+            ).with_model("gemini", "models/gemini-3.1-flash-lite-preview")
             
             response = await chat.send_message(UserMessage(
                 text="Count all distinct items/objects in this image. Return JSON: {\"count\": number, \"items\": [list of items]}",
