@@ -292,7 +292,7 @@ export default function ScanScreen() {
             <View style={styles.sideActionIcon}>
               <Ionicons name="images-outline" size={26} color="#FFF" />
             </View>
-            <Text style={styles.sideActionLabel}>Gallery</Text>
+            <Text style={styles.sideActionLabel}>{t('gallery')}</Text>
           </TouchableOpacity>
 
           {/* Shutter */}
@@ -321,7 +321,7 @@ export default function ScanScreen() {
               <View style={[styles.sideActionIcon, { backgroundColor: colors.primary }]}>
                 <Ionicons name="arrow-forward" size={26} color="#FFF" />
               </View>
-              <Text style={styles.sideActionLabel}>Continue</Text>
+              <Text style={styles.sideActionLabel}>{t('continue')}</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -334,7 +334,7 @@ export default function ScanScreen() {
               <View style={styles.sideActionIcon}>
                 <Ionicons name="camera-reverse-outline" size={26} color="#FFF" />
               </View>
-              <Text style={styles.sideActionLabel}>Flip</Text>
+              <Text style={styles.sideActionLabel}>{t('flip')}</Text>
             </TouchableOpacity>
           )}
         </View>
