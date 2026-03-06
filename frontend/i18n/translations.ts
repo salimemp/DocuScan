@@ -1413,6 +1413,23 @@ const ja: TranslationKeys = {
   exportFailed: 'エクスポート失敗',
   saveFailed: '保存失敗',
   networkError: 'ネットワークエラー',
+  skip: 'スキップ', next: '次へ', getStarted: '始める',
+  cookieConsentTitle: 'プライバシーは大切です', cookieConsentDesc: 'Cookieを使用しています。',
+  privacyPolicy: 'プライバシーポリシー', termsOfService: '利用規約',
+  managePreferences: '管理', acceptAll: 'すべて承認',
+  cookiePreferences: 'Cookie設定', essentialCookies: '必須',
+  essentialCookiesDesc: 'アプリの動作に必要', functionalCookies: '機能的',
+  functionalCookiesDesc: '設定を記憶', analyticsCookies: '分析',
+  analyticsCookiesDesc: '改善にご協力ください', alwaysOn: '常にオン',
+  savePreferences: '保存', cameraAccess: 'カメラアクセス',
+  cameraPermissionDesc: 'スキャンにカメラが必要です。',
+  enableCamera: 'カメラを有効にする', maybeLater: '後で',
+  alignDocument: '書類をフレームに合わせてください', addMorePagesOrContinue: 'ページを追加または続行',
+  gallery: 'ギャラリー', continue: '続行', flip: '反転',
+  documentPreview: 'ドキュメントプレビュー', discard: '破棄',
+  saving: '保存中...', saveToHistory: '履歴に保存',
+  loadingEditor: 'エディタを読み込み中...', editDocument: 'ドキュメントを編集',
+  page: 'ページ', of: '/',
 };
 
 const pt: TranslationKeys = {
