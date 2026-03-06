@@ -685,8 +685,282 @@ def generate_image_export(doc: dict, fmt: str) -> bytes:
             if y > H - 100:
                 break
     buf = io.BytesIO()
-    img.save(buf, format=fmt.upper(), quality=92 if fmt.upper() == 'JPEG' else None)
+    
+    # Handle different image formats
+    if fmt.upper() == 'JPEG':
+        img.save(buf, format='JPEG', quality=92)
+    elif fmt.upper() == 'PNG':
+        img.save(buf, format='PNG')
+    elif fmt.upper() == 'TIFF':
+        img.save(buf, format='TIFF')
+    elif fmt.upper() == 'BMP':
+        img.save(buf, format='BMP')
+    elif fmt.upper() == 'WEBP':
+        img.save(buf, format='WEBP', quality=90)
+    else:
+        img.save(buf, format=fmt.upper())
     return buf.getvalue()
+
+def generate_xlsx(doc: dict) -> bytes:
+    """Generate Excel spreadsheet from document"""
+    import xlsxwriter
+    buf = io.BytesIO()
+    wb = xlsxwriter.Workbook(buf, {'in_memory': True})
+    
+    # Title format
+    title_fmt = wb.add_format({'bold': True, 'font_size': 16, 'font_color': '#2563EB'})
+    header_fmt = wb.add_format({'bold': True, 'bg_color': '#2563EB', 'font_color': 'white', 'border': 1})
+    cell_fmt = wb.add_format({'text_wrap': True, 'valign': 'top', 'border': 1})
+    
+    # Document Info Sheet
+    ws_info = wb.add_worksheet('Document Info')
+    ws_info.set_column('A:A', 20)
+    ws_info.set_column('B:B', 60)
+    
+    ws_info.write('A1', doc.get('title', 'Untitled'), title_fmt)
+    ws_info.write('A3', 'Property', header_fmt)
+    ws_info.write('B3', 'Value', header_fmt)
+    
+    info_rows = [
+        ('Document Type', doc.get('document_type', '').replace('_', ' ').title()),
+        ('Language', doc.get('detected_language', 'Unknown')),
+        ('Confidence', f"{int(doc.get('confidence', 0) * 100)}%"),
+        ('Pages', str(doc.get('pages_count', 1))),
+        ('Created', doc.get('created_at', '')),
+    ]
+    for i, (prop, val) in enumerate(info_rows, start=4):
+        ws_info.write(f'A{i}', prop, cell_fmt)
+        ws_info.write(f'B{i}', val, cell_fmt)
+    
+    # Content Sheet
+    if doc.get('formatted_output'):
+        ws_content = wb.add_worksheet('Content')
+        ws_content.set_column('A:A', 100)
+        ws_content.write('A1', 'Extracted Content', title_fmt)
+        row = 2
+        for line in doc['formatted_output'].split('\n'):
+            ws_content.write(f'A{row}', line, cell_fmt)
+            row += 1
+    
+    # Summary Sheet
+    if doc.get('summary'):
+        ws_summary = wb.add_worksheet('Summary')
+        ws_summary.set_column('A:A', 80)
+        ws_summary.write('A1', 'Document Summary', title_fmt)
+        ws_summary.write('A3', doc['summary'], cell_fmt)
+    
+    wb.close()
+    return buf.getvalue()
+
+def generate_html(doc: dict) -> bytes:
+    """Generate HTML document"""
+    html = f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{doc.get('title', 'Document')}</title>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #f8fafc; }}
+        .header {{ background: #2563eb; color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; }}
+        .header h1 {{ margin: 0 0 10px 0; }}
+        .meta {{ display: flex; gap: 20px; font-size: 14px; opacity: 0.9; }}
+        .section {{ background: white; padding: 20px; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }}
+        .section h2 {{ color: #2563eb; margin-top: 0; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; }}
+        .content {{ white-space: pre-wrap; font-family: 'SF Mono', Monaco, monospace; font-size: 13px; line-height: 1.6; }}
+        .tag {{ display: inline-block; background: #dbeafe; color: #2563eb; padding: 4px 12px; border-radius: 16px; font-size: 12px; margin: 4px; }}
+        .footer {{ text-align: center; color: #6b7280; font-size: 12px; margin-top: 20px; }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{doc.get('title', 'Untitled Document')}</h1>
+        <div class="meta">
+            <span>📄 {doc.get('document_type', 'document').replace('_', ' ').title()}</span>
+            <span>🌐 {doc.get('detected_language', 'Unknown')}</span>
+            <span>✓ {int(doc.get('confidence', 0) * 100)}% confidence</span>
+        </div>
+    </div>
+'''
+    if doc.get('summary'):
+        html += f'''    <div class="section">
+        <h2>📋 Summary</h2>
+        <p>{doc['summary']}</p>
+    </div>
+'''
+    if doc.get('formatted_output'):
+        html += f'''    <div class="section">
+        <h2>📝 Content</h2>
+        <div class="content">{doc['formatted_output']}</div>
+    </div>
+'''
+    if doc.get('tags'):
+        tags_html = ''.join([f'<span class="tag">#{tag}</span>' for tag in doc['tags']])
+        html += f'''    <div class="section">
+        <h2>🏷️ Tags</h2>
+        {tags_html}
+    </div>
+'''
+    html += '''    <div class="footer">
+        <p>Exported from DocScan Pro</p>
+    </div>
+</body>
+</html>'''
+    return html.encode('utf-8')
+
+def generate_json_export(doc: dict) -> bytes:
+    """Generate JSON export"""
+    export_data = {
+        "document": {
+            "title": doc.get('title', ''),
+            "type": doc.get('document_type', ''),
+            "language": doc.get('detected_language', ''),
+            "confidence": doc.get('confidence', 0),
+            "pages_count": doc.get('pages_count', 1),
+            "created_at": doc.get('created_at', ''),
+        },
+        "content": {
+            "summary": doc.get('summary', ''),
+            "formatted_output": doc.get('formatted_output', ''),
+            "raw_text": doc.get('raw_text', ''),
+        },
+        "metadata": {
+            "tags": doc.get('tags', []),
+            "is_locked": doc.get('is_locked', False),
+            "comments_count": len(doc.get('comments', [])),
+            "signatures_count": len(doc.get('signatures', [])),
+        },
+        "export_info": {
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "source": "DocScan Pro",
+            "version": "5.0"
+        }
+    }
+    return json.dumps(export_data, indent=2, ensure_ascii=False).encode('utf-8')
+
+def generate_markdown(doc: dict) -> bytes:
+    """Generate Markdown document"""
+    md = f'''# {doc.get('title', 'Untitled Document')}
+
+---
+
+**Document Type:** {doc.get('document_type', 'document').replace('_', ' ').title()}  
+**Language:** {doc.get('detected_language', 'Unknown')}  
+**Confidence:** {int(doc.get('confidence', 0) * 100)}%  
+**Pages:** {doc.get('pages_count', 1)}
+
+---
+
+'''
+    if doc.get('summary'):
+        md += f'''## 📋 Summary
+
+{doc['summary']}
+
+'''
+    if doc.get('formatted_output'):
+        md += f'''## 📝 Content
+
+```
+{doc['formatted_output']}
+```
+
+'''
+    if doc.get('tags'):
+        tags = ' '.join([f'`#{tag}`' for tag in doc['tags']])
+        md += f'''## 🏷️ Tags
+
+{tags}
+
+'''
+    md += '''---
+
+*Exported from DocScan Pro*
+'''
+    return md.encode('utf-8')
+
+def generate_epub(doc: dict) -> bytes:
+    """Generate EPUB e-book"""
+    from ebooklib import epub
+    
+    book = epub.EpubBook()
+    book.set_identifier(doc.get('id', str(uuid.uuid4())))
+    book.set_title(doc.get('title', 'Document'))
+    book.set_language(doc.get('detected_language', 'en')[:2].lower() or 'en')
+    book.add_author('DocScan Pro')
+    
+    # Create chapter
+    c1 = epub.EpubHtml(title=doc.get('title', 'Document'), file_name='content.xhtml', lang='en')
+    content_html = f'''<html>
+<head><title>{doc.get('title', 'Document')}</title></head>
+<body>
+<h1>{doc.get('title', 'Document')}</h1>
+<p><em>Type: {doc.get('document_type', '').replace('_', ' ').title()}</em></p>
+'''
+    if doc.get('summary'):
+        content_html += f'<h2>Summary</h2><p>{doc["summary"]}</p>'
+    if doc.get('formatted_output'):
+        content_html += f'<h2>Content</h2><pre>{doc["formatted_output"]}</pre>'
+    content_html += '</body></html>'
+    c1.content = content_html
+    
+    book.add_item(c1)
+    book.spine = ['nav', c1]
+    book.add_item(epub.EpubNcx())
+    book.add_item(epub.EpubNav())
+    
+    buf = io.BytesIO()
+    epub.write_epub(buf, book)
+    return buf.getvalue()
+
+def generate_mobi(doc: dict) -> bytes:
+    """Generate MOBI (Kindle) - returns EPUB as MOBI conversion requires Kindlegen"""
+    # Note: True MOBI requires Amazon's Kindlegen tool
+    # We return EPUB which Kindle devices can also read
+    return generate_epub(doc)
+
+def generate_svg(doc: dict) -> bytes:
+    """Generate SVG document visualization"""
+    title = doc.get('title', 'Document')[:50]
+    doc_type = doc.get('document_type', 'document').replace('_', ' ').title()
+    content_lines = (doc.get('formatted_output', '') or '').split('\n')[:20]
+    
+    svg = f'''<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800" width="600" height="800">
+  <defs>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#2563eb"/>
+      <stop offset="100%" style="stop-color:#3b82f6"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="600" height="800" fill="#f8fafc"/>
+  
+  <!-- Header -->
+  <rect width="600" height="80" fill="url(#headerGrad)"/>
+  <text x="300" y="35" text-anchor="middle" fill="white" font-family="Arial" font-size="18" font-weight="bold">DocScan Pro</text>
+  <text x="300" y="60" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-family="Arial" font-size="12">{doc_type}</text>
+  
+  <!-- Title -->
+  <text x="30" y="120" fill="#1e3a5f" font-family="Arial" font-size="20" font-weight="bold">{title}</text>
+  
+  <!-- Content -->
+  <rect x="20" y="140" width="560" height="620" fill="white" stroke="#e5e7eb" rx="8"/>
+'''
+    y = 170
+    for line in content_lines:
+        escaped = line[:70].replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        svg += f'  <text x="35" y="{y}" fill="#374151" font-family="Monaco, monospace" font-size="11">{escaped}</text>\n'
+        y += 22
+        if y > 720:
+            break
+    
+    svg += '''  
+  <!-- Footer -->
+  <text x="300" y="780" text-anchor="middle" fill="#9ca3af" font-family="Arial" font-size="10">Exported from DocScan Pro</text>
+</svg>'''
+    return svg.encode('utf-8')
 
 # ── Routes ────────────────────────────────────────────────────────────────
 @api_router.get("/")
