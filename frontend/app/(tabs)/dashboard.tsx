@@ -654,6 +654,12 @@ export default function DashboardScreen() {
           </SafeAreaView>
         </View>
       </Modal>
+
+      {/* Powered By Elixio Digital */}
+      <PoweredByElixio style={{ bottom: 90 }} />
+
+      {/* Cookie Consent Banner */}
+      <CookieConsentBanner />
     </SafeAreaView>
   );
 }
