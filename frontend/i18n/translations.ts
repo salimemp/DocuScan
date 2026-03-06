@@ -1881,6 +1881,23 @@ const ko: TranslationKeys = {
   exportFailed: '내보내기 실패',
   saveFailed: '저장 실패',
   networkError: '네트워크 오류',
+  skip: '건너뛰기', next: '다음', getStarted: '시작하기',
+  cookieConsentTitle: '개인정보 보호', cookieConsentDesc: '쿠키를 사용합니다.',
+  privacyPolicy: '개인정보 처리방침', termsOfService: '이용약관',
+  managePreferences: '관리', acceptAll: '모두 수락',
+  cookiePreferences: '쿠키 설정', essentialCookies: '필수',
+  essentialCookiesDesc: '앱 작동에 필요', functionalCookies: '기능',
+  functionalCookiesDesc: '설정 기억', analyticsCookies: '분석',
+  analyticsCookiesDesc: '개선에 도움', alwaysOn: '항상 켜짐',
+  savePreferences: '저장', cameraAccess: '카메라 접근',
+  cameraPermissionDesc: '스캔에 카메라가 필요합니다.',
+  enableCamera: '카메라 활성화', maybeLater: '나중에',
+  alignDocument: '문서를 프레임에 맞추세요', addMorePagesOrContinue: '페이지 추가 또는 계속',
+  gallery: '갤러리', continue: '계속', flip: '뒤집기',
+  documentPreview: '문서 미리보기', discard: '취소',
+  saving: '저장 중...', saveToHistory: '기록에 저장',
+  loadingEditor: '편집기 로딩 중...', editDocument: '문서 편집',
+  page: '페이지', of: '/',
 };
 
 const ta: TranslationKeys = {
