@@ -364,10 +364,10 @@ export default function HistoryScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={[styles.title, { color: colors.textPrimary }]}>History</Text>
+          <Text style={[styles.title, { color: colors.textPrimary }]}>{t('history')}</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            {filtered.length} document{filtered.length !== 1 ? 's' : ''}
-            {lockedCount > 0 && ` • ${lockedCount} locked`}
+            {filtered.length} {t('documents')}
+            {lockedCount > 0 && ` • ${lockedCount} ${t('locked')}`}
           </Text>
         </View>
         {selectionMode ? (
