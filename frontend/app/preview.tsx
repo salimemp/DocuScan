@@ -204,7 +204,7 @@ export default function PreviewScreen() {
             Analyzing {pageCount} Page{pageCount !== 1 ? 's' : ''}
           </Text>
           <Text style={[styles.loadingSubtitle, { color: colors.textSecondary }]}>
-            Gemini AI is reading your document in all languages...
+            AI is reading your document in all languages...
           </Text>
           <View style={styles.loadingDots}>
             {['Detecting type', 'Extracting text', 'Structuring data'].map((step, i) => (
