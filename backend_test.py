@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 # Base URL from frontend environment
-BASE_URL = "https://gemini-scanner.preview.emergentagent.com/api"
+BASE_URL = "https://ai-paperless.preview.emergentagent.com/api"
 
 class APITester:
     def __init__(self):
