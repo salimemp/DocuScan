@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../hooks/useTheme';
 import { useLanguage } from '../hooks/useLanguage';
+import { analytics } from '../utils/analytics';
 
 const CONSENT_KEY = '@DocScanPro:cookieConsent';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
