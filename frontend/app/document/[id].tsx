@@ -475,7 +475,7 @@ export default function DocumentDetailScreen() {
             <View style={[styles.actionIcon, { backgroundColor: colors.primary + '18' }]}>
               <Ionicons name="create-outline" size={22} color={colors.primary} />
             </View>
-            <Text style={[styles.actionLabel, { color: colors.textPrimary }]}>Edit</Text>
+            <Text style={[styles.actionLabel, { color: colors.textPrimary }]}>{t('edit')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             testID="export-btn"
@@ -485,7 +485,7 @@ export default function DocumentDetailScreen() {
             <View style={[styles.actionIcon, { backgroundColor: '#059669' + '18' }]}>
               <Ionicons name="download-outline" size={22} color="#059669" />
             </View>
-            <Text style={[styles.actionLabel, { color: colors.textPrimary }]}>Export</Text>
+            <Text style={[styles.actionLabel, { color: colors.textPrimary }]}>{t('export')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             testID="share-btn"
@@ -495,7 +495,7 @@ export default function DocumentDetailScreen() {
             <View style={[styles.actionIcon, { backgroundColor: '#8B5CF6' + '18' }]}>
               <Ionicons name="share-social-outline" size={22} color="#8B5CF6" />
             </View>
-            <Text style={[styles.actionLabel, { color: colors.textPrimary }]}>Share</Text>
+            <Text style={[styles.actionLabel, { color: colors.textPrimary }]}>{t('share')}</Text>
           </TouchableOpacity>
         </View>
 
