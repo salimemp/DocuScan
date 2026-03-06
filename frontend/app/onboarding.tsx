@@ -78,6 +78,7 @@ export default function OnboardingScreen() {
   const completeOnboarding = async () => {
     try {
       await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+      await analytics.trackOnboardingComplete();
       router.replace('/dashboard');
     } catch (e) {
       router.replace('/dashboard');
