@@ -51,6 +51,10 @@ export const CookieConsentBanner: React.FC<CookieConsentProps> = ({ onAccept }) 
   const saveConsent = async (preferences: object) => {
     try {
       await AsyncStorage.setItem(CONSENT_KEY, JSON.stringify(preferences));
+      
+      // Track consent in analytics
+      await analytics.trackConsent(preferences as any);
+      
       Animated.timing(slideAnim, {
         toValue: 200,
         duration: 300,
