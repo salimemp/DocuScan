@@ -63,9 +63,9 @@ export default function DashboardScreen() {
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const greeting = (() => {
     const h = new Date().getHours();
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    return 'Good evening';
+    if (h < 12) return t('goodMorning');
+    if (h < 17) return t('goodAfternoon');
+    return t('goodEvening');
   })();
 
   const fetchData = useCallback(async () => {
