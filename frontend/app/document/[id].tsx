@@ -370,7 +370,7 @@ export default function DocumentDetailScreen() {
     return (
       <View style={[styles.centered, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading document...</Text>
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('loading')}</Text>
       </View>
     );
   }
@@ -380,12 +380,12 @@ export default function DocumentDetailScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={48} color={colors.error} />
-          <Text style={[styles.errorText, { color: colors.textPrimary }]}>{error || 'Document not found'}</Text>
+          <Text style={[styles.errorText, { color: colors.textPrimary }]}>{error || t('documentNotFound')}</Text>
           <TouchableOpacity
             style={[styles.backBtn, { backgroundColor: colors.primary }]}
             onPress={() => router.back()}
           >
-            <Text style={styles.backBtnText}>Go Back</Text>
+            <Text style={styles.backBtnText}>{t('back')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
