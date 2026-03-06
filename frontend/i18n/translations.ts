@@ -585,6 +585,51 @@ const es: TranslationKeys = {
   exportFailed: 'Exportación fallida',
   saveFailed: 'Error al guardar',
   networkError: 'Error de red',
+
+  // Onboarding
+  skip: 'Omitir',
+  next: 'Siguiente',
+  getStarted: 'Comenzar',
+
+  // Cookie Consent
+  cookieConsentTitle: 'Tu privacidad importa',
+  cookieConsentDesc: 'Usamos cookies para mejorar tu experiencia y analizar el uso.',
+  privacyPolicy: 'Política de privacidad',
+  termsOfService: 'Términos de servicio',
+  managePreferences: 'Gestionar',
+  acceptAll: 'Aceptar todo',
+  cookiePreferences: 'Preferencias de cookies',
+  essentialCookies: 'Esenciales',
+  essentialCookiesDesc: 'Necesarias para el funcionamiento',
+  functionalCookies: 'Funcionales',
+  functionalCookiesDesc: 'Recordar tus preferencias',
+  analyticsCookies: 'Analíticas',
+  analyticsCookiesDesc: 'Ayúdanos a mejorar',
+  alwaysOn: 'Siempre activo',
+  savePreferences: 'Guardar preferencias',
+
+  // Scan Screen
+  cameraAccess: 'Acceso a cámara',
+  cameraPermissionDesc: 'DocScan Pro necesita acceso a la cámara para escanear documentos.',
+  enableCamera: 'Activar cámara',
+  maybeLater: 'Quizás después',
+  alignDocument: 'Alinea el documento en el marco',
+  addMorePagesOrContinue: 'Añade más páginas o continúa',
+  gallery: 'Galería',
+  continue: 'Continuar',
+  flip: 'Voltear',
+
+  // Preview Screen
+  documentPreview: 'Vista previa',
+  discard: 'Descartar',
+  saving: 'Guardando...',
+  saveToHistory: 'Guardar en historial',
+
+  // Editor Screen
+  loadingEditor: 'Cargando editor...',
+  editDocument: 'Editar documento',
+  page: 'Página',
+  of: 'de',
 };
 
 const fr: TranslationKeys = {
