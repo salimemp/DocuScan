@@ -1,6 +1,9 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import translations, { LanguageCode, LANGUAGES } from './translations';
+
+const LANGUAGE_STORAGE_KEY = '@DocScanPro:language';
 
 // Initialize i18next
 i18n
@@ -31,8 +34,28 @@ i18n
     },
   });
 
-export const changeLanguage = (lang: LanguageCode) => {
-  i18n.changeLanguage(lang);
+// Load saved language on init
+export const loadSavedLanguage = async (): Promise<LanguageCode> => {
+  try {
+    const savedLang = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
+    if (savedLang && LANGUAGES.some(l => l.code === savedLang)) {
+      i18n.changeLanguage(savedLang);
+      return savedLang as LanguageCode;
+    }
+  } catch (e) {
+    console.log('Failed to load saved language:', e);
+  }
+  return 'en';
+};
+
+export const changeLanguage = async (lang: LanguageCode): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
+    i18n.changeLanguage(lang);
+  } catch (e) {
+    console.log('Failed to save language:', e);
+    i18n.changeLanguage(lang);
+  }
 };
 
 export const getCurrentLanguage = (): LanguageCode => {
