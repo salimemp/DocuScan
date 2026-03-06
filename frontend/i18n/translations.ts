@@ -1257,6 +1257,23 @@ const zh: TranslationKeys = {
   exportFailed: '导出失败',
   saveFailed: '保存失败',
   networkError: '网络错误',
+  skip: '跳过', next: '下一步', getStarted: '开始使用',
+  cookieConsentTitle: '您的隐私很重要', cookieConsentDesc: '我们使用cookies来改善体验。',
+  privacyPolicy: '隐私政策', termsOfService: '服务条款',
+  managePreferences: '管理', acceptAll: '全部接受',
+  cookiePreferences: 'Cookie设置', essentialCookies: '必要',
+  essentialCookiesDesc: '应用运行所必需', functionalCookies: '功能性',
+  functionalCookiesDesc: '记住您的偏好设置', analyticsCookies: '分析',
+  analyticsCookiesDesc: '帮助我们改进', alwaysOn: '始终开启',
+  savePreferences: '保存设置', cameraAccess: '相机权限',
+  cameraPermissionDesc: '需要相机权限来扫描文档。',
+  enableCamera: '启用相机', maybeLater: '稍后',
+  alignDocument: '将文档对齐到框内', addMorePagesOrContinue: '添加更多页面或继续',
+  gallery: '相册', continue: '继续', flip: '翻转',
+  documentPreview: '文档预览', discard: '放弃',
+  saving: '保存中...', saveToHistory: '保存到历史',
+  loadingEditor: '加载编辑器...', editDocument: '编辑文档',
+  page: '页', of: '/',
 };
 
 const ja: TranslationKeys = {
