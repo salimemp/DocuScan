@@ -406,7 +406,7 @@ export default function HistoryScreen() {
         <TextInput
           testID="history-search-input"
           style={[styles.searchInput, { color: colors.textPrimary }]}
-          placeholder="Search documents..."
+          placeholder={`${t('search')} ${t('documents')}...`}
           placeholderTextColor={colors.textTertiary}
           value={search}
           onChangeText={setSearch}
