@@ -65,12 +65,10 @@ class ExportFormatTester:
             return None
             
     def test_export_format(self, doc_id: str, format_name: str) -> bool:
-        """Test a specific export format using POST body method"""
+        """Test a specific export format using query parameter method"""
         try:
-            payload = {"format": format_name}
             response = self.session.post(
-                f"{BACKEND_URL}/documents/{doc_id}/export",
-                json=payload
+                f"{BACKEND_URL}/documents/{doc_id}/export?format={format_name}"
             )
             
             if response.status_code != 200:
