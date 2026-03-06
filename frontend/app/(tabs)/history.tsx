@@ -65,6 +65,7 @@ const formatDate = (iso: string) => {
 
 export default function HistoryScreen() {
   const { colors, shadows, isDark } = useTheme();
+  const { t } = useLanguage();
   const router = useRouter();
   const [docs, setDocs] = useState<any[]>([]);
   const [search, setSearch] = useState('');
