@@ -945,6 +945,23 @@ const de: TranslationKeys = {
   exportFailed: 'Export fehlgeschlagen',
   saveFailed: 'Speichern fehlgeschlagen',
   networkError: 'Netzwerkfehler',
+  skip: 'Überspringen', next: 'Weiter', getStarted: 'Loslegen',
+  cookieConsentTitle: 'Ihre Privatsphäre zählt', cookieConsentDesc: 'Wir verwenden Cookies.',
+  privacyPolicy: 'Datenschutz', termsOfService: 'Nutzungsbedingungen',
+  managePreferences: 'Verwalten', acceptAll: 'Alle akzeptieren',
+  cookiePreferences: 'Cookie-Einstellungen', essentialCookies: 'Erforderlich',
+  essentialCookiesDesc: 'Für den Betrieb notwendig', functionalCookies: 'Funktional',
+  functionalCookiesDesc: 'Einstellungen merken', analyticsCookies: 'Analytik',
+  analyticsCookiesDesc: 'Helfen Sie uns zu verbessern', alwaysOn: 'Immer aktiv',
+  savePreferences: 'Speichern', cameraAccess: 'Kamerazugriff',
+  cameraPermissionDesc: 'Kamerazugriff zum Scannen benötigt.',
+  enableCamera: 'Kamera aktivieren', maybeLater: 'Später',
+  alignDocument: 'Dokument im Rahmen ausrichten', addMorePagesOrContinue: 'Seiten hinzufügen oder fortfahren',
+  gallery: 'Galerie', continue: 'Weiter', flip: 'Umdrehen',
+  documentPreview: 'Dokumentvorschau', discard: 'Verwerfen',
+  saving: 'Speichern...', saveToHistory: 'Speichern',
+  loadingEditor: 'Editor wird geladen...', editDocument: 'Dokument bearbeiten',
+  page: 'Seite', of: 'von',
 };
 
 const ar: TranslationKeys = {
