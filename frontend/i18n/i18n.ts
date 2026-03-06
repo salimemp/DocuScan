@@ -2,30 +2,39 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Import split locale files
+// Import all split locale files
 import { en } from './locales/en';
 import { ko } from './locales/ko';
-
-// Import remaining languages from main file for now (can be split later)
-import translations, { LanguageCode, LANGUAGES } from './translations';
+import { es } from './locales/es';
+import { fr } from './locales/fr';
+import { de } from './locales/de';
+import { ar } from './locales/ar';
+import { zh } from './locales/zh';
+import { ja } from './locales/ja';
+import { pt } from './locales/pt';
+import { hi } from './locales/hi';
+import { ta } from './locales/ta';
+import { bn } from './locales/bn';
+import { he } from './locales/he';
+import { LANGUAGES, LanguageCode } from './translations';
 
 const LANGUAGE_STORAGE_KEY = '@DocScanPro:language';
 
-// Combine English and Korean from split files with rest from main
+// All resources from split files
 const resources = {
   en: { translation: en },
   ko: { translation: ko },
-  es: { translation: translations.es },
-  fr: { translation: translations.fr },
-  de: { translation: translations.de },
-  ar: { translation: translations.ar },
-  zh: { translation: translations.zh },
-  ja: { translation: translations.ja },
-  pt: { translation: translations.pt },
-  hi: { translation: translations.hi },
-  ta: { translation: translations.ta },
-  bn: { translation: translations.bn },
-  he: { translation: translations.he },
+  es: { translation: es },
+  fr: { translation: fr },
+  de: { translation: de },
+  ar: { translation: ar },
+  zh: { translation: zh },
+  ja: { translation: ja },
+  pt: { translation: pt },
+  hi: { translation: hi },
+  ta: { translation: ta },
+  bn: { translation: bn },
+  he: { translation: he },
 };
 
 // Initialize i18next
