@@ -442,7 +442,7 @@ export default function PreviewScreen() {
           activeOpacity={0.75}
         >
           <Ionicons name="trash-outline" size={18} color={colors.textSecondary} />
-          <Text style={[styles.discardBtnText, { color: colors.textSecondary }]}>Discard</Text>
+          <Text style={[styles.discardBtnText, { color: colors.textSecondary }]}>{t('discard')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           testID="save-document-btn"
@@ -454,7 +454,7 @@ export default function PreviewScreen() {
           {isSaving
             ? <ActivityIndicator size="small" color="#FFF" />
             : <Ionicons name="save-outline" size={18} color="#FFF" />}
-          <Text style={styles.saveBtnText}>{isSaving ? 'Saving...' : 'Save to History'}</Text>
+          <Text style={styles.saveBtnText}>{isSaving ? t('saving') : t('saveToHistory')}</Text>
         </TouchableOpacity>
       </SafeAreaView>
     </SafeAreaView>
