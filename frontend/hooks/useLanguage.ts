@@ -1,11 +1,22 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { I18nManager } from 'react-native';
-import i18n, { changeLanguage, isRTL, LANGUAGES, LanguageCode } from '../i18n/i18n';
+import i18n, { changeLanguage, isRTL, loadSavedLanguage, LANGUAGES, LanguageCode } from '../i18n/i18n';
 
 export const useLanguage = () => {
   const { t, i18n: i18nInstance } = useTranslation();
   const [currentLanguage, setCurrentLanguage] = useState<LanguageCode>(i18nInstance.language as LanguageCode);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Load saved language on mount
+    const initLanguage = async () => {
+      const savedLang = await loadSavedLanguage();
+      setCurrentLanguage(savedLang);
+      setIsLoading(false);
+    };
+    initLanguage();
+  }, []);
 
   useEffect(() => {
     const handleLanguageChange = (lng: string) => {
@@ -25,8 +36,8 @@ export const useLanguage = () => {
     };
   }, []);
 
-  const setLanguage = useCallback((lang: LanguageCode) => {
-    changeLanguage(lang);
+  const setLanguage = useCallback(async (lang: LanguageCode) => {
+    await changeLanguage(lang);
   }, []);
 
   const getCurrentLanguageInfo = useCallback(() => {
@@ -40,6 +51,7 @@ export const useLanguage = () => {
     getCurrentLanguageInfo,
     languages: LANGUAGES,
     isRTL: isRTL(currentLanguage),
+    isLoading,
   };
 };
 
