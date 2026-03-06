@@ -385,7 +385,7 @@ export default function EditorScreen() {
     return (
       <View style={[styles.centered, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading editor...</Text>
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('loadingEditor')}</Text>
       </View>
     );
   }
