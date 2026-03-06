@@ -28,6 +28,7 @@ export default function EditorScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors, shadows, isDark } = useTheme();
+  const { t } = useLanguage();
   const inputRef = useRef<TextInput>(null);
 
   const [doc, setDoc] = useState<any>(null);
