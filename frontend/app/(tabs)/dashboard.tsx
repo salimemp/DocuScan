@@ -37,6 +37,7 @@ const getMeta = (type: string) => DOC_META[type] ?? DOC_META.general_document;
 
 export default function DashboardScreen() {
   const { colors, shadows, isDark } = useTheme();
+  const { t, currentLanguage, setLanguage, getCurrentLanguageInfo, languages } = useLanguage();
   const router = useRouter();
   const [stats, setStats] = useState({ total_scans: 0, storage_used: '0 KB', last_scan: 'Never' });
   const [recentDocs, setRecentDocs] = useState<any[]>([]);
@@ -48,6 +49,7 @@ export default function DashboardScreen() {
   const [showShareDoc, setShowShareDoc] = useState(false);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [showCloudBackup, setShowCloudBackup] = useState(false);
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false);
   
   // Share form state
   const [shareEmail, setShareEmail] = useState('');
