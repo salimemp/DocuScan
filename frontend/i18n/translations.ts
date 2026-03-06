@@ -190,6 +190,51 @@ export type TranslationKeys = {
   exportFailed: string;
   saveFailed: string;
   networkError: string;
+
+  // Onboarding
+  skip: string;
+  next: string;
+  getStarted: string;
+
+  // Cookie Consent
+  cookieConsentTitle: string;
+  cookieConsentDesc: string;
+  privacyPolicy: string;
+  termsOfService: string;
+  managePreferences: string;
+  acceptAll: string;
+  cookiePreferences: string;
+  essentialCookies: string;
+  essentialCookiesDesc: string;
+  functionalCookies: string;
+  functionalCookiesDesc: string;
+  analyticsCookies: string;
+  analyticsCookiesDesc: string;
+  alwaysOn: string;
+  savePreferences: string;
+
+  // Scan Screen
+  cameraAccess: string;
+  cameraPermissionDesc: string;
+  enableCamera: string;
+  maybeLater: string;
+  alignDocument: string;
+  addMorePagesOrContinue: string;
+  gallery: string;
+  continue: string;
+  flip: string;
+
+  // Preview Screen
+  documentPreview: string;
+  discard: string;
+  saving: string;
+  saveToHistory: string;
+
+  // Editor Screen
+  loadingEditor: string;
+  editDocument: string;
+  page: string;
+  of: string;
 };
 
 const en: TranslationKeys = {
