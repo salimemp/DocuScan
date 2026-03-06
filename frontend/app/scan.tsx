@@ -242,7 +242,7 @@ export default function ScanScreen() {
       {/* Center instruction */}
       <View style={styles.centerInstruction}>
         <Text style={styles.instructionText}>
-          {pageCount === 0 ? 'Align document within the frame' : 'Add more pages or continue'}
+          {pageCount === 0 ? t('alignDocument') : t('addMorePagesOrContinue')}
         </Text>
       </View>
 
