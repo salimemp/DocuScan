@@ -401,6 +401,51 @@ const en: TranslationKeys = {
   exportFailed: 'Export failed',
   saveFailed: 'Failed to save',
   networkError: 'Network error',
+
+  // Onboarding
+  skip: 'Skip',
+  next: 'Next',
+  getStarted: 'Get Started',
+
+  // Cookie Consent
+  cookieConsentTitle: 'Your Privacy Matters',
+  cookieConsentDesc: 'We use cookies to improve your experience and analyze app usage.',
+  privacyPolicy: 'Privacy Policy',
+  termsOfService: 'Terms of Service',
+  managePreferences: 'Manage',
+  acceptAll: 'Accept All',
+  cookiePreferences: 'Cookie Preferences',
+  essentialCookies: 'Essential',
+  essentialCookiesDesc: 'Required for the app to function properly',
+  functionalCookies: 'Functional',
+  functionalCookiesDesc: 'Remember your preferences and settings',
+  analyticsCookies: 'Analytics',
+  analyticsCookiesDesc: 'Help us improve by collecting usage data',
+  alwaysOn: 'Always On',
+  savePreferences: 'Save Preferences',
+
+  // Scan Screen
+  cameraAccess: 'Camera Access',
+  cameraPermissionDesc: 'DocScan Pro needs camera access to scan documents. Your photos are processed securely.',
+  enableCamera: 'Enable Camera',
+  maybeLater: 'Maybe Later',
+  alignDocument: 'Align document within the frame',
+  addMorePagesOrContinue: 'Add more pages or continue',
+  gallery: 'Gallery',
+  continue: 'Continue',
+  flip: 'Flip',
+
+  // Preview Screen
+  documentPreview: 'Document Preview',
+  discard: 'Discard',
+  saving: 'Saving...',
+  saveToHistory: 'Save to History',
+
+  // Editor Screen
+  loadingEditor: 'Loading editor...',
+  editDocument: 'Edit Document',
+  page: 'Page',
+  of: 'of',
 };
 
 const es: TranslationKeys = {
