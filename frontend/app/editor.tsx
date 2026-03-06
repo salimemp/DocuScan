@@ -401,10 +401,10 @@ export default function EditorScreen() {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-            {title || 'Edit Document'}
+            {title || t('editDocument')}
           </Text>
           <Text style={[styles.headerSubtitle, { color: colors.textTertiary }]}>
-            Page {currentPage + 1} of {pages.length}
+            {t('page')} {currentPage + 1} {t('of')} {pages.length}
           </Text>
         </View>
         <View style={styles.headerRight}>
@@ -431,7 +431,7 @@ export default function EditorScreen() {
             {saving ? (
               <ActivityIndicator size="small" color="#FFF" />
             ) : (
-              <Text style={styles.saveBtnText}>Save</Text>
+              <Text style={styles.saveBtnText}>{t('save')}</Text>
             )}
           </TouchableOpacity>
         </View>
