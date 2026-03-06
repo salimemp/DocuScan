@@ -2349,6 +2349,23 @@ const he: TranslationKeys = {
   exportFailed: 'הייצוא נכשל',
   saveFailed: 'השמירה נכשלה',
   networkError: 'שגיאת רשת',
+  skip: 'דלג', next: 'הבא', getStarted: 'התחל',
+  cookieConsentTitle: 'הפרטיות שלך חשובה', cookieConsentDesc: 'אנו משתמשים בעוגיות.',
+  privacyPolicy: 'מדיניות פרטיות', termsOfService: 'תנאי השימוש',
+  managePreferences: 'ניהול', acceptAll: 'קבל הכל',
+  cookiePreferences: 'העדפות עוגיות', essentialCookies: 'חיוניות',
+  essentialCookiesDesc: 'נדרשות להפעלה', functionalCookies: 'פונקציונליות',
+  functionalCookiesDesc: 'זכור את ההעדפות שלך', analyticsCookies: 'אנליטיות',
+  analyticsCookiesDesc: 'עזור לנו להשתפר', alwaysOn: 'תמיד פעיל',
+  savePreferences: 'שמור', cameraAccess: 'גישה למצלמה',
+  cameraPermissionDesc: 'נדרשת מצלמה לסריקה.',
+  enableCamera: 'הפעל מצלמה', maybeLater: 'אולי מאוחר יותר',
+  alignDocument: 'יישר את המסמך במסגרת', addMorePagesOrContinue: 'הוסף עמודים או המשך',
+  gallery: 'גלריה', continue: 'המשך', flip: 'הפוך',
+  documentPreview: 'תצוגה מקדימה', discard: 'בטל',
+  saving: 'שומר...', saveToHistory: 'שמור בהיסטוריה',
+  loadingEditor: 'טוען עורך...', editDocument: 'ערוך מסמך',
+  page: 'עמוד', of: 'מתוך',
 };
 
 export const translations: Record<LanguageCode, TranslationKeys> = {
