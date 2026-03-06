@@ -408,7 +408,7 @@ export default function DocumentDetailScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-          Document Details
+          {t('documentDetails')}
         </Text>
         <TouchableOpacity testID="more-btn" onPress={handleDelete} style={styles.headerBtn}>
           <Ionicons name="trash-outline" size={22} color={colors.error} />
