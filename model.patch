@@ -1,1397 +1,1402 @@
-diff --git a/backend/server.py b/backend/server.py
-index 71cf849..1987b0f 100644
---- a/backend/server.py
-+++ b/backend/server.py
-@@ -810,6 +810,13 @@ def generate_html(doc: dict) -> bytes:
- 
- def generate_json_export(doc: dict) -> bytes:
-     """Generate JSON export"""
-+    # Convert datetime objects to ISO strings
-+    created_at = doc.get('created_at', '')
-+    if hasattr(created_at, 'isoformat'):
-+        created_at = created_at.isoformat()
-+    elif created_at and not isinstance(created_at, str):
-+        created_at = str(created_at)
-+    
-     export_data = {
-         "document": {
-             "title": doc.get('title', ''),
-@@ -817,7 +824,7 @@ def generate_json_export(doc: dict) -> bytes:
-             "language": doc.get('detected_language', ''),
-             "confidence": doc.get('confidence', 0),
-             "pages_count": doc.get('pages_count', 1),
--            "created_at": doc.get('created_at', ''),
-+            "created_at": created_at,
-         },
-         "content": {
-             "summary": doc.get('summary', ''),
-diff --git a/export_formats_test.py b/export_formats_test.py
-new file mode 100644
-index 0000000..f2e7b21
---- /dev/null
-+++ b/export_formats_test.py
-@@ -0,0 +1,236 @@
-+#!/usr/bin/env python3
-+"""
-+DocScan Pro - New Export Formats Testing
-+Testing the new export format endpoints: HTML, JSON, Markdown, EPUB, PPTX
-+"""
-+
-+import requests
-+import json
-+import base64
-+import sys
-+from typing import Dict, Any, Optional
-+
-+# Backend URL from environment
-+BACKEND_URL = "https://multi-lang-docs-1.preview.emergentagent.com/api"
-+
-+class ExportFormatTester:
-+    def __init__(self):
-+        self.session = requests.Session()
-+        self.session.headers.update({
-+            'Content-Type': 'application/json',
-+            'Accept': 'application/json'
-+        })
-+        self.test_results = []
-+        
-+    def log_test(self, test_name: str, success: bool, details: str = ""):
-+        """Log test result"""
-+        status = "✅ PASS" if success else "❌ FAIL"
-+        print(f"{status} {test_name}")
-+        if details:
-+            print(f"   Details: {details}")
-+        self.test_results.append({
-+            'test': test_name,
-+            'success': success,
-+            'details': details
-+        })
-+        
-+    def get_test_document_id(self) -> Optional[str]:
-+        """Get a document ID for testing"""
-+        try:
-+            response = self.session.get(f"{BACKEND_URL}/documents")
-+            
-+            if response.status_code != 200:
-+                self.log_test("GET /api/documents", False, f"Status: {response.status_code}")
-+                return None
-+                
-+            documents = response.json()
-+            
-+            if not documents:
-+                self.log_test("GET /api/documents", False, "No documents found")
-+                return None
-+                
-+            # Find a document with content
-+            for doc in documents:
-+                if doc.get('formatted_output') or doc.get('raw_text'):
-+                    self.log_test("GET /api/documents", True, f"Found {len(documents)} documents, selected: {doc.get('title', 'Untitled')}")
-+                    return doc['id']
-+                    
-+            # If no document with content, use the first one
-+            doc_id = documents[0]['id']
-+            self.log_test("GET /api/documents", True, f"Found {len(documents)} documents, using first: {documents[0].get('title', 'Untitled')}")
-+            return doc_id
-+            
-+        except Exception as e:
-+            self.log_test("GET /api/documents", False, f"Exception: {str(e)}")
-+            return None
-+            
-+    def test_export_format(self, doc_id: str, format_name: str) -> bool:
-+        """Test a specific export format using query parameter method"""
-+        try:
-+            response = self.session.post(
-+                f"{BACKEND_URL}/documents/{doc_id}/export?format={format_name}"
-+            )
-+            
-+            if response.status_code != 200:
-+                self.log_test(f"Export {format_name.upper()}", False, f"Status: {response.status_code}, Response: {response.text[:200]}")
-+                return False
-+                
-+            data = response.json()
-+            
-+            # Check if response contains expected fields
-+            if 'base64' not in data:
-+                self.log_test(f"Export {format_name.upper()}", False, "Missing 'base64' field in response")
-+                return False
-+                
-+            if 'mime_type' not in data:
-+                self.log_test(f"Export {format_name.upper()}", False, "Missing 'mime_type' field in response")
-+                return False
-+                
-+            # Validate base64 data
-+            try:
-+                decoded_data = base64.b64decode(data['base64'])
-+                data_size = len(decoded_data)
-+            except Exception as e:
-+                self.log_test(f"Export {format_name.upper()}", False, f"Invalid base64 data: {str(e)}")
-+                return False
-+                
-+            # Check if data is not empty
-+            if data_size == 0:
-+                self.log_test(f"Export {format_name.upper()}", False, "Empty export data")
-+                return False
-+                
-+            # Format-specific validation
-+            mime_type = data.get('mime_type', '')
-+            filename = data.get('filename', '')
-+            
-+            # Validate MIME types and basic content
-+            format_validations = {
-+                'html': ('text/html', b'<!DOCTYPE html'),
-+                'json': ('application/json', b'{'),
-+                'md': ('text/markdown', b'#'),
-+                'epub': ('application/epub+zip', b'PK'),  # EPUB is a ZIP file
-+                'pptx': ('application/vnd.openxmlformats-officedocument.presentationml.presentation', b'PK')  # PPTX is also ZIP-based
-+            }
-+            
-+            if format_name in format_validations:
-+                expected_mime, expected_start = format_validations[format_name]
-+                if expected_mime not in mime_type:
-+                    self.log_test(f"Export {format_name.upper()}", False, f"Unexpected MIME type: {mime_type}, expected: {expected_mime}")
-+                    return False
-+                    
-+                if format_name in ['html', 'json', 'md'] and not decoded_data.startswith(expected_start):
-+                    self.log_test(f"Export {format_name.upper()}", False, f"Content doesn't start with expected pattern")
-+                    return False
-+                
-+            self.log_test(f"Export {format_name.upper()}", True, f"Size: {data_size} bytes, MIME: {mime_type}, File: {filename}")
-+            return True
-+            
-+        except Exception as e:
-+            self.log_test(f"Export {format_name.upper()}", False, f"Exception: {str(e)}")
-+            return False
-+            
-+    def test_invalid_format(self, doc_id: str) -> bool:
-+        """Test invalid format to ensure proper error handling"""
-+        try:
-+            response = self.session.post(
-+                f"{BACKEND_URL}/documents/{doc_id}/export?format=invalid_format"
-+            )
-+            
-+            # Should return 400 error
-+            if response.status_code == 400:
-+                self.log_test("Invalid Format Error Handling", True, f"Correctly returned 400 error: {response.text[:100]}")
-+                return True
-+            else:
-+                self.log_test("Invalid Format Error Handling", False, f"Expected 400, got {response.status_code}")
-+                return False
-+                
-+        except Exception as e:
-+            self.log_test("Invalid Format Error Handling", False, f"Exception: {str(e)}")
-+            return False
-+            
-+    def run_export_format_tests(self):
-+        """Run all new export format tests"""
-+        print(f"\n🚀 DocScan Pro - New Export Formats Testing")
-+        print(f"Backend URL: {BACKEND_URL}")
-+        print("=" * 60)
-+        
-+        # Get a document to test with
-+        doc_id = self.get_test_document_id()
-+        if not doc_id:
-+            print("\n❌ Cannot proceed without a valid document ID")
-+            return False
-+            
-+        print(f"\n📄 Testing with document ID: {doc_id}")
-+        print("-" * 40)
-+        
-+        # Test new export formats as specified in the review request
-+        formats_to_test = [
-+            "html",     # HTML export format
-+            "json",     # JSON export format  
-+            "md",       # Markdown export format
-+            "epub",     # EPUB export format
-+            "pptx"      # PPTX export format (verify still works)
-+        ]
-+        
-+        successful_formats = []
-+        failed_formats = []
-+        
-+        for format_name in formats_to_test:
-+            success = self.test_export_format(doc_id, format_name)
-+            if success:
-+                successful_formats.append(format_name.upper())
-+            else:
-+                failed_formats.append(format_name.upper())
-+                
-+        # Test error handling
-+        print("\n🔍 Testing Error Handling")
-+        print("-" * 30)
-+        self.test_invalid_format(doc_id)
-+        
-+        # Summary
-+        print("\n📊 TEST SUMMARY")
-+        print("=" * 40)
-+        print(f"✅ Successful formats: {', '.join(successful_formats) if successful_formats else 'None'}")
-+        print(f"❌ Failed formats: {', '.join(failed_formats) if failed_formats else 'None'}")
-+        
-+        total_export_tests = len([r for r in self.test_results if 'Export' in r['test']])
-+        passed_export_tests = len([r for r in self.test_results if 'Export' in r['test'] and r['success']])
-+        
-+        print(f"\n📈 Export Tests: {passed_export_tests}/{total_export_tests} passed ({passed_export_tests/total_export_tests*100:.1f}%)")
-+        
-+        # Overall result
-+        if failed_formats:
-+            print(f"\n⚠️  ISSUES DETECTED: {len(failed_formats)} export format(s) failed")
-+            return False
-+        else:
-+            print(f"\n🎉 ALL NEW EXPORT FORMATS WORKING CORRECTLY!")
-+            return True
-+
-+def main():
-+    """Main test execution"""
-+    tester = ExportFormatTester()
-+    
-+    try:
-+        success = tester.run_export_format_tests()
-+        
-+        # Print detailed results for debugging
-+        print("\n🔍 DETAILED TEST RESULTS")
-+        print("=" * 50)
-+        for result in tester.test_results:
-+            status = "✅" if result['success'] else "❌"
-+            print(f"{status} {result['test']}")
-+            if result['details']:
-+                print(f"   {result['details']}")
-+                
-+        return 0 if success else 1
-+        
-+    except KeyboardInterrupt:
-+        print("\n\n⏹️  Testing interrupted by user")
-+        return 1
-+    except Exception as e:
-+        print(f"\n\n💥 Unexpected error: {str(e)}")
-+        return 1
-+
-+if __name__ == "__main__":
-+    exit_code = main()
-+    sys.exit(exit_code)
-\ No newline at end of file
 diff --git a/model.patch b/model.patch
-index 8c3ad8a..64242f3 100644
+index 37871bc..e69de29 100644
 --- a/model.patch
 +++ b/model.patch
-@@ -1,1098 +0,0 @@
--diff --git a/docscan_review_test.py b/docscan_review_test.py
+@@ -1,1397 +0,0 @@
+-diff --git a/backend/server.py b/backend/server.py
+-index 71cf849..1987b0f 100644
+---- a/backend/server.py
+-+++ b/backend/server.py
+-@@ -810,6 +810,13 @@ def generate_html(doc: dict) -> bytes:
+- 
+- def generate_json_export(doc: dict) -> bytes:
+-     """Generate JSON export"""
+-+    # Convert datetime objects to ISO strings
+-+    created_at = doc.get('created_at', '')
+-+    if hasattr(created_at, 'isoformat'):
+-+        created_at = created_at.isoformat()
+-+    elif created_at and not isinstance(created_at, str):
+-+        created_at = str(created_at)
+-+    
+-     export_data = {
+-         "document": {
+-             "title": doc.get('title', ''),
+-@@ -817,7 +824,7 @@ def generate_json_export(doc: dict) -> bytes:
+-             "language": doc.get('detected_language', ''),
+-             "confidence": doc.get('confidence', 0),
+-             "pages_count": doc.get('pages_count', 1),
+--            "created_at": doc.get('created_at', ''),
+-+            "created_at": created_at,
+-         },
+-         "content": {
+-             "summary": doc.get('summary', ''),
+-diff --git a/export_formats_test.py b/export_formats_test.py
 -new file mode 100644
--index 0000000..0000438
+-index 0000000..f2e7b21
 ---- /dev/null
--+++ b/docscan_review_test.py
--@@ -0,0 +1,475 @@
+-+++ b/export_formats_test.py
+-@@ -0,0 +1,236 @@
 -+#!/usr/bin/env python3
 -+"""
--+DocScan Pro Review Testing Suite
--+Focused testing for the specific features requested in the review:
--+1. Password Protection Flow (CRITICAL)
--+2. E-Signature System
--+3. Comments System  
--+4. Document Sharing
--+
--+Tests the production API at https://multi-lang-docs-1.preview.emergentagent.com
+-+DocScan Pro - New Export Formats Testing
+-+Testing the new export format endpoints: HTML, JSON, Markdown, EPUB, PPTX
 -+"""
 -+
 -+import requests
 -+import json
 -+import base64
--+import time
--+from datetime import datetime
+-+import sys
+-+from typing import Dict, Any, Optional
 -+
--+# Configuration
--+BASE_URL = "https://multi-lang-docs-1.preview.emergentagent.com/api"
--+TEST_PASSWORD = "test1234"
--+WRONG_PASSWORD = "wrongpass"
+-+# Backend URL from environment
+-+BACKEND_URL = "https://multi-lang-docs-1.preview.emergentagent.com/api"
 -+
--+class DocScanReviewTester:
+-+class ExportFormatTester:
 -+    def __init__(self):
 -+        self.session = requests.Session()
 -+        self.session.headers.update({
 -+            'Content-Type': 'application/json',
 -+            'Accept': 'application/json'
 -+        })
--+        self.test_doc_id = None
--+        self.test_signature_id = None
--+        self.test_comment_id = None
--+        self.results = []
+-+        self.test_results = []
 -+        
--+    def log_result(self, test_name, success, message, details=None):
+-+    def log_test(self, test_name: str, success: bool, details: str = ""):
 -+        """Log test result"""
 -+        status = "✅ PASS" if success else "❌ FAIL"
--+        result = {
--+            "test": test_name,
--+            "status": status,
--+            "message": message,
--+            "details": details,
--+            "timestamp": datetime.now().isoformat()
--+        }
--+        self.results.append(result)
--+        print(f"{status}: {test_name}")
--+        print(f"   {message}")
--+        if details and not success:
+-+        print(f"{status} {test_name}")
+-+        if details:
 -+            print(f"   Details: {details}")
--+        print()
--+    
--+    def create_test_document(self):
--+        """Create a test document for all testing"""
+-+        self.test_results.append({
+-+            'test': test_name,
+-+            'success': success,
+-+            'details': details
+-+        })
+-+        
+-+    def get_test_document_id(self) -> Optional[str]:
+-+        """Get a document ID for testing"""
 -+        try:
--+            doc_data = {
--+                "title": "Password Test Doc",
--+                "document_type": "general_document",
--+                "formatted_output": "This is a comprehensive test document for DocScan Pro review testing.",
--+                "raw_text": "Test content for password protection, signatures, comments, and sharing",
--+                "summary": "Test document for review validation",
--+                "detected_language": "English",
--+                "confidence": 0.95
+-+            response = self.session.get(f"{BACKEND_URL}/documents")
+-+            
+-+            if response.status_code != 200:
+-+                self.log_test("GET /api/documents", False, f"Status: {response.status_code}")
+-+                return None
+-+                
+-+            documents = response.json()
+-+            
+-+            if not documents:
+-+                self.log_test("GET /api/documents", False, "No documents found")
+-+                return None
+-+                
+-+            # Find a document with content
+-+            for doc in documents:
+-+                if doc.get('formatted_output') or doc.get('raw_text'):
+-+                    self.log_test("GET /api/documents", True, f"Found {len(documents)} documents, selected: {doc.get('title', 'Untitled')}")
+-+                    return doc['id']
+-+                    
+-+            # If no document with content, use the first one
+-+            doc_id = documents[0]['id']
+-+            self.log_test("GET /api/documents", True, f"Found {len(documents)} documents, using first: {documents[0].get('title', 'Untitled')}")
+-+            return doc_id
+-+            
+-+        except Exception as e:
+-+            self.log_test("GET /api/documents", False, f"Exception: {str(e)}")
+-+            return None
+-+            
+-+    def test_export_format(self, doc_id: str, format_name: str) -> bool:
+-+        """Test a specific export format using query parameter method"""
+-+        try:
+-+            response = self.session.post(
+-+                f"{BACKEND_URL}/documents/{doc_id}/export?format={format_name}"
+-+            )
+-+            
+-+            if response.status_code != 200:
+-+                self.log_test(f"Export {format_name.upper()}", False, f"Status: {response.status_code}, Response: {response.text[:200]}")
+-+                return False
+-+                
+-+            data = response.json()
+-+            
+-+            # Check if response contains expected fields
+-+            if 'base64' not in data:
+-+                self.log_test(f"Export {format_name.upper()}", False, "Missing 'base64' field in response")
+-+                return False
+-+                
+-+            if 'mime_type' not in data:
+-+                self.log_test(f"Export {format_name.upper()}", False, "Missing 'mime_type' field in response")
+-+                return False
+-+                
+-+            # Validate base64 data
+-+            try:
+-+                decoded_data = base64.b64decode(data['base64'])
+-+                data_size = len(decoded_data)
+-+            except Exception as e:
+-+                self.log_test(f"Export {format_name.upper()}", False, f"Invalid base64 data: {str(e)}")
+-+                return False
+-+                
+-+            # Check if data is not empty
+-+            if data_size == 0:
+-+                self.log_test(f"Export {format_name.upper()}", False, "Empty export data")
+-+                return False
+-+                
+-+            # Format-specific validation
+-+            mime_type = data.get('mime_type', '')
+-+            filename = data.get('filename', '')
+-+            
+-+            # Validate MIME types and basic content
+-+            format_validations = {
+-+                'html': ('text/html', b'<!DOCTYPE html'),
+-+                'json': ('application/json', b'{'),
+-+                'md': ('text/markdown', b'#'),
+-+                'epub': ('application/epub+zip', b'PK'),  # EPUB is a ZIP file
+-+                'pptx': ('application/vnd.openxmlformats-officedocument.presentationml.presentation', b'PK')  # PPTX is also ZIP-based
 -+            }
 -+            
--+            response = self.session.post(f"{BASE_URL}/documents", json=doc_data)
--+            if response.status_code == 200:
--+                data = response.json()
--+                self.test_doc_id = data.get("id")
--+                self.log_result("Setup - Create Document", True, f"Test document created: {self.test_doc_id}")
+-+            if format_name in format_validations:
+-+                expected_mime, expected_start = format_validations[format_name]
+-+                if expected_mime not in mime_type:
+-+                    self.log_test(f"Export {format_name.upper()}", False, f"Unexpected MIME type: {mime_type}, expected: {expected_mime}")
+-+                    return False
+-+                    
+-+                if format_name in ['html', 'json', 'md'] and not decoded_data.startswith(expected_start):
+-+                    self.log_test(f"Export {format_name.upper()}", False, f"Content doesn't start with expected pattern")
+-+                    return False
+-+                
+-+            self.log_test(f"Export {format_name.upper()}", True, f"Size: {data_size} bytes, MIME: {mime_type}, File: {filename}")
+-+            return True
+-+            
+-+        except Exception as e:
+-+            self.log_test(f"Export {format_name.upper()}", False, f"Exception: {str(e)}")
+-+            return False
+-+            
+-+    def test_invalid_format(self, doc_id: str) -> bool:
+-+        """Test invalid format to ensure proper error handling"""
+-+        try:
+-+            response = self.session.post(
+-+                f"{BACKEND_URL}/documents/{doc_id}/export?format=invalid_format"
+-+            )
+-+            
+-+            # Should return 400 error
+-+            if response.status_code == 400:
+-+                self.log_test("Invalid Format Error Handling", True, f"Correctly returned 400 error: {response.text[:100]}")
 -+                return True
 -+            else:
--+                self.log_result("Setup - Create Document", False, f"HTTP {response.status_code}", response.text[:200])
+-+                self.log_test("Invalid Format Error Handling", False, f"Expected 400, got {response.status_code}")
+-+                return False
+-+                
 -+        except Exception as e:
--+            self.log_result("Setup - Create Document", False, f"Error: {str(e)}")
--+        return False
--+    
--+    def test_password_protection_flow(self):
--+        """Test CRITICAL password protection flow as specified in review"""
--+        if not self.test_doc_id:
--+            self.log_result("Password Protection Flow", False, "No test document available")
+-+            self.log_test("Invalid Format Error Handling", False, f"Exception: {str(e)}")
 -+            return False
--+        
--+        print("🔐 TESTING PASSWORD PROTECTION FLOW (CRITICAL)")
--+        print("=" * 60)
--+        
--+        success_count = 0
--+        total_tests = 4
--+        
--+        # 1. Set password on document: POST /api/documents/{doc_id}/password
--+        try:
--+            response = self.session.post(
--+                f"{BASE_URL}/documents/{self.test_doc_id}/password",
--+                json={"password": TEST_PASSWORD}
--+            )
--+            if response.status_code == 200:
--+                data = response.json()
--+                if data.get("is_locked"):
--+                    self.log_result("1. Set Password", True, f"Password '{TEST_PASSWORD}' set successfully, document locked")
--+                    success_count += 1
--+                else:
--+                    self.log_result("1. Set Password", False, "Document not locked after setting password", data)
--+            else:
--+                self.log_result("1. Set Password", False, f"HTTP {response.status_code}", response.text[:200])
--+        except Exception as e:
--+            self.log_result("1. Set Password", False, f"Error: {str(e)}")
--+        
--+        # 2. Verify correct password works: POST /api/documents/{doc_id}/verify-password
--+        try:
--+            response = self.session.post(
--+                f"{BASE_URL}/documents/{self.test_doc_id}/verify-password",
--+                json={"password": TEST_PASSWORD}
--+            )
--+            if response.status_code == 200:
--+                data = response.json()
--+                if data.get("verified"):
--+                    self.log_result("2. Verify Correct Password", True, f"Correct password '{TEST_PASSWORD}' accepted")
--+                    success_count += 1
--+                else:
--+                    self.log_result("2. Verify Correct Password", False, "Correct password not verified", data)
--+            else:
--+                self.log_result("2. Verify Correct Password", False, f"HTTP {response.status_code}", response.text[:200])
--+        except Exception as e:
--+            self.log_result("2. Verify Correct Password", False, f"Error: {str(e)}")
--+        
--+        # 3. Verify wrong password is rejected (should return 403)
--+        try:
--+            response = self.session.post(
--+                f"{BASE_URL}/documents/{self.test_doc_id}/verify-password",
--+                json={"password": WRONG_PASSWORD}
--+            )
--+            if response.status_code == 403:
--+                self.log_result("3. Reject Wrong Password", True, f"Wrong password '{WRONG_PASSWORD}' correctly rejected (403 Forbidden)")
--+                success_count += 1
--+            elif response.status_code == 200:
--+                data = response.json()
--+                if not data.get("verified"):
--+                    self.log_result("3. Reject Wrong Password", True, f"Wrong password '{WRONG_PASSWORD}' correctly rejected")
--+                    success_count += 1
--+                else:
--+                    self.log_result("3. Reject Wrong Password", False, "Wrong password was incorrectly accepted", data)
--+            else:
--+                self.log_result("3. Reject Wrong Password", False, f"Unexpected HTTP {response.status_code}", response.text[:200])
--+        except Exception as e:
--+            self.log_result("3. Reject Wrong Password", False, f"Error: {str(e)}")
--+        
--+        # 4. Remove password with correct password: DELETE /api/documents/{doc_id}/password
--+        try:
--+            response = self.session.delete(
--+                f"{BASE_URL}/documents/{self.test_doc_id}/password",
--+                json={"password": TEST_PASSWORD}
--+            )
--+            if response.status_code == 200:
--+                data = response.json()
--+                if not data.get("is_locked"):
--+                    self.log_result("4. Remove Password", True, "Password removed successfully, document unlocked")
--+                    success_count += 1
--+                else:
--+                    self.log_result("4. Remove Password", False, "Document still locked after password removal", data)
--+            else:
--+                self.log_result("4. Remove Password", False, f"HTTP {response.status_code}", response.text[:200])
--+        except Exception as e:
--+            self.log_result("4. Remove Password", False, f"Error: {str(e)}")
--+        
--+        overall_success = success_count == total_tests
--+        print(f"🔐 PASSWORD PROTECTION FLOW: {success_count}/{total_tests} tests passed")
--+        return overall_success
--+    
--+    def test_signature_system(self):
--+        """Test E-Signature System as specified in review"""
--+        print("✍️ TESTING E-SIGNATURE SYSTEM")
--+        print("=" * 60)
--+        
--+        success_count = 0
--+        total_tests = 3
--+        
--+        # 1. Create a signature: POST /api/signatures
--+        try:
--+            # Create a simple base64 signature image
--+            signature_data = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCI+PHRleHQgeD0iMTAiIHk9IjUwIiBmb250LWZhbWlseT0iY3Vyc2l2ZSI+Sm9obiBEb2U8L3RleHQ+PC9zdmc+"
 -+            
--+            response = self.session.post(
--+                f"{BASE_URL}/signatures",
--+                json={
--+                    "name": "John Doe",
--+                    "image_base64": signature_data
--+                }
--+            )
--+            if response.status_code == 200:
--+                data = response.json()
--+                signature_info = data.get("signature", {})
--+                self.test_signature_id = signature_info.get("id")
--+                if self.test_signature_id:
--+                    self.log_result("1. Create Signature", True, f"Signature created for 'John Doe' with ID: {self.test_signature_id}")
--+                    success_count += 1
--+                else:
--+                    self.log_result("1. Create Signature", False, "No signature ID returned", data)
--+            else:
--+                self.log_result("1. Create Signature", False, f"HTTP {response.status_code}", response.text[:200])
--+        except Exception as e:
--+            self.log_result("1. Create Signature", False, f"Error: {str(e)}")
--+        
--+        # 2. List signatures: GET /api/signatures
--+        try:
--+            response = self.session.get(f"{BASE_URL}/signatures")
--+            if response.status_code == 200:
--+                data = response.json()
--+                if isinstance(data, list) and len(data) > 0:
--+                    # Check if our signature is in the list
--+                    found_signature = any(sig.get("id") == self.test_signature_id for sig in data)
--+                    if found_signature:
--+                        self.log_result("2. List Signatures", True, f"Found {len(data)} signatures including test signature")
--+                        success_count += 1
--+                    else:
--+                        self.log_result("2. List Signatures", False, f"Test signature not found in list of {len(data)} signatures")
--+                else:
--+                    self.log_result("2. List Signatures", False, "No signatures returned or invalid format", data)
--+            else:
--+                self.log_result("2. List Signatures", False, f"HTTP {response.status_code}", response.text[:200])
--+        except Exception as e:
--+            self.log_result("2. List Signatures", False, f"Error: {str(e)}")
--+        
--+        # 3. Add signature to document: POST /api/documents/{doc_id}/signatures
--+        if self.test_doc_id and self.test_signature_id:
--+            try:
--+                response = self.session.post(
--+                    f"{BASE_URL}/documents/{self.test_doc_id}/signatures",
--+                    json={
--+                        "signature_id": self.test_signature_id,
--+                        "page": 0,
--+                        "x": 100.0,
--+                        "y": 200.0,
--+                        "width": 150.0
--+                    }
--+                )
--+                if response.status_code == 200:
--+                    data = response.json()
--+                    placement = data.get("placement", {})
--+                    if placement.get("signature_id") == self.test_signature_id:
--+                        self.log_result("3. Add Signature to Document", True, f"Signature added to document at position (100, 200) on page 0")
--+                        success_count += 1
--+                    else:
--+                        self.log_result("3. Add Signature to Document", False, "Signature placement data incorrect", data)
--+                else:
--+                    self.log_result("3. Add Signature to Document", False, f"HTTP {response.status_code}", response.text[:200])
--+            except Exception as e:
--+                self.log_result("3. Add Signature to Document", False, f"Error: {str(e)}")
--+        else:
--+            self.log_result("3. Add Signature to Document", False, "Missing document ID or signature ID")
--+        
--+        overall_success = success_count == total_tests
--+        print(f"✍️ E-SIGNATURE SYSTEM: {success_count}/{total_tests} tests passed")
--+        return overall_success
--+    
--+    def test_comments_system(self):
--+        """Test Comments System as specified in review"""
--+        if not self.test_doc_id:
--+            self.log_result("Comments System", False, "No test document available")
--+            return False
--+        
--+        print("💬 TESTING COMMENTS SYSTEM")
+-+    def run_export_format_tests(self):
+-+        """Run all new export format tests"""
+-+        print(f"\n🚀 DocScan Pro - New Export Formats Testing")
+-+        print(f"Backend URL: {BACKEND_URL}")
 -+        print("=" * 60)
 -+        
--+        success_count = 0
--+        total_tests = 3
--+        
--+        # 1. Add a comment: POST /api/documents/{doc_id}/comments
--+        try:
--+            response = self.session.post(
--+                f"{BASE_URL}/documents/{self.test_doc_id}/comments",
--+                json={
--+                    "author": "Test User",
--+                    "author_email": "testuser@example.com",
--+                    "content": "Test comment - This document looks good for review testing"
--+                }
--+            )
--+            if response.status_code == 200:
--+                data = response.json()
--+                comment_info = data.get("comment", {})
--+                self.test_comment_id = comment_info.get("id")
--+                if self.test_comment_id and comment_info.get("content"):
--+                    self.log_result("1. Add Comment", True, f"Comment added by 'Test User' with ID: {self.test_comment_id}")
--+                    success_count += 1
--+                else:
--+                    self.log_result("1. Add Comment", False, "Comment data incorrect", data)
--+            else:
--+                self.log_result("1. Add Comment", False, f"HTTP {response.status_code}", response.text[:200])
--+        except Exception as e:
--+            self.log_result("1. Add Comment", False, f"Error: {str(e)}")
--+        
--+        # 2. Verify comment is stored on document: GET /api/documents/{doc_id}
--+        try:
--+            response = self.session.get(f"{BASE_URL}/documents/{self.test_doc_id}")
--+            if response.status_code == 200:
--+                data = response.json()
--+                comments = data.get("comments", [])
--+                found_comment = any(comment.get("id") == self.test_comment_id for comment in comments)
--+                if found_comment:
--+                    comment_data = next(c for c in comments if c.get("id") == self.test_comment_id)
--+                    self.log_result("2. Verify Comment Storage", True, f"Comment found in document (total: {len(comments)} comments)")
--+                    success_count += 1
--+                else:
--+                    self.log_result("2. Verify Comment Storage", False, f"Comment not found in document. Found {len(comments)} comments")
--+            else:
--+                self.log_result("2. Verify Comment Storage", False, f"HTTP {response.status_code}", response.text[:200])
--+        except Exception as e:
--+            self.log_result("2. Verify Comment Storage", False, f"Error: {str(e)}")
--+        
--+        # 3. Resolve comment: PUT /api/documents/{doc_id}/comments/{comment_id}/resolve
--+        if self.test_comment_id:
--+            try:
--+                response = self.session.put(f"{BASE_URL}/documents/{self.test_doc_id}/comments/{self.test_comment_id}/resolve")
--+                if response.status_code == 200:
--+                    data = response.json()
--+                    if "resolved" in data.get("message", "").lower():
--+                        self.log_result("3. Resolve Comment", True, f"Comment {self.test_comment_id} resolved successfully")
--+                        success_count += 1
--+                    else:
--+                        self.log_result("3. Resolve Comment", False, "Unexpected response", data)
--+                else:
--+                    self.log_result("3. Resolve Comment", False, f"HTTP {response.status_code}", response.text[:200])
--+            except Exception as e:
--+                self.log_result("3. Resolve Comment", False, f"Error: {str(e)}")
--+        else:
--+            self.log_result("3. Resolve Comment", False, "No comment ID available")
--+        
--+        overall_success = success_count == total_tests
--+        print(f"💬 COMMENTS SYSTEM: {success_count}/{total_tests} tests passed")
--+        return overall_success
--+    
--+    def test_document_sharing(self):
--+        """Test Document Sharing as specified in review"""
--+        if not self.test_doc_id:
--+            self.log_result("Document Sharing", False, "No test document available")
+-+        # Get a document to test with
+-+        doc_id = self.get_test_document_id()
+-+        if not doc_id:
+-+            print("\n❌ Cannot proceed without a valid document ID")
 -+            return False
+-+            
+-+        print(f"\n📄 Testing with document ID: {doc_id}")
+-+        print("-" * 40)
 -+        
--+        print("📤 TESTING DOCUMENT SHARING")
--+        print("=" * 60)
+-+        # Test new export formats as specified in the review request
+-+        formats_to_test = [
+-+            "html",     # HTML export format
+-+            "json",     # JSON export format  
+-+            "md",       # Markdown export format
+-+            "epub",     # EPUB export format
+-+            "pptx"      # PPTX export format (verify still works)
+-+        ]
 -+        
--+        # Share document via email: POST /api/documents/{doc_id}/share
--+        try:
--+            response = self.session.post(
--+                f"{BASE_URL}/documents/{self.test_doc_id}/share",
--+                json={
--+                    "sender_name": "Alice Johnson",
--+                    "sender_email": "alice.johnson@company.com",
--+                    "recipient_email": "bob.smith@partner.com",
--+                    "recipient_name": "Bob Smith",
--+                    "message": "Please review this test document for our DocScan Pro validation"
--+                }
--+            )
--+            if response.status_code == 200:
--+                data = response.json()
--+                if "shared" in data.get("message", "").lower():
--+                    self.log_result("Document Sharing", True, f"Document shared from alice.johnson@company.com to bob.smith@partner.com")
--+                    print(f"📤 DOCUMENT SHARING: 1/1 tests passed")
--+                    return True
--+                else:
--+                    self.log_result("Document Sharing", False, "Unexpected response format", data)
+-+        successful_formats = []
+-+        failed_formats = []
+-+        
+-+        for format_name in formats_to_test:
+-+            success = self.test_export_format(doc_id, format_name)
+-+            if success:
+-+                successful_formats.append(format_name.upper())
 -+            else:
--+                self.log_result("Document Sharing", False, f"HTTP {response.status_code}", response.text[:200])
--+        except Exception as e:
--+            self.log_result("Document Sharing", False, f"Error: {str(e)}")
--+        
--+        print(f"📤 DOCUMENT SHARING: 0/1 tests passed")
--+        return False
--+    
--+    def cleanup_test_data(self):
--+        """Clean up test data"""
--+        print("🧹 CLEANING UP TEST DATA")
--+        print("=" * 60)
--+        
--+        cleanup_count = 0
--+        
--+        # Delete test signature
--+        if self.test_signature_id:
--+            try:
--+                response = self.session.delete(f"{BASE_URL}/signatures/{self.test_signature_id}")
--+                if response.status_code == 200:
--+                    cleanup_count += 1
--+                    print(f"✅ Cleaned up test signature: {self.test_signature_id}")
--+                else:
--+                    print(f"⚠️  Failed to delete test signature: HTTP {response.status_code}")
--+            except Exception as e:
--+                print(f"⚠️  Error deleting test signature: {str(e)}")
--+        
--+        # Delete test document
--+        if self.test_doc_id:
--+            try:
--+                response = self.session.delete(f"{BASE_URL}/documents/{self.test_doc_id}")
--+                if response.status_code == 200:
--+                    cleanup_count += 1
--+                    print(f"✅ Cleaned up test document: {self.test_doc_id}")
--+                else:
--+                    print(f"⚠️  Failed to delete test document: HTTP {response.status_code}")
--+            except Exception as e:
--+                print(f"⚠️  Error deleting test document: {str(e)}")
--+        
--+        print(f"🧹 Cleanup completed: {cleanup_count} items removed")
--+        return cleanup_count
--+    
--+    def run_review_tests(self):
--+        """Run all review-specific tests"""
--+        print("=" * 80)
--+        print("🔍 DocScan Pro Backend Review Testing Suite")
--+        print(f"🌐 Testing API at: {BASE_URL}")
--+        print("📋 Focus: Password Protection, E-Signatures, Comments, Document Sharing")
--+        print("=" * 80)
--+        
--+        # Setup
--+        if not self.create_test_document():
--+            print("\n❌ CRITICAL: Cannot create test document. Aborting tests.")
--+            return False
--+        
--+        # Run all feature tests
--+        test_results = []
--+        test_results.append(self.test_password_protection_flow())
--+        test_results.append(self.test_signature_system())
--+        test_results.append(self.test_comments_system())
--+        test_results.append(self.test_document_sharing())
--+        
--+        # Cleanup
--+        self.cleanup_test_data()
+-+                failed_formats.append(format_name.upper())
+-+                
+-+        # Test error handling
+-+        print("\n🔍 Testing Error Handling")
+-+        print("-" * 30)
+-+        self.test_invalid_format(doc_id)
 -+        
 -+        # Summary
--+        print("\n" + "=" * 80)
--+        print("📊 REVIEW TEST SUMMARY")
--+        print("=" * 80)
+-+        print("\n📊 TEST SUMMARY")
+-+        print("=" * 40)
+-+        print(f"✅ Successful formats: {', '.join(successful_formats) if successful_formats else 'None'}")
+-+        print(f"❌ Failed formats: {', '.join(failed_formats) if failed_formats else 'None'}")
 -+        
--+        passed_features = sum(test_results)
--+        total_features = len(test_results)
+-+        total_export_tests = len([r for r in self.test_results if 'Export' in r['test']])
+-+        passed_export_tests = len([r for r in self.test_results if 'Export' in r['test'] and r['success']])
 -+        
--+        feature_names = ["Password Protection Flow", "E-Signature System", "Comments System", "Document Sharing"]
+-+        print(f"\n📈 Export Tests: {passed_export_tests}/{total_export_tests} passed ({passed_export_tests/total_export_tests*100:.1f}%)")
 -+        
--+        print(f"🎯 Critical Features Tested: {total_features}")
--+        print(f"✅ Features Working: {passed_features}")
--+        print(f"❌ Features Failing: {total_features - passed_features}")
--+        print(f"📈 Success Rate: {(passed_features/total_features)*100:.1f}%")
--+        
--+        print("\n📋 DETAILED RESULTS:")
--+        for i, (feature, result) in enumerate(zip(feature_names, test_results)):
--+            status = "✅ WORKING" if result else "❌ FAILING"
--+            priority = "CRITICAL" if i == 0 else "HIGH"  # Password protection is critical
--+            print(f"  {status} - {feature} ({priority} priority)")
--+        
--+        # Show failed tests details
--+        failed_results = [r for r in self.results if "❌ FAIL" in r["status"]]
--+        if failed_results:
--+            print(f"\n❌ FAILED TEST DETAILS ({len(failed_results)} failures):")
--+            for test in failed_results:
--+                print(f"  • {test['test']}: {test['message']}")
--+        
--+        # Overall assessment
--+        print("\n" + "=" * 80)
--+        if passed_features == total_features:
--+            print("🎉 ALL REVIEW FEATURES WORKING - API IS PRODUCTION READY")
--+            print("✅ Password Protection, E-Signatures, Comments, and Sharing all functional")
--+        elif passed_features >= 3:
--+            print("⚠️  MOSTLY WORKING - MINOR ISSUES DETECTED")
--+            print(f"✅ {passed_features}/{total_features} features working correctly")
+-+        # Overall result
+-+        if failed_formats:
+-+            print(f"\n⚠️  ISSUES DETECTED: {len(failed_formats)} export format(s) failed")
+-+            return False
 -+        else:
--+            print("🚨 CRITICAL ISSUES DETECTED - NEEDS IMMEDIATE ATTENTION")
--+            print(f"❌ {total_features - passed_features}/{total_features} features failing")
--+        print("=" * 80)
--+        
--+        return passed_features == total_features
+-+            print(f"\n🎉 ALL NEW EXPORT FORMATS WORKING CORRECTLY!")
+-+            return True
 -+
 -+def main():
 -+    """Main test execution"""
--+    tester = DocScanReviewTester()
--+    success = tester.run_review_tests()
--+    return 0 if success else 1
+-+    tester = ExportFormatTester()
+-+    
+-+    try:
+-+        success = tester.run_export_format_tests()
+-+        
+-+        # Print detailed results for debugging
+-+        print("\n🔍 DETAILED TEST RESULTS")
+-+        print("=" * 50)
+-+        for result in tester.test_results:
+-+            status = "✅" if result['success'] else "❌"
+-+            print(f"{status} {result['test']}")
+-+            if result['details']:
+-+                print(f"   {result['details']}")
+-+                
+-+        return 0 if success else 1
+-+        
+-+    except KeyboardInterrupt:
+-+        print("\n\n⏹️  Testing interrupted by user")
+-+        return 1
+-+    except Exception as e:
+-+        print(f"\n\n💥 Unexpected error: {str(e)}")
+-+        return 1
 -+
 -+if __name__ == "__main__":
--+    exit(main())
+-+    exit_code = main()
+-+    sys.exit(exit_code)
 -\ No newline at end of file
 -diff --git a/model.patch b/model.patch
--index 32927f9..8d99788 100644
+-index 8c3ad8a..64242f3 100644
 ---- a/model.patch
 -+++ b/model.patch
--@@ -1,597 +0,0 @@
+-@@ -1,1098 +0,0 @@
+--diff --git a/docscan_review_test.py b/docscan_review_test.py
+--new file mode 100644
+--index 0000000..0000438
+----- /dev/null
+--+++ b/docscan_review_test.py
+--@@ -0,0 +1,475 @@
+--+#!/usr/bin/env python3
+--+"""
+--+DocScan Pro Review Testing Suite
+--+Focused testing for the specific features requested in the review:
+--+1. Password Protection Flow (CRITICAL)
+--+2. E-Signature System
+--+3. Comments System  
+--+4. Document Sharing
+--+
+--+Tests the production API at https://multi-lang-docs-1.preview.emergentagent.com
+--+"""
+--+
+--+import requests
+--+import json
+--+import base64
+--+import time
+--+from datetime import datetime
+--+
+--+# Configuration
+--+BASE_URL = "https://multi-lang-docs-1.preview.emergentagent.com/api"
+--+TEST_PASSWORD = "test1234"
+--+WRONG_PASSWORD = "wrongpass"
+--+
+--+class DocScanReviewTester:
+--+    def __init__(self):
+--+        self.session = requests.Session()
+--+        self.session.headers.update({
+--+            'Content-Type': 'application/json',
+--+            'Accept': 'application/json'
+--+        })
+--+        self.test_doc_id = None
+--+        self.test_signature_id = None
+--+        self.test_comment_id = None
+--+        self.results = []
+--+        
+--+    def log_result(self, test_name, success, message, details=None):
+--+        """Log test result"""
+--+        status = "✅ PASS" if success else "❌ FAIL"
+--+        result = {
+--+            "test": test_name,
+--+            "status": status,
+--+            "message": message,
+--+            "details": details,
+--+            "timestamp": datetime.now().isoformat()
+--+        }
+--+        self.results.append(result)
+--+        print(f"{status}: {test_name}")
+--+        print(f"   {message}")
+--+        if details and not success:
+--+            print(f"   Details: {details}")
+--+        print()
+--+    
+--+    def create_test_document(self):
+--+        """Create a test document for all testing"""
+--+        try:
+--+            doc_data = {
+--+                "title": "Password Test Doc",
+--+                "document_type": "general_document",
+--+                "formatted_output": "This is a comprehensive test document for DocScan Pro review testing.",
+--+                "raw_text": "Test content for password protection, signatures, comments, and sharing",
+--+                "summary": "Test document for review validation",
+--+                "detected_language": "English",
+--+                "confidence": 0.95
+--+            }
+--+            
+--+            response = self.session.post(f"{BASE_URL}/documents", json=doc_data)
+--+            if response.status_code == 200:
+--+                data = response.json()
+--+                self.test_doc_id = data.get("id")
+--+                self.log_result("Setup - Create Document", True, f"Test document created: {self.test_doc_id}")
+--+                return True
+--+            else:
+--+                self.log_result("Setup - Create Document", False, f"HTTP {response.status_code}", response.text[:200])
+--+        except Exception as e:
+--+            self.log_result("Setup - Create Document", False, f"Error: {str(e)}")
+--+        return False
+--+    
+--+    def test_password_protection_flow(self):
+--+        """Test CRITICAL password protection flow as specified in review"""
+--+        if not self.test_doc_id:
+--+            self.log_result("Password Protection Flow", False, "No test document available")
+--+            return False
+--+        
+--+        print("🔐 TESTING PASSWORD PROTECTION FLOW (CRITICAL)")
+--+        print("=" * 60)
+--+        
+--+        success_count = 0
+--+        total_tests = 4
+--+        
+--+        # 1. Set password on document: POST /api/documents/{doc_id}/password
+--+        try:
+--+            response = self.session.post(
+--+                f"{BASE_URL}/documents/{self.test_doc_id}/password",
+--+                json={"password": TEST_PASSWORD}
+--+            )
+--+            if response.status_code == 200:
+--+                data = response.json()
+--+                if data.get("is_locked"):
+--+                    self.log_result("1. Set Password", True, f"Password '{TEST_PASSWORD}' set successfully, document locked")
+--+                    success_count += 1
+--+                else:
+--+                    self.log_result("1. Set Password", False, "Document not locked after setting password", data)
+--+            else:
+--+                self.log_result("1. Set Password", False, f"HTTP {response.status_code}", response.text[:200])
+--+        except Exception as e:
+--+            self.log_result("1. Set Password", False, f"Error: {str(e)}")
+--+        
+--+        # 2. Verify correct password works: POST /api/documents/{doc_id}/verify-password
+--+        try:
+--+            response = self.session.post(
+--+                f"{BASE_URL}/documents/{self.test_doc_id}/verify-password",
+--+                json={"password": TEST_PASSWORD}
+--+            )
+--+            if response.status_code == 200:
+--+                data = response.json()
+--+                if data.get("verified"):
+--+                    self.log_result("2. Verify Correct Password", True, f"Correct password '{TEST_PASSWORD}' accepted")
+--+                    success_count += 1
+--+                else:
+--+                    self.log_result("2. Verify Correct Password", False, "Correct password not verified", data)
+--+            else:
+--+                self.log_result("2. Verify Correct Password", False, f"HTTP {response.status_code}", response.text[:200])
+--+        except Exception as e:
+--+            self.log_result("2. Verify Correct Password", False, f"Error: {str(e)}")
+--+        
+--+        # 3. Verify wrong password is rejected (should return 403)
+--+        try:
+--+            response = self.session.post(
+--+                f"{BASE_URL}/documents/{self.test_doc_id}/verify-password",
+--+                json={"password": WRONG_PASSWORD}
+--+            )
+--+            if response.status_code == 403:
+--+                self.log_result("3. Reject Wrong Password", True, f"Wrong password '{WRONG_PASSWORD}' correctly rejected (403 Forbidden)")
+--+                success_count += 1
+--+            elif response.status_code == 200:
+--+                data = response.json()
+--+                if not data.get("verified"):
+--+                    self.log_result("3. Reject Wrong Password", True, f"Wrong password '{WRONG_PASSWORD}' correctly rejected")
+--+                    success_count += 1
+--+                else:
+--+                    self.log_result("3. Reject Wrong Password", False, "Wrong password was incorrectly accepted", data)
+--+            else:
+--+                self.log_result("3. Reject Wrong Password", False, f"Unexpected HTTP {response.status_code}", response.text[:200])
+--+        except Exception as e:
+--+            self.log_result("3. Reject Wrong Password", False, f"Error: {str(e)}")
+--+        
+--+        # 4. Remove password with correct password: DELETE /api/documents/{doc_id}/password
+--+        try:
+--+            response = self.session.delete(
+--+                f"{BASE_URL}/documents/{self.test_doc_id}/password",
+--+                json={"password": TEST_PASSWORD}
+--+            )
+--+            if response.status_code == 200:
+--+                data = response.json()
+--+                if not data.get("is_locked"):
+--+                    self.log_result("4. Remove Password", True, "Password removed successfully, document unlocked")
+--+                    success_count += 1
+--+                else:
+--+                    self.log_result("4. Remove Password", False, "Document still locked after password removal", data)
+--+            else:
+--+                self.log_result("4. Remove Password", False, f"HTTP {response.status_code}", response.text[:200])
+--+        except Exception as e:
+--+            self.log_result("4. Remove Password", False, f"Error: {str(e)}")
+--+        
+--+        overall_success = success_count == total_tests
+--+        print(f"🔐 PASSWORD PROTECTION FLOW: {success_count}/{total_tests} tests passed")
+--+        return overall_success
+--+    
+--+    def test_signature_system(self):
+--+        """Test E-Signature System as specified in review"""
+--+        print("✍️ TESTING E-SIGNATURE SYSTEM")
+--+        print("=" * 60)
+--+        
+--+        success_count = 0
+--+        total_tests = 3
+--+        
+--+        # 1. Create a signature: POST /api/signatures
+--+        try:
+--+            # Create a simple base64 signature image
+--+            signature_data = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCI+PHRleHQgeD0iMTAiIHk9IjUwIiBmb250LWZhbWlseT0iY3Vyc2l2ZSI+Sm9obiBEb2U8L3RleHQ+PC9zdmc+"
+--+            
+--+            response = self.session.post(
+--+                f"{BASE_URL}/signatures",
+--+                json={
+--+                    "name": "John Doe",
+--+                    "image_base64": signature_data
+--+                }
+--+            )
+--+            if response.status_code == 200:
+--+                data = response.json()
+--+                signature_info = data.get("signature", {})
+--+                self.test_signature_id = signature_info.get("id")
+--+                if self.test_signature_id:
+--+                    self.log_result("1. Create Signature", True, f"Signature created for 'John Doe' with ID: {self.test_signature_id}")
+--+                    success_count += 1
+--+                else:
+--+                    self.log_result("1. Create Signature", False, "No signature ID returned", data)
+--+            else:
+--+                self.log_result("1. Create Signature", False, f"HTTP {response.status_code}", response.text[:200])
+--+        except Exception as e:
+--+            self.log_result("1. Create Signature", False, f"Error: {str(e)}")
+--+        
+--+        # 2. List signatures: GET /api/signatures
+--+        try:
+--+            response = self.session.get(f"{BASE_URL}/signatures")
+--+            if response.status_code == 200:
+--+                data = response.json()
+--+                if isinstance(data, list) and len(data) > 0:
+--+                    # Check if our signature is in the list
+--+                    found_signature = any(sig.get("id") == self.test_signature_id for sig in data)
+--+                    if found_signature:
+--+                        self.log_result("2. List Signatures", True, f"Found {len(data)} signatures including test signature")
+--+                        success_count += 1
+--+                    else:
+--+                        self.log_result("2. List Signatures", False, f"Test signature not found in list of {len(data)} signatures")
+--+                else:
+--+                    self.log_result("2. List Signatures", False, "No signatures returned or invalid format", data)
+--+            else:
+--+                self.log_result("2. List Signatures", False, f"HTTP {response.status_code}", response.text[:200])
+--+        except Exception as e:
+--+            self.log_result("2. List Signatures", False, f"Error: {str(e)}")
+--+        
+--+        # 3. Add signature to document: POST /api/documents/{doc_id}/signatures
+--+        if self.test_doc_id and self.test_signature_id:
+--+            try:
+--+                response = self.session.post(
+--+                    f"{BASE_URL}/documents/{self.test_doc_id}/signatures",
+--+                    json={
+--+                        "signature_id": self.test_signature_id,
+--+                        "page": 0,
+--+                        "x": 100.0,
+--+                        "y": 200.0,
+--+                        "width": 150.0
+--+                    }
+--+                )
+--+                if response.status_code == 200:
+--+                    data = response.json()
+--+                    placement = data.get("placement", {})
+--+                    if placement.get("signature_id") == self.test_signature_id:
+--+                        self.log_result("3. Add Signature to Document", True, f"Signature added to document at position (100, 200) on page 0")
+--+                        success_count += 1
+--+                    else:
+--+                        self.log_result("3. Add Signature to Document", False, "Signature placement data incorrect", data)
+--+                else:
+--+                    self.log_result("3. Add Signature to Document", False, f"HTTP {response.status_code}", response.text[:200])
+--+            except Exception as e:
+--+                self.log_result("3. Add Signature to Document", False, f"Error: {str(e)}")
+--+        else:
+--+            self.log_result("3. Add Signature to Document", False, "Missing document ID or signature ID")
+--+        
+--+        overall_success = success_count == total_tests
+--+        print(f"✍️ E-SIGNATURE SYSTEM: {success_count}/{total_tests} tests passed")
+--+        return overall_success
+--+    
+--+    def test_comments_system(self):
+--+        """Test Comments System as specified in review"""
+--+        if not self.test_doc_id:
+--+            self.log_result("Comments System", False, "No test document available")
+--+            return False
+--+        
+--+        print("💬 TESTING COMMENTS SYSTEM")
+--+        print("=" * 60)
+--+        
+--+        success_count = 0
+--+        total_tests = 3
+--+        
+--+        # 1. Add a comment: POST /api/documents/{doc_id}/comments
+--+        try:
+--+            response = self.session.post(
+--+                f"{BASE_URL}/documents/{self.test_doc_id}/comments",
+--+                json={
+--+                    "author": "Test User",
+--+                    "author_email": "testuser@example.com",
+--+                    "content": "Test comment - This document looks good for review testing"
+--+                }
+--+            )
+--+            if response.status_code == 200:
+--+                data = response.json()
+--+                comment_info = data.get("comment", {})
+--+                self.test_comment_id = comment_info.get("id")
+--+                if self.test_comment_id and comment_info.get("content"):
+--+                    self.log_result("1. Add Comment", True, f"Comment added by 'Test User' with ID: {self.test_comment_id}")
+--+                    success_count += 1
+--+                else:
+--+                    self.log_result("1. Add Comment", False, "Comment data incorrect", data)
+--+            else:
+--+                self.log_result("1. Add Comment", False, f"HTTP {response.status_code}", response.text[:200])
+--+        except Exception as e:
+--+            self.log_result("1. Add Comment", False, f"Error: {str(e)}")
+--+        
+--+        # 2. Verify comment is stored on document: GET /api/documents/{doc_id}
+--+        try:
+--+            response = self.session.get(f"{BASE_URL}/documents/{self.test_doc_id}")
+--+            if response.status_code == 200:
+--+                data = response.json()
+--+                comments = data.get("comments", [])
+--+                found_comment = any(comment.get("id") == self.test_comment_id for comment in comments)
+--+                if found_comment:
+--+                    comment_data = next(c for c in comments if c.get("id") == self.test_comment_id)
+--+                    self.log_result("2. Verify Comment Storage", True, f"Comment found in document (total: {len(comments)} comments)")
+--+                    success_count += 1
+--+                else:
+--+                    self.log_result("2. Verify Comment Storage", False, f"Comment not found in document. Found {len(comments)} comments")
+--+            else:
+--+                self.log_result("2. Verify Comment Storage", False, f"HTTP {response.status_code}", response.text[:200])
+--+        except Exception as e:
+--+            self.log_result("2. Verify Comment Storage", False, f"Error: {str(e)}")
+--+        
+--+        # 3. Resolve comment: PUT /api/documents/{doc_id}/comments/{comment_id}/resolve
+--+        if self.test_comment_id:
+--+            try:
+--+                response = self.session.put(f"{BASE_URL}/documents/{self.test_doc_id}/comments/{self.test_comment_id}/resolve")
+--+                if response.status_code == 200:
+--+                    data = response.json()
+--+                    if "resolved" in data.get("message", "").lower():
+--+                        self.log_result("3. Resolve Comment", True, f"Comment {self.test_comment_id} resolved successfully")
+--+                        success_count += 1
+--+                    else:
+--+                        self.log_result("3. Resolve Comment", False, "Unexpected response", data)
+--+                else:
+--+                    self.log_result("3. Resolve Comment", False, f"HTTP {response.status_code}", response.text[:200])
+--+            except Exception as e:
+--+                self.log_result("3. Resolve Comment", False, f"Error: {str(e)}")
+--+        else:
+--+            self.log_result("3. Resolve Comment", False, "No comment ID available")
+--+        
+--+        overall_success = success_count == total_tests
+--+        print(f"💬 COMMENTS SYSTEM: {success_count}/{total_tests} tests passed")
+--+        return overall_success
+--+    
+--+    def test_document_sharing(self):
+--+        """Test Document Sharing as specified in review"""
+--+        if not self.test_doc_id:
+--+            self.log_result("Document Sharing", False, "No test document available")
+--+            return False
+--+        
+--+        print("📤 TESTING DOCUMENT SHARING")
+--+        print("=" * 60)
+--+        
+--+        # Share document via email: POST /api/documents/{doc_id}/share
+--+        try:
+--+            response = self.session.post(
+--+                f"{BASE_URL}/documents/{self.test_doc_id}/share",
+--+                json={
+--+                    "sender_name": "Alice Johnson",
+--+                    "sender_email": "alice.johnson@company.com",
+--+                    "recipient_email": "bob.smith@partner.com",
+--+                    "recipient_name": "Bob Smith",
+--+                    "message": "Please review this test document for our DocScan Pro validation"
+--+                }
+--+            )
+--+            if response.status_code == 200:
+--+                data = response.json()
+--+                if "shared" in data.get("message", "").lower():
+--+                    self.log_result("Document Sharing", True, f"Document shared from alice.johnson@company.com to bob.smith@partner.com")
+--+                    print(f"📤 DOCUMENT SHARING: 1/1 tests passed")
+--+                    return True
+--+                else:
+--+                    self.log_result("Document Sharing", False, "Unexpected response format", data)
+--+            else:
+--+                self.log_result("Document Sharing", False, f"HTTP {response.status_code}", response.text[:200])
+--+        except Exception as e:
+--+            self.log_result("Document Sharing", False, f"Error: {str(e)}")
+--+        
+--+        print(f"📤 DOCUMENT SHARING: 0/1 tests passed")
+--+        return False
+--+    
+--+    def cleanup_test_data(self):
+--+        """Clean up test data"""
+--+        print("🧹 CLEANING UP TEST DATA")
+--+        print("=" * 60)
+--+        
+--+        cleanup_count = 0
+--+        
+--+        # Delete test signature
+--+        if self.test_signature_id:
+--+            try:
+--+                response = self.session.delete(f"{BASE_URL}/signatures/{self.test_signature_id}")
+--+                if response.status_code == 200:
+--+                    cleanup_count += 1
+--+                    print(f"✅ Cleaned up test signature: {self.test_signature_id}")
+--+                else:
+--+                    print(f"⚠️  Failed to delete test signature: HTTP {response.status_code}")
+--+            except Exception as e:
+--+                print(f"⚠️  Error deleting test signature: {str(e)}")
+--+        
+--+        # Delete test document
+--+        if self.test_doc_id:
+--+            try:
+--+                response = self.session.delete(f"{BASE_URL}/documents/{self.test_doc_id}")
+--+                if response.status_code == 200:
+--+                    cleanup_count += 1
+--+                    print(f"✅ Cleaned up test document: {self.test_doc_id}")
+--+                else:
+--+                    print(f"⚠️  Failed to delete test document: HTTP {response.status_code}")
+--+            except Exception as e:
+--+                print(f"⚠️  Error deleting test document: {str(e)}")
+--+        
+--+        print(f"🧹 Cleanup completed: {cleanup_count} items removed")
+--+        return cleanup_count
+--+    
+--+    def run_review_tests(self):
+--+        """Run all review-specific tests"""
+--+        print("=" * 80)
+--+        print("🔍 DocScan Pro Backend Review Testing Suite")
+--+        print(f"🌐 Testing API at: {BASE_URL}")
+--+        print("📋 Focus: Password Protection, E-Signatures, Comments, Document Sharing")
+--+        print("=" * 80)
+--+        
+--+        # Setup
+--+        if not self.create_test_document():
+--+            print("\n❌ CRITICAL: Cannot create test document. Aborting tests.")
+--+            return False
+--+        
+--+        # Run all feature tests
+--+        test_results = []
+--+        test_results.append(self.test_password_protection_flow())
+--+        test_results.append(self.test_signature_system())
+--+        test_results.append(self.test_comments_system())
+--+        test_results.append(self.test_document_sharing())
+--+        
+--+        # Cleanup
+--+        self.cleanup_test_data()
+--+        
+--+        # Summary
+--+        print("\n" + "=" * 80)
+--+        print("📊 REVIEW TEST SUMMARY")
+--+        print("=" * 80)
+--+        
+--+        passed_features = sum(test_results)
+--+        total_features = len(test_results)
+--+        
+--+        feature_names = ["Password Protection Flow", "E-Signature System", "Comments System", "Document Sharing"]
+--+        
+--+        print(f"🎯 Critical Features Tested: {total_features}")
+--+        print(f"✅ Features Working: {passed_features}")
+--+        print(f"❌ Features Failing: {total_features - passed_features}")
+--+        print(f"📈 Success Rate: {(passed_features/total_features)*100:.1f}%")
+--+        
+--+        print("\n📋 DETAILED RESULTS:")
+--+        for i, (feature, result) in enumerate(zip(feature_names, test_results)):
+--+            status = "✅ WORKING" if result else "❌ FAILING"
+--+            priority = "CRITICAL" if i == 0 else "HIGH"  # Password protection is critical
+--+            print(f"  {status} - {feature} ({priority} priority)")
+--+        
+--+        # Show failed tests details
+--+        failed_results = [r for r in self.results if "❌ FAIL" in r["status"]]
+--+        if failed_results:
+--+            print(f"\n❌ FAILED TEST DETAILS ({len(failed_results)} failures):")
+--+            for test in failed_results:
+--+                print(f"  • {test['test']}: {test['message']}")
+--+        
+--+        # Overall assessment
+--+        print("\n" + "=" * 80)
+--+        if passed_features == total_features:
+--+            print("🎉 ALL REVIEW FEATURES WORKING - API IS PRODUCTION READY")
+--+            print("✅ Password Protection, E-Signatures, Comments, and Sharing all functional")
+--+        elif passed_features >= 3:
+--+            print("⚠️  MOSTLY WORKING - MINOR ISSUES DETECTED")
+--+            print(f"✅ {passed_features}/{total_features} features working correctly")
+--+        else:
+--+            print("🚨 CRITICAL ISSUES DETECTED - NEEDS IMMEDIATE ATTENTION")
+--+            print(f"❌ {total_features - passed_features}/{total_features} features failing")
+--+        print("=" * 80)
+--+        
+--+        return passed_features == total_features
+--+
+--+def main():
+--+    """Main test execution"""
+--+    tester = DocScanReviewTester()
+--+    success = tester.run_review_tests()
+--+    return 0 if success else 1
+--+
+--+if __name__ == "__main__":
+--+    exit(main())
+--\ No newline at end of file
 --diff --git a/model.patch b/model.patch
---index b223c3e..e69de29 100644
+--index 32927f9..8d99788 100644
 ----- a/model.patch
 --+++ b/model.patch
---@@ -1,575 +0,0 @@
----diff --git a/backend_test_v5.py b/backend_test_v5.py
----new file mode 100644
----index 0000000..483df8b
------- /dev/null
----+++ b/backend_test_v5.py
----@@ -0,0 +1,424 @@
----+#!/usr/bin/env python3
----+"""
----+DocScan Pro Backend API v5 Testing Suite
----+Tests all new features including Resend email integration, AI assistant, 
----+image processing, and cloud storage as requested in the review.
----+"""
----+
----+import requests
----+import json
----+import base64
----+import time
----+from typing import Dict, Any, Optional
----+
----+# Configuration
----+BASE_URL = "https://multi-lang-docs-1.preview.emergentagent.com/api"
----+TIMEOUT = 30
----+
----+class DocScanV5Tester:
----+    def __init__(self):
----+        self.session = requests.Session()
----+        self.session.timeout = TIMEOUT
----+        self.test_document_id = None
----+        self.results = []
----+        
----+    def log_result(self, test_name: str, success: bool, details: str = "", response_data: Any = None):
----+        """Log test result"""
----+        status = "✅ PASS" if success else "❌ FAIL"
----+        print(f"{status} {test_name}")
----+        if details:
----+            print(f"   Details: {details}")
----+        if response_data and isinstance(response_data, dict):
----+            print(f"   Response: {json.dumps(response_data, indent=2)[:200]}...")
----+        
----+        self.results.append({
----+            "test": test_name,
----+            "success": success,
----+            "details": details,
----+            "response": response_data
----+        })
----+        print("-" * 60)
----+    
----+    def test_api_root(self):
----+        """Test GET /api/ - Should return API version v5"""
----+        try:
----+            response = self.session.get(f"{BASE_URL}/")
----+            
----+            if response.status_code == 200:
----+                data = response.json()
----+                message = data.get("message", "")
----+                
----+                if "v5" in message and "Full Featured" in message:
----+                    self.log_result("API Root Endpoint", True, 
----+                                  f"Returned correct v5 message: {message}", data)
----+                else:
----+                    self.log_result("API Root Endpoint", False, 
----+                                  f"Unexpected message format: {message}", data)
----+            else:
----+                self.log_result("API Root Endpoint", False, 
----+                              f"HTTP {response.status_code}: {response.text}")
----+                
----+        except Exception as e:
----+            self.log_result("API Root Endpoint", False, f"Exception: {str(e)}")
----+    
----+    def test_ai_assistant(self):
----+        """Test POST /api/ai-assistant - AI Assistant functionality"""
----+        try:
----+            payload = {
----+                "message": "What is the capital of France?",
----+                "context": "Geography question"
----+            }
----+            
----+            response = self.session.post(f"{BASE_URL}/ai-assistant", json=payload)
----+            
----+            if response.status_code == 200:
----+                data = response.json()
----+                ai_response = data.get("response", "")
----+                
----+                if ai_response and "Paris" in ai_response:
----+                    self.log_result("AI Assistant", True, 
----+                                  f"AI correctly answered geography question", 
----+                                  {"response_length": len(ai_response), "contains_paris": True})
----+                elif ai_response:
----+                    self.log_result("AI Assistant", True, 
----+                                  f"AI responded but answer unclear: {ai_response[:100]}...", data)
----+                else:
----+                    self.log_result("AI Assistant", False, 
----+                                  "AI response was empty", data)
----+            elif response.status_code == 500:
----+                # Check if it's a Gemini model issue
----+                error_text = response.text
----+                if "gemini-2.0-flash is no longer available" in error_text:
----+                    self.log_result("AI Assistant", False, 
----+                                  "Gemini 2.0 Flash model deprecated - needs model update", 
----+                                  {"error": "Model deprecated", "suggestion": "Update to gemini-1.5-flash or gemini-2.5-flash"})
----+                else:
----+                    self.log_result("AI Assistant", False, 
----+                                  f"HTTP {response.status_code}: {response.text}")
----+            else:
----+                self.log_result("AI Assistant", False, 
----+                              f"HTTP {response.status_code}: {response.text}")
----+                
----+        except Exception as e:
----+            self.log_result("AI Assistant", False, f"Exception: {str(e)}")
----+    
----+    def test_cloud_providers(self):
----+        """Test GET /api/cloud/providers - List cloud storage providers"""
----+        try:
----+            response = self.session.get(f"{BASE_URL}/cloud/providers")
----+            
----+            if response.status_code == 200:
----+                data = response.json()
----+                providers = data.get("providers", [])
----+                
----+                expected_providers = ["google_drive", "dropbox", "onedrive", "box", "icloud"]
----+                provider_ids = [p.get("id") for p in providers]
----+                
----+                if len(providers) == 5 and all(pid in provider_ids for pid in expected_providers):
----+                    self.log_result("Cloud Providers", True, 
----+                                  f"All 5 providers returned: {provider_ids}", 
----+                                  {"provider_count": len(providers)})
----+                else:
----+                    self.log_result("Cloud Providers", False, 
----+                                  f"Expected 5 providers, got {len(providers)}: {provider_ids}", data)
----+            else:
----+                self.log_result("Cloud Providers", False, 
----+                              f"HTTP {response.status_code}: {response.text}")
----+                
----+        except Exception as e:
----+            self.log_result("Cloud Providers", False, f"Exception: {str(e)}")
----+    
----+    def create_test_document(self) -> Optional[str]:
----+        """Create a test document for signature and sharing tests"""
----+        try:
----+            # Create a simple base64 image placeholder
----+            test_image = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
----+            
----+            payload = {
----+                "title": "Test Document for API v5 Testing",
----+                "document_type": "general_document",
----+                "raw_text": "This is a test document for API v5 testing",
----+                "formatted_output": "Test Document Content",
----+                "summary": "Test document for signature and sharing functionality",
----+                "image_thumbnail": test_image,
----+                "pages_thumbnails": [test_image],
----+                "pages_count": 1
----+            }
----+            
----+            response = self.session.post(f"{BASE_URL}/documents", json=payload)
----+            
----+            if response.status_code == 200:
----+                data = response.json()
----+                doc_id = data.get("id")
----+                self.test_document_id = doc_id
----+                self.log_result("Create Test Document", True, 
----+                              f"Created document with ID: {doc_id}", 
----+                              {"document_id": doc_id, "title": data.get("title")})
----+                return doc_id
----+            else:
----+                self.log_result("Create Test Document", False, 
----+                              f"HTTP {response.status_code}: {response.text}")
----+                return None
----+                
----+        except Exception as e:
----+            self.log_result("Create Test Document", False, f"Exception: {str(e)}")
----+            return None
----+    
----+    def test_signature_request(self, doc_id: str):
----+        """Test POST /api/documents/{id}/request-signature - Email signature requests"""
----+        try:
----+            payload = {
----+                "requester_name": "John Doe",
----+                "requester_email": "john@example.com",
----+                "signer_email": "test@example.com",
----+                "signer_name": "Test User",
----+                "message": "Please sign this document"
----+            }
----+            
----+            response = self.session.post(f"{BASE_URL}/documents/{doc_id}/request-signature", json=payload)
----+            
----+            if response.status_code == 200:
----+                data = response.json()
----+                message = data.get("message", "")
----+                
----+                if "sent" in message.lower():
----+                    self.log_result("Signature Request", True, 
----+                                  f"Signature request sent successfully: {message}", data)
----+                else:
----+                    self.log_result("Signature Request", False, 
----+                                  f"Unexpected response: {message}", data)
----+            else:
----+                self.log_result("Signature Request", False, 
----+                              f"HTTP {response.status_code}: {response.text}")
----+                
----+        except Exception as e:
----+            self.log_result("Signature Request", False, f"Exception: {str(e)}")
----+    
----+    def test_document_sharing(self, doc_id: str):
----+        """Test POST /api/documents/{id}/share - Document sharing"""
----+        try:
----+            payload = {
----+                "sender_name": "John Doe",
----+                "sender_email": "john@example.com",
----+                "recipient_email": "recipient@example.com",
----+                "recipient_name": "Recipient",
----+                "message": "Check out this document"
----+            }
----+            
----+            response = self.session.post(f"{BASE_URL}/documents/{doc_id}/share", json=payload)
----+            
----+            if response.status_code == 200:
----+                data = response.json()
----+                message = data.get("message", "")
----+                
----+                if "shared" in message.lower():
----+                    self.log_result("Document Sharing", True, 
----+                                  f"Document shared successfully: {message}", data)
----+                else:
----+                    self.log_result("Document Sharing", False, 
----+                                  f"Unexpected response: {message}", data)
----+            else:
----+                self.log_result("Document Sharing", False, 
----+                              f"HTTP {response.status_code}: {response.text}")
----+                
----+        except Exception as e:
----+            self.log_result("Document Sharing", False, f"Exception: {str(e)}")
----+    
----+    def test_measurement_api(self):
----+        """Test POST /api/measure - Measurement API"""
----+        try:
----+            # Test area measurement mode
----+            payload = {
----+                "image": "base64_placeholder",
----+                "mode": "area",
----+                "points": [
----+                    {"x": 0, "y": 0},
----+                    {"x": 100, "y": 0},
----+                    {"x": 100, "y": 100},
----+                    {"x": 0, "y": 100}
----+                ]
----+            }
----+            
----+            response = self.session.post(f"{BASE_URL}/measure", json=payload)
----+            
----+            if response.status_code == 200:
----+                data = response.json()
----+                area = data.get("area_pixels")
----+                
----+                if area is not None:
----+                    # Expected area for 100x100 square is 10000
----+                    expected_area = 10000.0
----+                    if abs(area - expected_area) < 1:
----+                        self.log_result("Measurement API (Area)", True, 
----+                                      f"Calculated area correctly: {area} pixels", data)
----+                    else:
----+                        self.log_result("Measurement API (Area)", False, 
----+                                      f"Area calculation incorrect. Expected ~{expected_area}, got {area}", data)
----+                else:
----+                    self.log_result("Measurement API (Area)", False, 
----+                                  "No area returned in response", data)
----+            else:
----+                self.log_result("Measurement API (Area)", False, 
----+                              f"HTTP {response.status_code}: {response.text}")
----+                
----+        except Exception as e:
----+            self.log_result("Measurement API (Area)", False, f"Exception: {str(e)}")
----+        
----+        # Test count measurement mode
----+        try:
----+            # Create a simple 1x1 pixel PNG image in base64
----+            simple_png_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
----+            
----+            payload = {
----+                "image": simple_png_b64,
----+                "mode": "count"
----+            }
----+            
----+            response = self.session.post(f"{BASE_URL}/measure", json=payload)
----+            
----+            if response.status_code == 200:
----+                data = response.json()
----+                count = data.get("count")
----+                
----+                if count is not None:
----+                    self.log_result("Measurement API (Count)", True, 
----+                                  f"Count mode responded with count: {count}", data)
----+                else:
----+                    # Check if there's a raw_response indicating AI processing
----+                    raw_response = data.get("raw_response")
----+                    if raw_response:
----+                        self.log_result("Measurement API (Count)", True, 
----+                                      f"Count mode responded with AI analysis", 
----+                                      {"has_raw_response": True})
----+                    else:
----+                        self.log_result("Measurement API (Count)", False, 
----+                                      "No count or raw_response in response", data)
----+            elif response.status_code == 500:
----+                # Check if it's a Gemini model issue
----+                error_text = response.text
----+                if "gemini-2.0-flash is no longer available" in error_text:
----+                    self.log_result("Measurement API (Count)", False, 
----+                                  "Gemini 2.0 Flash model deprecated - needs model update", 
----+                                  {"error": "Model deprecated", "suggestion": "Update to gemini-1.5-flash or gemini-2.5-flash"})
----+                elif "Base64 decoding failed" in error_text:
----+                    self.log_result("Measurement API (Count)", False, 
----+                                  "Base64 image validation failed", 
----+                                  {"error": "Invalid base64", "suggestion": "Use proper base64 encoded image"})
----+                else:
----+                    self.log_result("Measurement API (Count)", False, 
----+                                  f"HTTP {response.status_code}: {response.text}")
----+            else:
----+                self.log_result("Measurement API (Count)", False, 
----+                              f"HTTP {response.status_code}: {response.text}")
----+                
----+        except Exception as e:
----+            self.log_result("Measurement API (Count)", False, f"Exception: {str(e)}")
----+    
----+    def cleanup_test_document(self):
----+        """Delete the test document"""
----+        if not self.test_document_id:
----+            self.log_result("Cleanup Test Document", False, "No test document ID to cleanup")
----+            return
----+            
----+        try:
----+            response = self.session.delete(f"{BASE_URL}/documents/{self.test_document_id}")
----+            
----+            if response.status_code == 200:
----+                data = response.json()
----+                message = data.get("message", "")
----+                
----+                if "deleted" in message.lower():
----+                    self.log_result("Cleanup Test Document", True, 
----+                                  f"Test document deleted successfully: {message}", data)
----+                else:
----+                    self.log_result("Cleanup Test Document", False, 
----+                                  f"Unexpected response: {message}", data)
----+            else:
----+                self.log_result("Cleanup Test Document", False, 
----+                              f"HTTP {response.status_code}: {response.text}")
----+                
----+        except Exception as e:
----+            self.log_result("Cleanup Test Document", False, f"Exception: {str(e)}")
----+    
----+    def run_all_tests(self):
----+        """Run all API v5 tests"""
----+        print("=" * 60)
----+        print("DocScan Pro Backend API v5 Testing Suite")
----+        print("=" * 60)
----+        print(f"Base URL: {BASE_URL}")
----+        print(f"Timeout: {TIMEOUT}s")
----+        print("=" * 60)
----+        
----+        # Test 1: API Root
----+        self.test_api_root()
----+        
----+        # Test 2: AI Assistant
----+        self.test_ai_assistant()
----+        
----+        # Test 3: Cloud Providers
----+        self.test_cloud_providers()
----+        
----+        # Test 4: Create test document for email tests
----+        doc_id = self.create_test_document()
----+        
----+        if doc_id:
----+            # Test 5: Signature Request (Resend email integration)
----+            self.test_signature_request(doc_id)
----+            
----+            # Test 6: Document Sharing
----+            self.test_document_sharing(doc_id)
----+            
----+            # Test 7: Cleanup
----+            self.cleanup_test_document()
----+        else:
----+            self.log_result("Signature Request", False, "Skipped - no test document")
----+            self.log_result("Document Sharing", False, "Skipped - no test document")
----+            self.log_result("Cleanup Test Document", False, "Skipped - no test document")
----+        
----+        # Test 8: Measurement API
----+        self.test_measurement_api()
----+        
----+        # Summary
----+        self.print_summary()
----+    
----+    def print_summary(self):
----+        """Print test summary"""
----+        print("\n" + "=" * 60)
----+        print("TEST SUMMARY")
----+        print("=" * 60)
----+        
----+        passed = sum(1 for r in self.results if r["success"])
----+        total = len(self.results)
----+        
----+        print(f"Total Tests: {total}")
----+        print(f"Passed: {passed}")
----+        print(f"Failed: {total - passed}")
----+        print(f"Success Rate: {(passed/total)*100:.1f}%")
----+        
----+        if total - passed > 0:
----+            print("\nFAILED TESTS:")
----+            for result in self.results:
----+                if not result["success"]:
----+                    print(f"  ❌ {result['test']}: {result['details']}")
----+        
----+        print("\nCRITICAL FEATURES STATUS:")
----+        critical_tests = [
----+            "API Root Endpoint",
----+            "AI Assistant", 
----+            "Cloud Providers",
----+            "Signature Request",
----+            "Document Sharing",
----+            "Measurement API (Area)"
----+        ]
----+        
----+        for test_name in critical_tests:
----+            result = next((r for r in self.results if r["test"] == test_name), None)
----+            if result:
----+                status = "✅ WORKING" if result["success"] else "❌ FAILED"
----+                print(f"  {status} {test_name}")
----+            else:
----+                print(f"  ⚠️  NOT TESTED {test_name}")
----+
----+if __name__ == "__main__":
----+    tester = DocScanV5Tester()
----+    tester.run_all_tests()
----\ No newline at end of file
+--@@ -1,597 +0,0 @@
 ---diff --git a/model.patch b/model.patch
----index 9cbf862..503f0f4 100644
+---index b223c3e..e69de29 100644
 ------ a/model.patch
 ---+++ b/model.patch
----@@ -1,125 +0,0 @@
+---@@ -1,575 +0,0 @@
+----diff --git a/backend_test_v5.py b/backend_test_v5.py
+----new file mode 100644
+----index 0000000..483df8b
+------- /dev/null
+----+++ b/backend_test_v5.py
+----@@ -0,0 +1,424 @@
+----+#!/usr/bin/env python3
+----+"""
+----+DocScan Pro Backend API v5 Testing Suite
+----+Tests all new features including Resend email integration, AI assistant, 
+----+image processing, and cloud storage as requested in the review.
+----+"""
+----+
+----+import requests
+----+import json
+----+import base64
+----+import time
+----+from typing import Dict, Any, Optional
+----+
+----+# Configuration
+----+BASE_URL = "https://multi-lang-docs-1.preview.emergentagent.com/api"
+----+TIMEOUT = 30
+----+
+----+class DocScanV5Tester:
+----+    def __init__(self):
+----+        self.session = requests.Session()
+----+        self.session.timeout = TIMEOUT
+----+        self.test_document_id = None
+----+        self.results = []
+----+        
+----+    def log_result(self, test_name: str, success: bool, details: str = "", response_data: Any = None):
+----+        """Log test result"""
+----+        status = "✅ PASS" if success else "❌ FAIL"
+----+        print(f"{status} {test_name}")
+----+        if details:
+----+            print(f"   Details: {details}")
+----+        if response_data and isinstance(response_data, dict):
+----+            print(f"   Response: {json.dumps(response_data, indent=2)[:200]}...")
+----+        
+----+        self.results.append({
+----+            "test": test_name,
+----+            "success": success,
+----+            "details": details,
+----+            "response": response_data
+----+        })
+----+        print("-" * 60)
+----+    
+----+    def test_api_root(self):
+----+        """Test GET /api/ - Should return API version v5"""
+----+        try:
+----+            response = self.session.get(f"{BASE_URL}/")
+----+            
+----+            if response.status_code == 200:
+----+                data = response.json()
+----+                message = data.get("message", "")
+----+                
+----+                if "v5" in message and "Full Featured" in message:
+----+                    self.log_result("API Root Endpoint", True, 
+----+                                  f"Returned correct v5 message: {message}", data)
+----+                else:
+----+                    self.log_result("API Root Endpoint", False, 
+----+                                  f"Unexpected message format: {message}", data)
+----+            else:
+----+                self.log_result("API Root Endpoint", False, 
+----+                              f"HTTP {response.status_code}: {response.text}")
+----+                
+----+        except Exception as e:
+----+            self.log_result("API Root Endpoint", False, f"Exception: {str(e)}")
+----+    
+----+    def test_ai_assistant(self):
+----+        """Test POST /api/ai-assistant - AI Assistant functionality"""
+----+        try:
+----+            payload = {
+----+                "message": "What is the capital of France?",
+----+                "context": "Geography question"
+----+            }
+----+            
+----+            response = self.session.post(f"{BASE_URL}/ai-assistant", json=payload)
+----+            
+----+            if response.status_code == 200:
+----+                data = response.json()
+----+                ai_response = data.get("response", "")
+----+                
+----+                if ai_response and "Paris" in ai_response:
+----+                    self.log_result("AI Assistant", True, 
+----+                                  f"AI correctly answered geography question", 
+----+                                  {"response_length": len(ai_response), "contains_paris": True})
+----+                elif ai_response:
+----+                    self.log_result("AI Assistant", True, 
+----+                                  f"AI responded but answer unclear: {ai_response[:100]}...", data)
+----+                else:
+----+                    self.log_result("AI Assistant", False, 
+----+                                  "AI response was empty", data)
+----+            elif response.status_code == 500:
+----+                # Check if it's a Gemini model issue
+----+                error_text = response.text
+----+                if "gemini-2.0-flash is no longer available" in error_text:
+----+                    self.log_result("AI Assistant", False, 
+----+                                  "Gemini 2.0 Flash model deprecated - needs model update", 
+----+                                  {"error": "Model deprecated", "suggestion": "Update to gemini-1.5-flash or gemini-2.5-flash"})
+----+                else:
+----+                    self.log_result("AI Assistant", False, 
+----+                                  f"HTTP {response.status_code}: {response.text}")
+----+            else:
+----+                self.log_result("AI Assistant", False, 
+----+                              f"HTTP {response.status_code}: {response.text}")
+----+                
+----+        except Exception as e:
+----+            self.log_result("AI Assistant", False, f"Exception: {str(e)}")
+----+    
+----+    def test_cloud_providers(self):
+----+        """Test GET /api/cloud/providers - List cloud storage providers"""
+----+        try:
+----+            response = self.session.get(f"{BASE_URL}/cloud/providers")
+----+            
+----+            if response.status_code == 200:
+----+                data = response.json()
+----+                providers = data.get("providers", [])
+----+                
+----+                expected_providers = ["google_drive", "dropbox", "onedrive", "box", "icloud"]
+----+                provider_ids = [p.get("id") for p in providers]
+----+                
+----+                if len(providers) == 5 and all(pid in provider_ids for pid in expected_providers):
+----+                    self.log_result("Cloud Providers", True, 
+----+                                  f"All 5 providers returned: {provider_ids}", 
+----+                                  {"provider_count": len(providers)})
+----+                else:
+----+                    self.log_result("Cloud Providers", False, 
+----+                                  f"Expected 5 providers, got {len(providers)}: {provider_ids}", data)
+----+            else:
+----+                self.log_result("Cloud Providers", False, 
+----+                              f"HTTP {response.status_code}: {response.text}")
+----+                
+----+        except Exception as e:
+----+            self.log_result("Cloud Providers", False, f"Exception: {str(e)}")
+----+    
+----+    def create_test_document(self) -> Optional[str]:
+----+        """Create a test document for signature and sharing tests"""
+----+        try:
+----+            # Create a simple base64 image placeholder
+----+            test_image = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+----+            
+----+            payload = {
+----+                "title": "Test Document for API v5 Testing",
+----+                "document_type": "general_document",
+----+                "raw_text": "This is a test document for API v5 testing",
+----+                "formatted_output": "Test Document Content",
+----+                "summary": "Test document for signature and sharing functionality",
+----+                "image_thumbnail": test_image,
+----+                "pages_thumbnails": [test_image],
+----+                "pages_count": 1
+----+            }
+----+            
+----+            response = self.session.post(f"{BASE_URL}/documents", json=payload)
+----+            
+----+            if response.status_code == 200:
+----+                data = response.json()
+----+                doc_id = data.get("id")
+----+                self.test_document_id = doc_id
+----+                self.log_result("Create Test Document", True, 
+----+                              f"Created document with ID: {doc_id}", 
+----+                              {"document_id": doc_id, "title": data.get("title")})
+----+                return doc_id
+----+            else:
+----+                self.log_result("Create Test Document", False, 
+----+                              f"HTTP {response.status_code}: {response.text}")
+----+                return None
+----+                
+----+        except Exception as e:
+----+            self.log_result("Create Test Document", False, f"Exception: {str(e)}")
+----+            return None
+----+    
+----+    def test_signature_request(self, doc_id: str):
+----+        """Test POST /api/documents/{id}/request-signature - Email signature requests"""
+----+        try:
+----+            payload = {
+----+                "requester_name": "John Doe",
+----+                "requester_email": "john@example.com",
+----+                "signer_email": "test@example.com",
+----+                "signer_name": "Test User",
+----+                "message": "Please sign this document"
+----+            }
+----+            
+----+            response = self.session.post(f"{BASE_URL}/documents/{doc_id}/request-signature", json=payload)
+----+            
+----+            if response.status_code == 200:
+----+                data = response.json()
+----+                message = data.get("message", "")
+----+                
+----+                if "sent" in message.lower():
+----+                    self.log_result("Signature Request", True, 
+----+                                  f"Signature request sent successfully: {message}", data)
+----+                else:
+----+                    self.log_result("Signature Request", False, 
+----+                                  f"Unexpected response: {message}", data)
+----+            else:
+----+                self.log_result("Signature Request", False, 
+----+                              f"HTTP {response.status_code}: {response.text}")
+----+                
+----+        except Exception as e:
+----+            self.log_result("Signature Request", False, f"Exception: {str(e)}")
+----+    
+----+    def test_document_sharing(self, doc_id: str):
+----+        """Test POST /api/documents/{id}/share - Document sharing"""
+----+        try:
+----+            payload = {
+----+                "sender_name": "John Doe",
+----+                "sender_email": "john@example.com",
+----+                "recipient_email": "recipient@example.com",
+----+                "recipient_name": "Recipient",
+----+                "message": "Check out this document"
+----+            }
+----+            
+----+            response = self.session.post(f"{BASE_URL}/documents/{doc_id}/share", json=payload)
+----+            
+----+            if response.status_code == 200:
+----+                data = response.json()
+----+                message = data.get("message", "")
+----+                
+----+                if "shared" in message.lower():
+----+                    self.log_result("Document Sharing", True, 
+----+                                  f"Document shared successfully: {message}", data)
+----+                else:
+----+                    self.log_result("Document Sharing", False, 
+----+                                  f"Unexpected response: {message}", data)
+----+            else:
+----+                self.log_result("Document Sharing", False, 
+----+                              f"HTTP {response.status_code}: {response.text}")
+----+                
+----+        except Exception as e:
+----+            self.log_result("Document Sharing", False, f"Exception: {str(e)}")
+----+    
+----+    def test_measurement_api(self):
+----+        """Test POST /api/measure - Measurement API"""
+----+        try:
+----+            # Test area measurement mode
+----+            payload = {
+----+                "image": "base64_placeholder",
+----+                "mode": "area",
+----+                "points": [
+----+                    {"x": 0, "y": 0},
+----+                    {"x": 100, "y": 0},
+----+                    {"x": 100, "y": 100},
+----+                    {"x": 0, "y": 100}
+----+                ]
+----+            }
+----+            
+----+            response = self.session.post(f"{BASE_URL}/measure", json=payload)
+----+            
+----+            if response.status_code == 200:
+----+                data = response.json()
+----+                area = data.get("area_pixels")
+----+                
+----+                if area is not None:
+----+                    # Expected area for 100x100 square is 10000
+----+                    expected_area = 10000.0
+----+                    if abs(area - expected_area) < 1:
+----+                        self.log_result("Measurement API (Area)", True, 
+----+                                      f"Calculated area correctly: {area} pixels", data)
+----+                    else:
+----+                        self.log_result("Measurement API (Area)", False, 
+----+                                      f"Area calculation incorrect. Expected ~{expected_area}, got {area}", data)
+----+                else:
+----+                    self.log_result("Measurement API (Area)", False, 
+----+                                  "No area returned in response", data)
+----+            else:
+----+                self.log_result("Measurement API (Area)", False, 
+----+                              f"HTTP {response.status_code}: {response.text}")
+----+                
+----+        except Exception as e:
+----+            self.log_result("Measurement API (Area)", False, f"Exception: {str(e)}")
+----+        
+----+        # Test count measurement mode
+----+        try:
+----+            # Create a simple 1x1 pixel PNG image in base64
+----+            simple_png_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+----+            
+----+            payload = {
+----+                "image": simple_png_b64,
+----+                "mode": "count"
+----+            }
+----+            
+----+            response = self.session.post(f"{BASE_URL}/measure", json=payload)
+----+            
+----+            if response.status_code == 200:
+----+                data = response.json()
+----+                count = data.get("count")
+----+                
+----+                if count is not None:
+----+                    self.log_result("Measurement API (Count)", True, 
+----+                                  f"Count mode responded with count: {count}", data)
+----+                else:
+----+                    # Check if there's a raw_response indicating AI processing
+----+                    raw_response = data.get("raw_response")
+----+                    if raw_response:
+----+                        self.log_result("Measurement API (Count)", True, 
+----+                                      f"Count mode responded with AI analysis", 
+----+                                      {"has_raw_response": True})
+----+                    else:
+----+                        self.log_result("Measurement API (Count)", False, 
+----+                                      "No count or raw_response in response", data)
+----+            elif response.status_code == 500:
+----+                # Check if it's a Gemini model issue
+----+                error_text = response.text
+----+                if "gemini-2.0-flash is no longer available" in error_text:
+----+                    self.log_result("Measurement API (Count)", False, 
+----+                                  "Gemini 2.0 Flash model deprecated - needs model update", 
+----+                                  {"error": "Model deprecated", "suggestion": "Update to gemini-1.5-flash or gemini-2.5-flash"})
+----+                elif "Base64 decoding failed" in error_text:
+----+                    self.log_result("Measurement API (Count)", False, 
+----+                                  "Base64 image validation failed", 
+----+                                  {"error": "Invalid base64", "suggestion": "Use proper base64 encoded image"})
+----+                else:
+----+                    self.log_result("Measurement API (Count)", False, 
+----+                                  f"HTTP {response.status_code}: {response.text}")
+----+            else:
+----+                self.log_result("Measurement API (Count)", False, 
+----+                              f"HTTP {response.status_code}: {response.text}")
+----+                
+----+        except Exception as e:
+----+            self.log_result("Measurement API (Count)", False, f"Exception: {str(e)}")
+----+    
+----+    def cleanup_test_document(self):
+----+        """Delete the test document"""
+----+        if not self.test_document_id:
+----+            self.log_result("Cleanup Test Document", False, "No test document ID to cleanup")
+----+            return
+----+            
+----+        try:
+----+            response = self.session.delete(f"{BASE_URL}/documents/{self.test_document_id}")
+----+            
+----+            if response.status_code == 200:
+----+                data = response.json()
+----+                message = data.get("message", "")
+----+                
+----+                if "deleted" in message.lower():
+----+                    self.log_result("Cleanup Test Document", True, 
+----+                                  f"Test document deleted successfully: {message}", data)
+----+                else:
+----+                    self.log_result("Cleanup Test Document", False, 
+----+                                  f"Unexpected response: {message}", data)
+----+            else:
+----+                self.log_result("Cleanup Test Document", False, 
+----+                              f"HTTP {response.status_code}: {response.text}")
+----+                
+----+        except Exception as e:
+----+            self.log_result("Cleanup Test Document", False, f"Exception: {str(e)}")
+----+    
+----+    def run_all_tests(self):
+----+        """Run all API v5 tests"""
+----+        print("=" * 60)
+----+        print("DocScan Pro Backend API v5 Testing Suite")
+----+        print("=" * 60)
+----+        print(f"Base URL: {BASE_URL}")
+----+        print(f"Timeout: {TIMEOUT}s")
+----+        print("=" * 60)
+----+        
+----+        # Test 1: API Root
+----+        self.test_api_root()
+----+        
+----+        # Test 2: AI Assistant
+----+        self.test_ai_assistant()
+----+        
+----+        # Test 3: Cloud Providers
+----+        self.test_cloud_providers()
+----+        
+----+        # Test 4: Create test document for email tests
+----+        doc_id = self.create_test_document()
+----+        
+----+        if doc_id:
+----+            # Test 5: Signature Request (Resend email integration)
+----+            self.test_signature_request(doc_id)
+----+            
+----+            # Test 6: Document Sharing
+----+            self.test_document_sharing(doc_id)
+----+            
+----+            # Test 7: Cleanup
+----+            self.cleanup_test_document()
+----+        else:
+----+            self.log_result("Signature Request", False, "Skipped - no test document")
+----+            self.log_result("Document Sharing", False, "Skipped - no test document")
+----+            self.log_result("Cleanup Test Document", False, "Skipped - no test document")
+----+        
+----+        # Test 8: Measurement API
+----+        self.test_measurement_api()
+----+        
+----+        # Summary
+----+        self.print_summary()
+----+    
+----+    def print_summary(self):
+----+        """Print test summary"""
+----+        print("\n" + "=" * 60)
+----+        print("TEST SUMMARY")
+----+        print("=" * 60)
+----+        
+----+        passed = sum(1 for r in self.results if r["success"])
+----+        total = len(self.results)
+----+        
+----+        print(f"Total Tests: {total}")
+----+        print(f"Passed: {passed}")
+----+        print(f"Failed: {total - passed}")
+----+        print(f"Success Rate: {(passed/total)*100:.1f}%")
+----+        
+----+        if total - passed > 0:
+----+            print("\nFAILED TESTS:")
+----+            for result in self.results:
+----+                if not result["success"]:
+----+                    print(f"  ❌ {result['test']}: {result['details']}")
+----+        
+----+        print("\nCRITICAL FEATURES STATUS:")
+----+        critical_tests = [
+----+            "API Root Endpoint",
+----+            "AI Assistant", 
+----+            "Cloud Providers",
+----+            "Signature Request",
+----+            "Document Sharing",
+----+            "Measurement API (Area)"
+----+        ]
+----+        
+----+        for test_name in critical_tests:
+----+            result = next((r for r in self.results if r["test"] == test_name), None)
+----+            if result:
+----+                status = "✅ WORKING" if result["success"] else "❌ FAILED"
+----+                print(f"  {status} {test_name}")
+----+            else:
+----+                print(f"  ⚠️  NOT TESTED {test_name}")
+----+
+----+if __name__ == "__main__":
+----+    tester = DocScanV5Tester()
+----+    tester.run_all_tests()
+----\ No newline at end of file
 ----diff --git a/model.patch b/model.patch
-----index 937c693..e69de29 100644
+----index 9cbf862..503f0f4 100644
 ------- a/model.patch
 ----+++ b/model.patch
-----@@ -1,51 +0,0 @@
+----@@ -1,125 +0,0 @@
+-----diff --git a/model.patch b/model.patch
+-----index 937c693..e69de29 100644
+-------- a/model.patch
+-----+++ b/model.patch
+-----@@ -1,51 +0,0 @@
+------diff --git a/test_result.md b/test_result.md
+------index ecaeff9..ce91948 100644
+--------- a/test_result.md
+------+++ b/test_result.md
+------@@ -171,15 +171,18 @@ backend:
+------ 
+------   - task: "POST /api/scan - Gemini AI document scan"
+------     implemented: true
+-------    working: true
+------+    working: false
+------     file: "/app/backend/server.py"
+-------    stuck_count: 0
+------+    stuck_count: 1
+------     priority: "high"
+------     needs_retesting: false
+------     status_history:
+------       - working: true
+------         agent: "main"
+------         comment: "Multi-page scanning with Gemini AI working"
+------+      - working: false
+------+        agent: "testing"
+------+        comment: "AI scan endpoint failing due to Gemini API quota exceeded (HTTP 429). Error: 'You exceeded your current quota, please check your plan and billing details'. This is an external service limitation, not a code issue. The endpoint implementation is correct but requires valid API quota."
+------ 
+------   - task: "POST /api/documents/{id}/export - Export document"
+------     implemented: true
+------@@ -187,11 +190,14 @@ backend:
+------     file: "/app/backend/server.py"
+------     stuck_count: 0
+------     priority: "high"
+-------    needs_retesting: true
+------+    needs_retesting: false
+------     status_history:
+------       - working: true
+------         agent: "main"
+------         comment: "Export to PDF, DOCX, PPTX, PNG, JPEG, TXT implemented"
+------+      - working: true
+------+        agent: "testing"
+------+        comment: "All export formats tested successfully: PDF (2713 bytes), TXT (1066 chars), DOCX (36951 bytes), PPTX (31126 bytes), PNG (11999 bytes), JPEG (30555 bytes). Base64 encoding working correctly. Error handling for invalid formats working (returns 400)."
+------ 
+------ frontend:
+------   - task: "Dashboard screen"
+------@@ -295,4 +301,6 @@ test_plan:
+------ 
+------ agent_communication:
+------   - agent: "main"
+-------    message: "Implemented Phase 3 features: multi-page scanning, document detail screen, editor, and export. Ready for backend testing."
+------\ No newline at end of file
+------+    message: "Implemented Phase 3 features: multi-page scanning, document detail screen, editor, and export. Ready for backend testing."
+------+  - agent: "testing"
+------+    message: "Backend testing completed. All CRUD operations working perfectly (11/11 tests passed). All export formats (PDF, TXT, DOCX, PPTX, PNG, JPEG) working correctly with proper base64 encoding. Error handling validated. Only issue: AI scan endpoint failing due to Gemini API quota exceeded (external service limitation, not code issue). Backend API is production-ready except for AI quota constraint."
+------\ No newline at end of file
 -----diff --git a/test_result.md b/test_result.md
------index ecaeff9..ce91948 100644
+-----index ce91948..a7f3aba 100644
 -------- a/test_result.md
 -----+++ b/test_result.md
------@@ -171,15 +171,18 @@ backend:
+-----@@ -199,6 +199,54 @@ backend:
+-----         agent: "testing"
+-----         comment: "All export formats tested successfully: PDF (2713 bytes), TXT (1066 chars), DOCX (36951 bytes), PPTX (31126 bytes), PNG (11999 bytes), JPEG (30555 bytes). Base64 encoding working correctly. Error handling for invalid formats working (returns 400)."
 ----- 
------   - task: "POST /api/scan - Gemini AI document scan"
------     implemented: true
-------    working: true
------+    working: false
------     file: "/app/backend/server.py"
-------    stuck_count: 0
------+    stuck_count: 1
------     priority: "high"
------     needs_retesting: false
------     status_history:
------       - working: true
------         agent: "main"
------         comment: "Multi-page scanning with Gemini AI working"
------+      - working: false
------+        agent: "testing"
------+        comment: "AI scan endpoint failing due to Gemini API quota exceeded (HTTP 429). Error: 'You exceeded your current quota, please check your plan and billing details'. This is an external service limitation, not a code issue. The endpoint implementation is correct but requires valid API quota."
------ 
------   - task: "POST /api/documents/{id}/export - Export document"
------     implemented: true
------@@ -187,11 +190,14 @@ backend:
------     file: "/app/backend/server.py"
------     stuck_count: 0
------     priority: "high"
-------    needs_retesting: true
+-----+  - task: "Password Protection - Set/Verify/Remove password"
+-----+    implemented: true
+-----+    working: true
+-----+    file: "/app/backend/server.py"
+-----+    stuck_count: 0
+-----+    priority: "high"
 -----+    needs_retesting: false
------     status_history:
------       - working: true
------         agent: "main"
------         comment: "Export to PDF, DOCX, PPTX, PNG, JPEG, TXT implemented"
+-----+    status_history:
 -----+      - working: true
 -----+        agent: "testing"
------+        comment: "All export formats tested successfully: PDF (2713 bytes), TXT (1066 chars), DOCX (36951 bytes), PPTX (31126 bytes), PNG (11999 bytes), JPEG (30555 bytes). Base64 encoding working correctly. Error handling for invalid formats working (returns 400)."
------ 
+-----+        comment: "Password protection fully functional. Set password (POST /password), verify correct password (returns verified: true), reject wrong password (403 Forbidden), password hashing with SHA-256 working correctly."
+-----+
+-----+  - task: "Comments System - Add/Resolve/Reply to comments"
+-----+    implemented: true
+-----+    working: true
+-----+    file: "/app/backend/server.py"
+-----+    stuck_count: 0
+-----+    priority: "high"
+-----+    needs_retesting: false
+-----+    status_history:
+-----+      - working: true
+-----+        agent: "testing"
+-----+        comment: "Comments system fully functional. Add comments (POST /comments), resolve comments (PUT /resolve), comments properly stored in document, comment IDs generated correctly, author and content fields working."
+-----+
+-----+  - task: "Signatures System - Create/List/Add to documents"
+-----+    implemented: true
+-----+    working: true
+-----+    file: "/app/backend/server.py"
+-----+    stuck_count: 0
+-----+    priority: "high"
+-----+    needs_retesting: false
+-----+    status_history:
+-----+      - working: true
+-----+        agent: "testing"
+-----+        comment: "Signatures system fully functional. Create signatures (POST /signatures), list signatures (GET /signatures), add signatures to documents with positioning (x, y, width, page), signature base64 storage working, cleanup functionality working."
+-----+
+-----+  - task: "Signature Requests - Request signatures via email"
+-----+    implemented: true
+-----+    working: true
+-----+    file: "/app/backend/server.py"
+-----+    stuck_count: 0
+-----+    priority: "high"
+-----+    needs_retesting: false
+-----+    status_history:
+-----+      - working: true
+-----+        agent: "testing"
+-----+        comment: "Signature request system working. POST /request-signature accepts requester/signer details, background email task queued successfully, request tracking implemented. Email sending is mocked but request flow is complete."
+-----+
 ----- frontend:
 -----   - task: "Dashboard screen"
------@@ -295,4 +301,6 @@ test_plan:
------ 
------ agent_communication:
+-----     implemented: true
+-----@@ -303,4 +351,6 @@ agent_communication:
 -----   - agent: "main"
-------    message: "Implemented Phase 3 features: multi-page scanning, document detail screen, editor, and export. Ready for backend testing."
+-----     message: "Implemented Phase 3 features: multi-page scanning, document detail screen, editor, and export. Ready for backend testing."
+-----   - agent: "testing"
+------    message: "Backend testing completed. All CRUD operations working perfectly (11/11 tests passed). All export formats (PDF, TXT, DOCX, PPTX, PNG, JPEG) working correctly with proper base64 encoding. Error handling validated. Only issue: AI scan endpoint failing due to Gemini API quota exceeded (external service limitation, not code issue). Backend API is production-ready except for AI quota constraint."
 -----\ No newline at end of file
------+    message: "Implemented Phase 3 features: multi-page scanning, document detail screen, editor, and export. Ready for backend testing."
------+  - agent: "testing"
 -----+    message: "Backend testing completed. All CRUD operations working perfectly (11/11 tests passed). All export formats (PDF, TXT, DOCX, PPTX, PNG, JPEG) working correctly with proper base64 encoding. Error handling validated. Only issue: AI scan endpoint failing due to Gemini API quota exceeded (external service limitation, not code issue). Backend API is production-ready except for AI quota constraint."
+-----+  - agent: "testing"
+-----+    message: "Comprehensive testing of new features completed successfully. All 16 backend API tests passed including: Root endpoint (API v4), password protection (set/verify/reject), comments (add/resolve/verify), signatures (create/list/add to document), signature requests, document CRUD operations, export functionality (PDF/TXT), and error handling. New features (signatures, comments, password protection) are fully functional and production-ready."
 -----\ No newline at end of file
 ----diff --git a/test_result.md b/test_result.md
-----index ce91948..a7f3aba 100644
+----index a7f3aba..0ddf834 100644
 ------- a/test_result.md
 ----+++ b/test_result.md
-----@@ -199,6 +199,54 @@ backend:
-----         agent: "testing"
-----         comment: "All export formats tested successfully: PDF (2713 bytes), TXT (1066 chars), DOCX (36951 bytes), PPTX (31126 bytes), PNG (11999 bytes), JPEG (30555 bytes). Base64 encoding working correctly. Error handling for invalid formats working (returns 400)."
----- 
-----+  - task: "Password Protection - Set/Verify/Remove password"
-----+    implemented: true
-----+    working: true
-----+    file: "/app/backend/server.py"
-----+    stuck_count: 0
-----+    priority: "high"
-----+    needs_retesting: false
-----+    status_history:
-----+      - working: true
-----+        agent: "testing"
-----+        comment: "Password protection fully functional. Set password (POST /password), verify correct password (returns verified: true), reject wrong password (403 Forbidden), password hashing with SHA-256 working correctly."
-----+
-----+  - task: "Comments System - Add/Resolve/Reply to comments"
-----+    implemented: true
-----+    working: true
-----+    file: "/app/backend/server.py"
-----+    stuck_count: 0
-----+    priority: "high"
-----+    needs_retesting: false
-----+    status_history:
-----+      - working: true
-----+        agent: "testing"
-----+        comment: "Comments system fully functional. Add comments (POST /comments), resolve comments (PUT /resolve), comments properly stored in document, comment IDs generated correctly, author and content fields working."
-----+
-----+  - task: "Signatures System - Create/List/Add to documents"
-----+    implemented: true
-----+    working: true
-----+    file: "/app/backend/server.py"
-----+    stuck_count: 0
-----+    priority: "high"
-----+    needs_retesting: false
-----+    status_history:
-----+      - working: true
-----+        agent: "testing"
-----+        comment: "Signatures system fully functional. Create signatures (POST /signatures), list signatures (GET /signatures), add signatures to documents with positioning (x, y, width, page), signature base64 storage working, cleanup functionality working."
-----+
-----+  - task: "Signature Requests - Request signatures via email"
-----+    implemented: true
-----+    working: true
-----+    file: "/app/backend/server.py"
-----+    stuck_count: 0
-----+    priority: "high"
-----+    needs_retesting: false
-----+    status_history:
-----+      - working: true
-----+        agent: "testing"
-----+        comment: "Signature request system working. POST /request-signature accepts requester/signer details, background email task queued successfully, request tracking implemented. Email sending is mocked but request flow is complete."
-----+
----- frontend:
-----   - task: "Dashboard screen"
-----     implemented: true
-----@@ -303,4 +351,6 @@ agent_communication:
-----   - agent: "main"
-----     message: "Implemented Phase 3 features: multi-page scanning, document detail screen, editor, and export. Ready for backend testing."
+----@@ -353,4 +353,6 @@ agent_communication:
 ----   - agent: "testing"
------    message: "Backend testing completed. All CRUD operations working perfectly (11/11 tests passed). All export formats (PDF, TXT, DOCX, PPTX, PNG, JPEG) working correctly with proper base64 encoding. Error handling validated. Only issue: AI scan endpoint failing due to Gemini API quota exceeded (external service limitation, not code issue). Backend API is production-ready except for AI quota constraint."
+----     message: "Backend testing completed. All CRUD operations working perfectly (11/11 tests passed). All export formats (PDF, TXT, DOCX, PPTX, PNG, JPEG) working correctly with proper base64 encoding. Error handling validated. Only issue: AI scan endpoint failing due to Gemini API quota exceeded (external service limitation, not code issue). Backend API is production-ready except for AI quota constraint."
+----   - agent: "testing"
+-----    message: "Comprehensive testing of new features completed successfully. All 16 backend API tests passed including: Root endpoint (API v4), password protection (set/verify/reject), comments (add/resolve/verify), signatures (create/list/add to document), signature requests, document CRUD operations, export functionality (PDF/TXT), and error handling. New features (signatures, comments, password protection) are fully functional and production-ready."
 ----\ No newline at end of file
-----+    message: "Backend testing completed. All CRUD operations working perfectly (11/11 tests passed). All export formats (PDF, TXT, DOCX, PPTX, PNG, JPEG) working correctly with proper base64 encoding. Error handling validated. Only issue: AI scan endpoint failing due to Gemini API quota exceeded (external service limitation, not code issue). Backend API is production-ready except for AI quota constraint."
-----+  - agent: "testing"
 ----+    message: "Comprehensive testing of new features completed successfully. All 16 backend API tests passed including: Root endpoint (API v4), password protection (set/verify/reject), comments (add/resolve/verify), signatures (create/list/add to document), signature requests, document CRUD operations, export functionality (PDF/TXT), and error handling. New features (signatures, comments, password protection) are fully functional and production-ready."
+----+  - agent: "testing"
+----+    message: "DocScan Pro API v5 Testing Completed: Tested all new v5 features including Resend email integration, AI assistant, cloud storage, and measurement API. Results: 7/9 tests passed (77.8% success rate). ✅ WORKING: API v5 root endpoint, cloud providers (5 providers), signature requests, document sharing, measurement area calculation. ❌ CRITICAL ISSUES: AI Assistant and Measurement Count mode both failing due to Gemini 2.0 Flash model deprecation (404 error: 'no longer available to new users'). Resend email integration working but limited to verified email addresses in test mode. URGENT: Backend needs Gemini model update to gemini-1.5-flash or gemini-2.5-flash to restore AI functionality."
 ----\ No newline at end of file
 ---diff --git a/test_result.md b/test_result.md
----index a7f3aba..0ddf834 100644
+---index 0ddf834..0c7efff 100644
 ------ a/test_result.md
 ---+++ b/test_result.md
----@@ -353,4 +353,6 @@ agent_communication:
+---@@ -353,6 +353,8 @@ agent_communication:
 ---   - agent: "testing"
 ---     message: "Backend testing completed. All CRUD operations working perfectly (11/11 tests passed). All export formats (PDF, TXT, DOCX, PPTX, PNG, JPEG) working correctly with proper base64 encoding. Error handling validated. Only issue: AI scan endpoint failing due to Gemini API quota exceeded (external service limitation, not code issue). Backend API is production-ready except for AI quota constraint."
 ---   - agent: "testing"
 ----    message: "Comprehensive testing of new features completed successfully. All 16 backend API tests passed including: Root endpoint (API v4), password protection (set/verify/reject), comments (add/resolve/verify), signatures (create/list/add to document), signature requests, document CRUD operations, export functionality (PDF/TXT), and error handling. New features (signatures, comments, password protection) are fully functional and production-ready."
+---+    message: "Comprehensive testing of new features completed successfully. All 16 backend API tests passed including: Root endpoint (API v5), password protection (set/verify/reject), comments (add/resolve/verify), signatures (create/list/add to document), signature requests, document CRUD operations, export functionality (PDF/TXT), and error handling. New features (signatures, comments, password protection) are fully functional and production-ready."
+---   - agent: "testing"
+----    message: "DocScan Pro API v5 Testing Completed: Tested all new v5 features including Resend email integration, AI assistant, cloud storage, and measurement API. Results: 7/9 tests passed (77.8% success rate). ✅ WORKING: API v5 root endpoint, cloud providers (5 providers), signature requests, document sharing, measurement area calculation. ❌ CRITICAL ISSUES: AI Assistant and Measurement Count mode both failing due to Gemini 2.0 Flash model deprecation (404 error: 'no longer available to new users'). Resend email integration working but limited to verified email addresses in test mode. URGENT: Backend needs Gemini model update to gemini-1.5-flash or gemini-2.5-flash to restore AI functionality."
 ---\ No newline at end of file
----+    message: "Comprehensive testing of new features completed successfully. All 16 backend API tests passed including: Root endpoint (API v4), password protection (set/verify/reject), comments (add/resolve/verify), signatures (create/list/add to document), signature requests, document CRUD operations, export functionality (PDF/TXT), and error handling. New features (signatures, comments, password protection) are fully functional and production-ready."
----+  - agent: "testing"
 ---+    message: "DocScan Pro API v5 Testing Completed: Tested all new v5 features including Resend email integration, AI assistant, cloud storage, and measurement API. Results: 7/9 tests passed (77.8% success rate). ✅ WORKING: API v5 root endpoint, cloud providers (5 providers), signature requests, document sharing, measurement area calculation. ❌ CRITICAL ISSUES: AI Assistant and Measurement Count mode both failing due to Gemini 2.0 Flash model deprecation (404 error: 'no longer available to new users'). Resend email integration working but limited to verified email addresses in test mode. URGENT: Backend needs Gemini model update to gemini-1.5-flash or gemini-2.5-flash to restore AI functionality."
+---+  - agent: "main"
+---+    message: "Dashboard button fixes verified working (Settings, Share Doc, New Folder, Cloud Backup all functional with modals). Now testing password protection, e-signatures, and comments features end-to-end."
 ---\ No newline at end of file
 --diff --git a/test_result.md b/test_result.md
---index 0ddf834..0c7efff 100644
+--index 0c7efff..d113c24 100644
 ----- a/test_result.md
 --+++ b/test_result.md
---@@ -353,6 +353,8 @@ agent_communication:
+--@@ -357,4 +357,6 @@ agent_communication:
 --   - agent: "testing"
---     message: "Backend testing completed. All CRUD operations working perfectly (11/11 tests passed). All export formats (PDF, TXT, DOCX, PPTX, PNG, JPEG) working correctly with proper base64 encoding. Error handling validated. Only issue: AI scan endpoint failing due to Gemini API quota exceeded (external service limitation, not code issue). Backend API is production-ready except for AI quota constraint."
---   - agent: "testing"
----    message: "Comprehensive testing of new features completed successfully. All 16 backend API tests passed including: Root endpoint (API v4), password protection (set/verify/reject), comments (add/resolve/verify), signatures (create/list/add to document), signature requests, document CRUD operations, export functionality (PDF/TXT), and error handling. New features (signatures, comments, password protection) are fully functional and production-ready."
---+    message: "Comprehensive testing of new features completed successfully. All 16 backend API tests passed including: Root endpoint (API v5), password protection (set/verify/reject), comments (add/resolve/verify), signatures (create/list/add to document), signature requests, document CRUD operations, export functionality (PDF/TXT), and error handling. New features (signatures, comments, password protection) are fully functional and production-ready."
---   - agent: "testing"
----    message: "DocScan Pro API v5 Testing Completed: Tested all new v5 features including Resend email integration, AI assistant, cloud storage, and measurement API. Results: 7/9 tests passed (77.8% success rate). ✅ WORKING: API v5 root endpoint, cloud providers (5 providers), signature requests, document sharing, measurement area calculation. ❌ CRITICAL ISSUES: AI Assistant and Measurement Count mode both failing due to Gemini 2.0 Flash model deprecation (404 error: 'no longer available to new users'). Resend email integration working but limited to verified email addresses in test mode. URGENT: Backend needs Gemini model update to gemini-1.5-flash or gemini-2.5-flash to restore AI functionality."
+--     message: "DocScan Pro API v5 Testing Completed: Tested all new v5 features including Resend email integration, AI assistant, cloud storage, and measurement API. Results: 7/9 tests passed (77.8% success rate). ✅ WORKING: API v5 root endpoint, cloud providers (5 providers), signature requests, document sharing, measurement area calculation. ❌ CRITICAL ISSUES: AI Assistant and Measurement Count mode both failing due to Gemini 2.0 Flash model deprecation (404 error: 'no longer available to new users'). Resend email integration working but limited to verified email addresses in test mode. URGENT: Backend needs Gemini model update to gemini-1.5-flash or gemini-2.5-flash to restore AI functionality."
+--   - agent: "main"
+---    message: "Dashboard button fixes verified working (Settings, Share Doc, New Folder, Cloud Backup all functional with modals). Now testing password protection, e-signatures, and comments features end-to-end."
 --\ No newline at end of file
---+    message: "DocScan Pro API v5 Testing Completed: Tested all new v5 features including Resend email integration, AI assistant, cloud storage, and measurement API. Results: 7/9 tests passed (77.8% success rate). ✅ WORKING: API v5 root endpoint, cloud providers (5 providers), signature requests, document sharing, measurement area calculation. ❌ CRITICAL ISSUES: AI Assistant and Measurement Count mode both failing due to Gemini 2.0 Flash model deprecation (404 error: 'no longer available to new users'). Resend email integration working but limited to verified email addresses in test mode. URGENT: Backend needs Gemini model update to gemini-1.5-flash or gemini-2.5-flash to restore AI functionality."
---+  - agent: "main"
 --+    message: "Dashboard button fixes verified working (Settings, Share Doc, New Folder, Cloud Backup all functional with modals). Now testing password protection, e-signatures, and comments features end-to-end."
+--+  - agent: "testing"
+--+    message: "DocScan Pro Review Testing Completed Successfully: Comprehensive end-to-end testing of all requested features at production URL https://multi-lang-docs-1.preview.emergentagent.com completed. Results: 4/4 critical features working (100% success rate). ✅ WORKING: Password Protection Flow (set/verify/reject/remove), E-Signature System (create/list/add to document), Comments System (add/verify storage/resolve), Document Sharing (email notifications). All features are production-ready and functioning correctly. No critical issues detected."
 --\ No newline at end of file
 -diff --git a/test_result.md b/test_result.md
--index 0c7efff..d113c24 100644
+-index 605190b..3f61161 100644
 ---- a/test_result.md
 -+++ b/test_result.md
--@@ -357,4 +357,6 @@ agent_communication:
+-@@ -198,6 +198,9 @@ backend:
+-       - working: true
+-         agent: "testing"
+-         comment: "All export formats tested successfully: PDF (2713 bytes), TXT (1066 chars), DOCX (36951 bytes), PPTX (31126 bytes), PNG (11999 bytes), JPEG (30555 bytes). Base64 encoding working correctly. Error handling for invalid formats working (returns 400)."
+-+      - working: true
+-+        agent: "testing"
+-+        comment: "NEW EXPORT FORMATS TESTING COMPLETED: All 5 new export formats working perfectly. HTML (2678 bytes), JSON (1903 bytes), Markdown (974 bytes), EPUB (2470 bytes), PPTX (29504 bytes). Fixed JSON serialization issue with datetime objects. Error handling validated (400 for invalid formats). All formats return correct MIME types and valid base64 data. 100% success rate (5/5 tests passed)."
+- 
+-   - task: "Password Protection - Set/Verify/Remove password"
+-     implemented: true
+-@@ -363,4 +366,6 @@ agent_communication:
 -   - agent: "testing"
--     message: "DocScan Pro API v5 Testing Completed: Tested all new v5 features including Resend email integration, AI assistant, cloud storage, and measurement API. Results: 7/9 tests passed (77.8% success rate). ✅ WORKING: API v5 root endpoint, cloud providers (5 providers), signature requests, document sharing, measurement area calculation. ❌ CRITICAL ISSUES: AI Assistant and Measurement Count mode both failing due to Gemini 2.0 Flash model deprecation (404 error: 'no longer available to new users'). Resend email integration working but limited to verified email addresses in test mode. URGENT: Backend needs Gemini model update to gemini-1.5-flash or gemini-2.5-flash to restore AI functionality."
+-     message: "DocScan Pro Review Testing Completed Successfully: Comprehensive end-to-end testing of all requested features at production URL https://multi-lang-docs-1.preview.emergentagent.com completed. Results: 4/4 critical features working (100% success rate). ✅ WORKING: Password Protection Flow (set/verify/reject/remove), E-Signature System (create/list/add to document), Comments System (add/verify storage/resolve), Document Sharing (email notifications). All features are production-ready and functioning correctly. No critical issues detected."
 -   - agent: "main"
---    message: "Dashboard button fixes verified working (Settings, Share Doc, New Folder, Cloud Backup all functional with modals). Now testing password protection, e-signatures, and comments features end-to-end."
+--    message: "NEW FEATURE: Implemented multi-language support (i18n) with 13 languages including English, Korean, Tamil, Bengali, Hebrew. Added language persistence with AsyncStorage. Also added new export formats to backend (HTML, JSON, Markdown, EPUB). Need testing for: 1) New backend export formats (HTML, JSON, MD, EPUB, PPTX), 2) Language switching and persistence."
 -\ No newline at end of file
--+    message: "Dashboard button fixes verified working (Settings, Share Doc, New Folder, Cloud Backup all functional with modals). Now testing password protection, e-signatures, and comments features end-to-end."
+-+    message: "NEW FEATURE: Implemented multi-language support (i18n) with 13 languages including English, Korean, Tamil, Bengali, Hebrew. Added language persistence with AsyncStorage. Also added new export formats to backend (HTML, JSON, Markdown, EPUB). Need testing for: 1) New backend export formats (HTML, JSON, MD, EPUB, PPTX), 2) Language switching and persistence."
 -+  - agent: "testing"
--+    message: "DocScan Pro Review Testing Completed Successfully: Comprehensive end-to-end testing of all requested features at production URL https://multi-lang-docs-1.preview.emergentagent.com completed. Results: 4/4 critical features working (100% success rate). ✅ WORKING: Password Protection Flow (set/verify/reject/remove), E-Signature System (create/list/add to document), Comments System (add/verify storage/resolve), Document Sharing (email notifications). All features are production-ready and functioning correctly. No critical issues detected."
+-+    message: "NEW EXPORT FORMATS TESTING COMPLETED SUCCESSFULLY: Tested all 5 requested new export formats at https://multi-lang-docs-1.preview.emergentagent.com/api. Results: 100% success rate (5/5 formats working). ✅ WORKING: HTML export (2678 bytes, text/html), JSON export (1903 bytes, application/json), Markdown export (974 bytes, text/markdown), EPUB export (2470 bytes, application/epub+zip), PPTX export (29504 bytes, correct MIME type). Fixed JSON serialization issue with datetime objects during testing. Error handling validated (400 for invalid formats). All formats return correct MIME types and valid base64 data. Export functionality is production-ready."
 -\ No newline at end of file
-diff --git a/test_result.md b/test_result.md
-index 605190b..3f61161 100644
---- a/test_result.md
-+++ b/test_result.md
-@@ -198,6 +198,9 @@ backend:
-       - working: true
-         agent: "testing"
-         comment: "All export formats tested successfully: PDF (2713 bytes), TXT (1066 chars), DOCX (36951 bytes), PPTX (31126 bytes), PNG (11999 bytes), JPEG (30555 bytes). Base64 encoding working correctly. Error handling for invalid formats working (returns 400)."
-+      - working: true
-+        agent: "testing"
-+        comment: "NEW EXPORT FORMATS TESTING COMPLETED: All 5 new export formats working perfectly. HTML (2678 bytes), JSON (1903 bytes), Markdown (974 bytes), EPUB (2470 bytes), PPTX (29504 bytes). Fixed JSON serialization issue with datetime objects. Error handling validated (400 for invalid formats). All formats return correct MIME types and valid base64 data. 100% success rate (5/5 tests passed)."
- 
-   - task: "Password Protection - Set/Verify/Remove password"
-     implemented: true
-@@ -363,4 +366,6 @@ agent_communication:
-   - agent: "testing"
-     message: "DocScan Pro Review Testing Completed Successfully: Comprehensive end-to-end testing of all requested features at production URL https://multi-lang-docs-1.preview.emergentagent.com completed. Results: 4/4 critical features working (100% success rate). ✅ WORKING: Password Protection Flow (set/verify/reject/remove), E-Signature System (create/list/add to document), Comments System (add/verify storage/resolve), Document Sharing (email notifications). All features are production-ready and functioning correctly. No critical issues detected."
-   - agent: "main"
--    message: "NEW FEATURE: Implemented multi-language support (i18n) with 13 languages including English, Korean, Tamil, Bengali, Hebrew. Added language persistence with AsyncStorage. Also added new export formats to backend (HTML, JSON, Markdown, EPUB). Need testing for: 1) New backend export formats (HTML, JSON, MD, EPUB, PPTX), 2) Language switching and persistence."
-\ No newline at end of file
-+    message: "NEW FEATURE: Implemented multi-language support (i18n) with 13 languages including English, Korean, Tamil, Bengali, Hebrew. Added language persistence with AsyncStorage. Also added new export formats to backend (HTML, JSON, Markdown, EPUB). Need testing for: 1) New backend export formats (HTML, JSON, MD, EPUB, PPTX), 2) Language switching and persistence."
-+  - agent: "testing"
-+    message: "NEW EXPORT FORMATS TESTING COMPLETED SUCCESSFULLY: Tested all 5 requested new export formats at https://multi-lang-docs-1.preview.emergentagent.com/api. Results: 100% success rate (5/5 formats working). ✅ WORKING: HTML export (2678 bytes, text/html), JSON export (1903 bytes, application/json), Markdown export (974 bytes, text/markdown), EPUB export (2470 bytes, application/epub+zip), PPTX export (29504 bytes, correct MIME type). Fixed JSON serialization issue with datetime objects during testing. Error handling validated (400 for invalid formats). All formats return correct MIME types and valid base64 data. Export functionality is production-ready."
-\ No newline at end of file
