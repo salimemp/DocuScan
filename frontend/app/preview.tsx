@@ -122,6 +122,7 @@ function FormattedOutput({ text, colors }: { text: string; colors: any }) {
 export default function PreviewScreen() {
   const router = useRouter();
   const { colors, shadows, isDark } = useTheme();
+  const { t } = useLanguage();
   const [isAnalyzing, setIsAnalyzing] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [result, setResult] = useState<any>(null);
