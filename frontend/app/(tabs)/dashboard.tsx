@@ -552,7 +552,7 @@ export default function DashboardScreen() {
               <TouchableOpacity onPress={() => setShowCloudBackup(false)} style={styles.modalHeaderBtn}>
                 <Ionicons name="close" size={24} color={colors.textPrimary} />
               </TouchableOpacity>
-              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Cloud Backup</Text>
+              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>{t('cloudBackup')}</Text>
               <View style={{ width: 44 }} />
             </View>
             
@@ -561,13 +561,13 @@ export default function DashboardScreen() {
                 <View style={[styles.cloudHeaderIcon, { backgroundColor: '#8B5CF6' }]}>
                   <Ionicons name="cloud-upload" size={32} color="#FFF" />
                 </View>
-                <Text style={[styles.cloudHeaderTitle, { color: colors.textPrimary }]}>Backup Your Documents</Text>
+                <Text style={[styles.cloudHeaderTitle, { color: colors.textPrimary }]}>{t('backupDocuments')}</Text>
                 <Text style={[styles.cloudHeaderSubtitle, { color: colors.textSecondary }]}>
-                  Connect a cloud storage provider to automatically backup your scanned documents
+                  {t('connectProvider')}
                 </Text>
               </View>
 
-              <Text style={[styles.cloudSectionTitle, { color: colors.textSecondary }]}>AVAILABLE PROVIDERS</Text>
+              <Text style={[styles.cloudSectionTitle, { color: colors.textSecondary }]}>{t('availableProviders').toUpperCase()}</Text>
               
               {cloudProviders.map((provider) => (
                 <TouchableOpacity
@@ -588,9 +588,66 @@ export default function DashboardScreen() {
               <View style={[styles.cloudInfo, { backgroundColor: colors.surfaceHighlight }]}>
                 <Ionicons name="information-circle-outline" size={20} color={colors.textSecondary} />
                 <Text style={[styles.cloudInfoText, { color: colors.textSecondary }]}>
-                  Your documents are encrypted before upload. Only you can access them.
+                  {t('documentsEncrypted')}
                 </Text>
               </View>
+            </ScrollView>
+          </SafeAreaView>
+        </View>
+      </Modal>
+
+      {/* Language Picker Modal */}
+      <Modal visible={showLanguagePicker} transparent animationType="slide" onRequestClose={() => setShowLanguagePicker(false)}>
+        <View style={[styles.modalFull, { backgroundColor: colors.background }]}>
+          <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <TouchableOpacity onPress={() => setShowLanguagePicker(false)} style={styles.modalHeaderBtn}>
+                <Ionicons name="close" size={24} color={colors.textPrimary} />
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>{t('languageSetting')}</Text>
+              <View style={{ width: 44 }} />
+            </View>
+            
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20 }}>
+              <View style={[styles.langHeader, { backgroundColor: colors.primary + '15' }]}>
+                <View style={[styles.langHeaderIcon, { backgroundColor: colors.primary }]}>
+                  <Ionicons name="language" size={32} color="#FFF" />
+                </View>
+                <Text style={[styles.langHeaderTitle, { color: colors.textPrimary }]}>Select Language</Text>
+                <Text style={[styles.langHeaderSubtitle, { color: colors.textSecondary }]}>
+                  Choose your preferred language
+                </Text>
+              </View>
+
+              {languages.map((lang) => (
+                <TouchableOpacity
+                  key={lang.code}
+                  style={[
+                    styles.langOption, 
+                    { backgroundColor: colors.surface, ...shadows.sm },
+                    currentLanguage === lang.code && { borderColor: colors.primary, borderWidth: 2 }
+                  ]}
+                  onPress={() => {
+                    setLanguage(lang.code);
+                    setShowLanguagePicker(false);
+                  }}
+                >
+                  <View style={styles.langInfo}>
+                    <Text style={[styles.langName, { color: colors.textPrimary }]}>{lang.name}</Text>
+                    <Text style={[styles.langNative, { color: colors.textSecondary }]}>{lang.nativeName}</Text>
+                  </View>
+                  {currentLanguage === lang.code && (
+                    <View style={[styles.langCheck, { backgroundColor: colors.primary }]}>
+                      <Ionicons name="checkmark" size={18} color="#FFF" />
+                    </View>
+                  )}
+                  {lang.rtl && (
+                    <View style={[styles.rtlBadge, { backgroundColor: colors.surfaceHighlight }]}>
+                      <Text style={[styles.rtlBadgeText, { color: colors.textTertiary }]}>RTL</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
             </ScrollView>
           </SafeAreaView>
         </View>
