@@ -277,7 +277,7 @@ export default function PreviewScreen() {
         >
           <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Document Preview</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('documentPreview')}</Text>
         <View style={{ width: 36 }} />
       </View>
 
