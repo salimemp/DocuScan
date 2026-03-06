@@ -215,10 +215,10 @@ export default function ScanScreen() {
           </TouchableOpacity>
 
           <View style={styles.topCenter}>
-            <Text style={styles.topTitle}>Scan Document</Text>
+            <Text style={styles.topTitle}>{t('scanDocument')}</Text>
             {pageCount > 0 && (
               <View style={[styles.pageCountBadge, { backgroundColor: colors.primary }]}>
-                <Text style={styles.pageCountText}>{pageCount} page{pageCount !== 1 ? 's' : ''}</Text>
+                <Text style={styles.pageCountText}>{pageCount} {t('pages')}</Text>
               </View>
             )}
           </View>
