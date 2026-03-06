@@ -13,7 +13,7 @@ index 0000000..0000438
 +3. Comments System  
 +4. Document Sharing
 +
-+Tests the production API at https://ai-paperless.preview.emergentagent.com
++Tests the production API at https://multi-lang-docs-1.preview.emergentagent.com
 +"""
 +
 +import requests
@@ -23,7 +23,7 @@ index 0000000..0000438
 +from datetime import datetime
 +
 +# Configuration
-+BASE_URL = "https://ai-paperless.preview.emergentagent.com/api"
++BASE_URL = "https://multi-lang-docs-1.preview.emergentagent.com/api"
 +TEST_PASSWORD = "test1234"
 +WRONG_PASSWORD = "wrongpass"
 +
@@ -510,7 +510,7 @@ index 32927f9..8d99788 100644
 --+from typing import Dict, Any, Optional
 --+
 --+# Configuration
---+BASE_URL = "https://ai-paperless.preview.emergentagent.com/api"
+--+BASE_URL = "https://multi-lang-docs-1.preview.emergentagent.com/api"
 --+TIMEOUT = 30
 --+
 --+class DocScanV5Tester:
@@ -1094,5 +1094,5 @@ index 0c7efff..d113c24 100644
 \ No newline at end of file
 +    message: "Dashboard button fixes verified working (Settings, Share Doc, New Folder, Cloud Backup all functional with modals). Now testing password protection, e-signatures, and comments features end-to-end."
 +  - agent: "testing"
-+    message: "DocScan Pro Review Testing Completed Successfully: Comprehensive end-to-end testing of all requested features at production URL https://ai-paperless.preview.emergentagent.com completed. Results: 4/4 critical features working (100% success rate). ✅ WORKING: Password Protection Flow (set/verify/reject/remove), E-Signature System (create/list/add to document), Comments System (add/verify storage/resolve), Document Sharing (email notifications). All features are production-ready and functioning correctly. No critical issues detected."
++    message: "DocScan Pro Review Testing Completed Successfully: Comprehensive end-to-end testing of all requested features at production URL https://multi-lang-docs-1.preview.emergentagent.com completed. Results: 4/4 critical features working (100% success rate). ✅ WORKING: Password Protection Flow (set/verify/reject/remove), E-Signature System (create/list/add to document), Comments System (add/verify storage/resolve), Document Sharing (email notifications). All features are production-ready and functioning correctly. No critical issues detected."
 \ No newline at end of file
