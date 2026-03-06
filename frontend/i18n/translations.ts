@@ -2037,6 +2037,23 @@ const ta: TranslationKeys = {
   exportFailed: 'ஏற்றுமதி தோல்வி',
   saveFailed: 'சேமிப்பு தோல்வி',
   networkError: 'நெட்வொர்க் பிழை',
+  skip: 'தவிர்', next: 'அடுத்து', getStarted: 'தொடங்கு',
+  cookieConsentTitle: 'உங்கள் தனியுரிமை முக்கியம்', cookieConsentDesc: 'குக்கீகளைப் பயன்படுத்துகிறோம்.',
+  privacyPolicy: 'தனியுரிமைக் கொள்கை', termsOfService: 'சேவை விதிமுறைகள்',
+  managePreferences: 'நிர்வகி', acceptAll: 'அனைத்தும் ஏற்கவும்',
+  cookiePreferences: 'குக்கீ விருப்பங்கள்', essentialCookies: 'அத்தியாவசியம்',
+  essentialCookiesDesc: 'செயல்பட தேவை', functionalCookies: 'செயல்பாட்டு',
+  functionalCookiesDesc: 'விருப்பங்களை நினைவில் கொள்ளவும்', analyticsCookies: 'பகுப்பாய்வு',
+  analyticsCookiesDesc: 'மேம்படுத்த உதவுங்கள்', alwaysOn: 'எப்போதும் இயங்கும்',
+  savePreferences: 'சேமி', cameraAccess: 'கேமரா அணுகல்',
+  cameraPermissionDesc: 'ஸ்கேன் செய்ய கேமரா தேவை.',
+  enableCamera: 'கேமராவை இயக்கு', maybeLater: 'பின்னர்',
+  alignDocument: 'ஆவணத்தை சட்டத்தில் சீரமைக்கவும்', addMorePagesOrContinue: 'பக்கங்களைச் சேர்க்கவும் அல்லது தொடரவும்',
+  gallery: 'கேலரி', continue: 'தொடர்', flip: 'புரட்டு',
+  documentPreview: 'ஆவண முன்னோட்டம்', discard: 'நிராகரி',
+  saving: 'சேமிக்கிறது...', saveToHistory: 'வரலாற்றில் சேமி',
+  loadingEditor: 'எடிட்டர் ஏற்றுகிறது...', editDocument: 'ஆவணத்தைத் திருத்து',
+  page: 'பக்கம்', of: 'இல்',
 };
 
 const bn: TranslationKeys = {
