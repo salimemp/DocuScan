@@ -1466,22 +1466,50 @@ async def export_document(doc_id: str, format: str = Query("pdf")):
         raise HTTPException(404, "Document not found")
     fmt = format.lower().lstrip('.')
     try:
+        # Document formats
         if fmt == "pdf":
             data, mime, ext = generate_pdf(doc), "application/pdf", "pdf"
-        elif fmt in ("jpeg", "jpg"):
-            data, mime, ext = generate_image_export(doc, "JPEG"), "image/jpeg", "jpg"
-        elif fmt == "png":
-            data, mime, ext = generate_image_export(doc, "PNG"), "image/png", "png"
         elif fmt in ("docx", "doc"):
             data = generate_docx(doc)
             mime, ext = "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx"
         elif fmt == "pptx":
             data = generate_pptx(doc)
             mime, ext = "application/vnd.openxmlformats-officedocument.presentationml.presentation", "pptx"
+        elif fmt in ("xlsx", "xls", "excel"):
+            data = generate_xlsx(doc)
+            mime, ext = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx"
         elif fmt == "txt":
             data, mime, ext = generate_txt(doc), "text/plain", "txt"
+        elif fmt == "html":
+            data, mime, ext = generate_html(doc), "text/html", "html"
+        elif fmt == "json":
+            data, mime, ext = generate_json_export(doc), "application/json", "json"
+        elif fmt in ("md", "markdown"):
+            data, mime, ext = generate_markdown(doc), "text/markdown", "md"
+        
+        # Image formats
+        elif fmt in ("jpeg", "jpg"):
+            data, mime, ext = generate_image_export(doc, "JPEG"), "image/jpeg", "jpg"
+        elif fmt == "png":
+            data, mime, ext = generate_image_export(doc, "PNG"), "image/png", "png"
+        elif fmt == "tiff":
+            data, mime, ext = generate_image_export(doc, "TIFF"), "image/tiff", "tiff"
+        elif fmt == "bmp":
+            data, mime, ext = generate_image_export(doc, "BMP"), "image/bmp", "bmp"
+        elif fmt == "webp":
+            data, mime, ext = generate_image_export(doc, "WEBP"), "image/webp", "webp"
+        elif fmt == "svg":
+            data, mime, ext = generate_svg(doc), "image/svg+xml", "svg"
+        
+        # E-book formats
+        elif fmt == "epub":
+            data, mime, ext = generate_epub(doc), "application/epub+zip", "epub"
+        elif fmt == "mobi":
+            data, mime, ext = generate_mobi(doc), "application/x-mobipocket-ebook", "mobi"
+        
         else:
-            raise HTTPException(400, f"Unsupported format: {fmt}")
+            raise HTTPException(400, f"Unsupported format: {fmt}. Supported: pdf, docx, pptx, xlsx, txt, html, json, md, jpg, png, tiff, bmp, webp, svg, epub, mobi")
+        
         safe_title = re.sub(r'[^\w\s-]', '', doc.get('title', 'document')).strip()[:40]
         filename = f"{safe_title.replace(' ', '_') or 'document'}.{ext}"
         return {"base64": base64.b64encode(data).decode(), "mime_type": mime, "filename": filename}
