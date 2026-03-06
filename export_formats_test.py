@@ -132,10 +132,8 @@ class ExportFormatTester:
     def test_invalid_format(self, doc_id: str) -> bool:
         """Test invalid format to ensure proper error handling"""
         try:
-            payload = {"format": "invalid_format"}
             response = self.session.post(
-                f"{BACKEND_URL}/documents/{doc_id}/export",
-                json=payload
+                f"{BACKEND_URL}/documents/{doc_id}/export?format=invalid_format"
             )
             
             # Should return 400 error
