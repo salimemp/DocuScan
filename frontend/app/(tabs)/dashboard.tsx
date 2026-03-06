@@ -788,4 +788,17 @@ const styles = StyleSheet.create({
   connectBadgeText: { fontSize: 13, fontWeight: '600' },
   cloudInfo: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 12, marginTop: 16 },
   cloudInfoText: { flex: 1, fontSize: 13, lineHeight: 18 },
+
+  // Language Picker
+  langHeader: { borderRadius: 20, padding: 24, alignItems: 'center', marginBottom: 24 },
+  langHeaderIcon: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  langHeaderTitle: { fontSize: 20, fontWeight: '700', marginBottom: 8 },
+  langHeaderSubtitle: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  langOption: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 14, marginBottom: 10 },
+  langInfo: { flex: 1 },
+  langName: { fontSize: 15, fontWeight: '600' },
+  langNative: { fontSize: 13, marginTop: 2 },
+  langCheck: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  rtlBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginRight: 8 },
+  rtlBadgeText: { fontSize: 10, fontWeight: '700' },
 });
