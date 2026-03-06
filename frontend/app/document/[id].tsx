@@ -38,11 +38,25 @@ const DOC_META: Record<string, { emoji: string; color: string; label: string }> 
 const getMeta = (type: string) => DOC_META[type] ?? DOC_META.general_document;
 
 const EXPORT_FORMATS = [
-  { id: 'pdf', label: 'PDF Document', icon: 'document-text', ext: '.pdf', mime: 'application/pdf' },
-  { id: 'docx', label: 'Word Document', icon: 'document', ext: '.docx', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
-  { id: 'txt', label: 'Plain Text', icon: 'reader', ext: '.txt', mime: 'text/plain' },
-  { id: 'png', label: 'PNG Image', icon: 'image', ext: '.png', mime: 'image/png' },
-  { id: 'jpeg', label: 'JPEG Image', icon: 'image-outline', ext: '.jpg', mime: 'image/jpeg' },
+  // Documents
+  { id: 'pdf', label: 'PDF Document', icon: 'document-text', ext: '.pdf', mime: 'application/pdf', category: 'doc' },
+  { id: 'docx', label: 'Word Document', icon: 'document', ext: '.docx', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', category: 'doc' },
+  { id: 'xlsx', label: 'Excel Spreadsheet', icon: 'grid', ext: '.xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', category: 'doc' },
+  { id: 'pptx', label: 'PowerPoint', icon: 'easel', ext: '.pptx', mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', category: 'doc' },
+  { id: 'txt', label: 'Plain Text', icon: 'reader', ext: '.txt', mime: 'text/plain', category: 'doc' },
+  { id: 'html', label: 'HTML Page', icon: 'code-slash', ext: '.html', mime: 'text/html', category: 'doc' },
+  { id: 'json', label: 'JSON Data', icon: 'code', ext: '.json', mime: 'application/json', category: 'doc' },
+  { id: 'md', label: 'Markdown', icon: 'logo-markdown', ext: '.md', mime: 'text/markdown', category: 'doc' },
+  // Images
+  { id: 'png', label: 'PNG Image', icon: 'image', ext: '.png', mime: 'image/png', category: 'img' },
+  { id: 'jpeg', label: 'JPEG Image', icon: 'image-outline', ext: '.jpg', mime: 'image/jpeg', category: 'img' },
+  { id: 'tiff', label: 'TIFF Image', icon: 'image', ext: '.tiff', mime: 'image/tiff', category: 'img' },
+  { id: 'bmp', label: 'BMP Image', icon: 'image', ext: '.bmp', mime: 'image/bmp', category: 'img' },
+  { id: 'webp', label: 'WebP Image', icon: 'image', ext: '.webp', mime: 'image/webp', category: 'img' },
+  { id: 'svg', label: 'SVG Vector', icon: 'shapes', ext: '.svg', mime: 'image/svg+xml', category: 'img' },
+  // E-books
+  { id: 'epub', label: 'EPUB E-book', icon: 'book', ext: '.epub', mime: 'application/epub+zip', category: 'ebook' },
+  { id: 'mobi', label: 'MOBI (Kindle)', icon: 'tablet-landscape', ext: '.mobi', mime: 'application/x-mobipocket-ebook', category: 'ebook' },
 ];
 
 export default function DocumentDetailScreen() {
