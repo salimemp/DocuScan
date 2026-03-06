@@ -1725,6 +1725,23 @@ const hi: TranslationKeys = {
   exportFailed: 'निर्यात विफल',
   saveFailed: 'सहेजने में विफल',
   networkError: 'नेटवर्क त्रुटि',
+  skip: 'छोड़ें', next: 'आगे', getStarted: 'शुरू करें',
+  cookieConsentTitle: 'आपकी गोपनीयता महत्वपूर्ण है', cookieConsentDesc: 'हम कुकीज़ का उपयोग करते हैं।',
+  privacyPolicy: 'गोपनीयता नीति', termsOfService: 'सेवा की शर्तें',
+  managePreferences: 'प्रबंधित करें', acceptAll: 'सभी स्वीकार करें',
+  cookiePreferences: 'कुकी प्राथमिकताएं', essentialCookies: 'आवश्यक',
+  essentialCookiesDesc: 'ऐप चलाने के लिए ज़रूरी', functionalCookies: 'कार्यात्मक',
+  functionalCookiesDesc: 'आपकी प्राथमिकताएं याद रखें', analyticsCookies: 'विश्लेषणात्मक',
+  analyticsCookiesDesc: 'सुधार में मदद करें', alwaysOn: 'हमेशा चालू',
+  savePreferences: 'सहेजें', cameraAccess: 'कैमरा एक्सेस',
+  cameraPermissionDesc: 'स्कैन के लिए कैमरा चाहिए।',
+  enableCamera: 'कैमरा सक्षम करें', maybeLater: 'बाद में',
+  alignDocument: 'दस्तावेज़ को फ्रेम में संरेखित करें', addMorePagesOrContinue: 'पेज जोड़ें या जारी रखें',
+  gallery: 'गैलरी', continue: 'जारी रखें', flip: 'पलटें',
+  documentPreview: 'दस्तावेज़ पूर्वावलोकन', discard: 'छोड़ें',
+  saving: 'सहेज रहा है...', saveToHistory: 'इतिहास में सहेजें',
+  loadingEditor: 'संपादक लोड हो रहा है...', editDocument: 'दस्तावेज़ संपादित करें',
+  page: 'पृष्ठ', of: 'का',
 };
 
 const ko: TranslationKeys = {
