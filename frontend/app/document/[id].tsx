@@ -64,6 +64,7 @@ export default function DocumentDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors, shadows, isDark } = useTheme();
+  const { t } = useLanguage();
 
   const [doc, setDoc] = useState<any>(null);
   const [loading, setLoading] = useState(true);
