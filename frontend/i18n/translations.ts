@@ -2193,6 +2193,23 @@ const bn: TranslationKeys = {
   exportFailed: 'রপ্তানি ব্যর্থ',
   saveFailed: 'সংরক্ষণ ব্যর্থ',
   networkError: 'নেটওয়ার্ক ত্রুটি',
+  skip: 'এড়িয়ে যান', next: 'পরবর্তী', getStarted: 'শুরু করুন',
+  cookieConsentTitle: 'আপনার গোপনীয়তা গুরুত্বপূর্ণ', cookieConsentDesc: 'আমরা কুকি ব্যবহার করি।',
+  privacyPolicy: 'গোপনীয়তা নীতি', termsOfService: 'সেবার শর্তাবলী',
+  managePreferences: 'পরিচালনা', acceptAll: 'সব গ্রহণ করুন',
+  cookiePreferences: 'কুকি পছন্দসমূহ', essentialCookies: 'প্রয়োজনীয়',
+  essentialCookiesDesc: 'অ্যাপ চালাতে প্রয়োজন', functionalCookies: 'কার্যকরী',
+  functionalCookiesDesc: 'আপনার পছন্দ মনে রাখুন', analyticsCookies: 'বিশ্লেষণাত্মক',
+  analyticsCookiesDesc: 'উন্নতিতে সাহায্য করুন', alwaysOn: 'সবসময় চালু',
+  savePreferences: 'সংরক্ষণ করুন', cameraAccess: 'ক্যামেরা অ্যাক্সেস',
+  cameraPermissionDesc: 'স্ক্যান করতে ক্যামেরা প্রয়োজন।',
+  enableCamera: 'ক্যামেরা সক্রিয় করুন', maybeLater: 'পরে',
+  alignDocument: 'ফ্রেমে নথি সারিবদ্ধ করুন', addMorePagesOrContinue: 'পৃষ্ঠা যোগ করুন বা চালিয়ে যান',
+  gallery: 'গ্যালারি', continue: 'চালিয়ে যান', flip: 'উল্টান',
+  documentPreview: 'নথির পূর্বরূপ', discard: 'বাতিল',
+  saving: 'সংরক্ষণ হচ্ছে...', saveToHistory: 'ইতিহাসে সংরক্ষণ করুন',
+  loadingEditor: 'সম্পাদক লোড হচ্ছে...', editDocument: 'নথি সম্পাদনা করুন',
+  page: 'পৃষ্ঠা', of: 'এর',
 };
 
 const he: TranslationKeys = {
