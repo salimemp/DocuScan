@@ -148,9 +148,9 @@ export default function ScanScreen() {
             <View style={styles.permissionIconWrap}>
               <Ionicons name="camera-outline" size={56} color="#FFFFFF" />
             </View>
-            <Text style={styles.permissionTitle}>Camera Access</Text>
+            <Text style={styles.permissionTitle}>{t('cameraAccess')}</Text>
             <Text style={styles.permissionSubtitle}>
-              DocScan Pro needs camera access to scan documents. Your photos are processed securely.
+              {t('cameraPermissionDesc')}
             </Text>
             <TouchableOpacity
               testID="grant-camera-btn"
@@ -159,7 +159,7 @@ export default function ScanScreen() {
               activeOpacity={0.85}
             >
               <Ionicons name="camera" size={20} color="#FFF" />
-              <Text style={styles.grantBtnText}>Enable Camera</Text>
+              <Text style={styles.grantBtnText}>{t('enableCamera')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               testID="cancel-permission-btn"
@@ -167,7 +167,7 @@ export default function ScanScreen() {
               onPress={() => router.back()}
               activeOpacity={0.7}
             >
-              <Text style={styles.cancelPermText}>Maybe Later</Text>
+              <Text style={styles.cancelPermText}>{t('maybeLater')}</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
