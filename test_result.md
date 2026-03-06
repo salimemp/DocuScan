@@ -198,6 +198,9 @@ backend:
       - working: true
         agent: "testing"
         comment: "All export formats tested successfully: PDF (2713 bytes), TXT (1066 chars), DOCX (36951 bytes), PPTX (31126 bytes), PNG (11999 bytes), JPEG (30555 bytes). Base64 encoding working correctly. Error handling for invalid formats working (returns 400)."
+      - working: true
+        agent: "testing"
+        comment: "NEW EXPORT FORMATS TESTING COMPLETED: All 5 new export formats working perfectly. HTML (2678 bytes), JSON (1903 bytes), Markdown (974 bytes), EPUB (2470 bytes), PPTX (29504 bytes). Fixed JSON serialization issue with datetime objects. Error handling validated (400 for invalid formats). All formats return correct MIME types and valid base64 data. 100% success rate (5/5 tests passed)."
 
   - task: "Password Protection - Set/Verify/Remove password"
     implemented: true
