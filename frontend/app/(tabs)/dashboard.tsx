@@ -363,14 +363,14 @@ export default function DashboardScreen() {
               <View style={[styles.settingsCard, { backgroundColor: colors.surface, ...shadows.sm }]}>
                 <TouchableOpacity style={styles.settingsItem}>
                   <Ionicons name="moon-outline" size={22} color={colors.primary} />
-                  <Text style={[styles.settingsItemText, { color: colors.textPrimary }]}>Dark Mode</Text>
+                  <Text style={[styles.settingsItemText, { color: colors.textPrimary }]}>{t('darkMode')}</Text>
                   <Text style={[styles.settingsItemValue, { color: colors.textTertiary }]}>Auto</Text>
                 </TouchableOpacity>
                 <View style={[styles.settingsDivider, { backgroundColor: colors.border }]} />
-                <TouchableOpacity style={styles.settingsItem}>
+                <TouchableOpacity style={styles.settingsItem} onPress={() => setShowLanguagePicker(true)}>
                   <Ionicons name="language-outline" size={22} color={colors.primary} />
-                  <Text style={[styles.settingsItemText, { color: colors.textPrimary }]}>Language</Text>
-                  <Text style={[styles.settingsItemValue, { color: colors.textTertiary }]}>English</Text>
+                  <Text style={[styles.settingsItemText, { color: colors.textPrimary }]}>{t('languageSetting')}</Text>
+                  <Text style={[styles.settingsItemValue, { color: colors.textTertiary }]}>{getCurrentLanguageInfo().nativeName}</Text>
                 </TouchableOpacity>
                 <View style={[styles.settingsDivider, { backgroundColor: colors.border }]} />
                 <TouchableOpacity style={styles.settingsItem}>
