@@ -11,7 +11,7 @@ import sys
 from typing import Dict, Any, Optional
 
 # Backend URL from environment
-BACKEND_URL = "https://multi-lang-docs-1.preview.emergentagent.com/api"
+BACKEND_URL = "https://docuflow-i18n.preview.emergentagent.com/api"
 
 class ExportFormatTester:
     def __init__(self):
