@@ -21,7 +21,7 @@ export default function MathSolverScreen() {
   const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
 
-  const solveMathProblem = async (imageBase64?: string, textEquation?: string) => {
+  const solveMathProblem = async (imageBase64, textEquation) => {
     if (!imageBase64 && !textEquation?.trim()) {
       Alert.alert('Error', 'Please provide either an equation or select an image');
       return;
