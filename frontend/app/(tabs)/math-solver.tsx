@@ -19,7 +19,7 @@ export default function MathSolverScreen() {
   const [equation, setEquation] = useState('');
   const [solution, setSolution] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState(null);
 
   const solveMathProblem = async (imageBase64?: string, textEquation?: string) => {
     if (!imageBase64 && !textEquation?.trim()) {
