@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -16,6 +16,7 @@ function RootLayoutNav() {
   const segments = useSegments();
   const [isLoading, setIsLoading] = useState(true);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
+  const hasRedirected = useRef(false);
 
   const checkOnboardingStatus = useCallback(async () => {
     try {
@@ -36,32 +37,18 @@ function RootLayoutNav() {
     checkOnboardingStatus();
   }, [checkOnboardingStatus]);
 
-  // Listen for storage changes (when onboarding completes)
   useEffect(() => {
-    const interval = setInterval(async () => {
-      if (hasCompletedOnboarding === false) {
-        const completed = await AsyncStorage.getItem(ONBOARDING_KEY);
-        if (completed === 'true') {
-          setHasCompletedOnboarding(true);
-        }
-      }
-    }, 500);
-
-    return () => clearInterval(interval);
-  }, [hasCompletedOnboarding]);
-
-  useEffect(() => {
-    if (isLoading || hasCompletedOnboarding === null) return;
+    if (isLoading || hasCompletedOnboarding === null || hasRedirected.current) return;
 
     const inOnboarding = segments[0] === 'onboarding';
     
+    // Only redirect to onboarding once, at initial load
     if (!hasCompletedOnboarding && !inOnboarding) {
-      // Redirect to onboarding if not completed
+      hasRedirected.current = true;
       router.replace('/onboarding');
     }
-    // Removed the redirect from onboarding to dashboard here
-    // The onboarding screen handles its own navigation after completion
-  }, [isLoading, hasCompletedOnboarding, segments]);
+    // Don't redirect away from onboarding - let the onboarding screen handle its own navigation
+  }, [isLoading, hasCompletedOnboarding, segments, router]);
 
   if (isLoading) {
     return (
