@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -15,13 +15,9 @@ function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
   const [isLoading, setIsLoading] = useState(true);
-  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    checkOnboardingStatus();
-  }, []);
-
-  const checkOnboardingStatus = async () => {
+  const checkOnboardingStatus = useCallback(async () => {
     try {
       const completed = await AsyncStorage.getItem(ONBOARDING_KEY);
       setHasCompletedOnboarding(completed === 'true');
@@ -30,23 +26,41 @@ function RootLayoutNav() {
       await analytics.init();
     } catch (e) {
       console.log('Error checking onboarding:', e);
+      setHasCompletedOnboarding(false);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    if (isLoading) return;
+    checkOnboardingStatus();
+  }, [checkOnboardingStatus]);
+
+  // Listen for storage changes (when onboarding completes)
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (hasCompletedOnboarding === false) {
+        const completed = await AsyncStorage.getItem(ONBOARDING_KEY);
+        if (completed === 'true') {
+          setHasCompletedOnboarding(true);
+        }
+      }
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [hasCompletedOnboarding]);
+
+  useEffect(() => {
+    if (isLoading || hasCompletedOnboarding === null) return;
 
     const inOnboarding = segments[0] === 'onboarding';
     
     if (!hasCompletedOnboarding && !inOnboarding) {
       // Redirect to onboarding if not completed
       router.replace('/onboarding');
-    } else if (hasCompletedOnboarding && inOnboarding) {
-      // Redirect to dashboard if already completed
-      router.replace('/dashboard');
     }
+    // Removed the redirect from onboarding to dashboard here
+    // The onboarding screen handles its own navigation after completion
   }, [isLoading, hasCompletedOnboarding, segments]);
 
   if (isLoading) {
@@ -76,6 +90,10 @@ function RootLayoutNav() {
       <Stack.Screen
         name="editor"
         options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="compliance"
+        options={{ animation: 'slide_from_right' }}
       />
     </Stack>
   );
