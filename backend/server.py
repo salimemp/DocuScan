@@ -1545,6 +1545,74 @@ async def get_stats():
     storage_str = f"{storage_kb / 1024:.1f} MB" if storage_kb >= 1024 else f"{storage_kb} KB"
     return {"total_scans": total, "locked_documents": locked, "storage_used": storage_str, "last_scan": last_scan}
 
+
+# ── Math Solver ────────────────────────────────────────────────────────────
+class MathSolveRequest(BaseModel):
+    image_base64: Optional[str] = None
+    equation: Optional[str] = None
+
+@api_router.post("/math/solve")
+async def solve_math_problem(request: MathSolveRequest):
+    """
+    Solve math problems from image or text input using Gemini AI.
+    Supports both image-based (photo of math problem) and text-based equations.
+    """
+    if not request.image_base64 and not request.equation:
+        raise HTTPException(400, "Please provide either an image or an equation")
+    
+    try:
+        api_key = get_api_key()
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"math-solver-{uuid.uuid4()}",
+            system_message="""You are an expert math tutor and problem solver. Your task is to:
+1. Identify the mathematical problem (from image or text)
+2. Solve it step-by-step
+3. Provide a clear, educational explanation
+
+Format your response as:
+**Problem:** [State the problem clearly]
+
+**Solution:**
+Step 1: [First step with explanation]
+Step 2: [Second step with explanation]
+...
+
+**Answer:** [Final answer]
+
+**Explanation:** [Brief explanation of the concept or method used]
+
+Be thorough but concise. Use proper mathematical notation where possible."""
+        ).with_model("gemini", "gemini-2.5-flash")
+        
+        if request.image_base64:
+            # Image-based math solving
+            clean_base64 = strip_b64_prefix(request.image_base64)
+            image_content = ImageContent(image_base64=clean_base64)
+            
+            user_message = UserMessage(
+                text="Please analyze this math problem image and solve it step-by-step. Show all your work and explain each step clearly.",
+                image_contents=[image_content]
+            )
+        else:
+            # Text-based equation solving
+            user_message = UserMessage(
+                text=f"Please solve this math problem step-by-step: {request.equation}\n\nShow all your work and explain each step clearly."
+            )
+        
+        response = await chat.send_message(user_message)
+        
+        return {
+            "success": True,
+            "solution": response,
+            "input_type": "image" if request.image_base64 else "text",
+            "original_equation": request.equation if request.equation else "Extracted from image"
+        }
+        
+    except Exception as e:
+        logger.error(f"Math solver error: {e}")
+        raise HTTPException(500, f"Failed to solve math problem: {str(e)}")
+
 app.include_router(api_router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
