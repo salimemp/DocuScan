@@ -82,14 +82,15 @@ export default function OnboardingScreen() {
     setIsNavigating(true);
     
     try {
-      // Set the flag BEFORE navigating
+      // Mark globally that onboarding is complete (prevents redirect loop)
+      markOnboardingComplete();
+      
+      // Set the flag in storage for persistence
       await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
       await analytics.trackOnboardingComplete();
       
-      // Small delay to ensure storage is persisted
-      setTimeout(() => {
-        router.replace('/(tabs)/dashboard');
-      }, 100);
+      // Navigate to dashboard
+      router.replace('/(tabs)/dashboard');
     } catch (e) {
       console.log('Error completing onboarding:', e);
       router.replace('/(tabs)/dashboard');
