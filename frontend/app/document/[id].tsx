@@ -96,6 +96,9 @@ export default function DocumentDetailScreen() {
   
   // Saved signatures
   const [savedSignatures, setSavedSignatures] = useState<any[]>([]);
+  
+  // Read Aloud state
+  const [showReadAloud, setShowReadAloud] = useState(false);
 
   const fetchDocument = useCallback(async () => {
     try {
