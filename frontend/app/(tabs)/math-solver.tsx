@@ -44,7 +44,7 @@ export default function MathSolverScreen() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const result: any = await response.json();
+      const result = await response.json();
       setSolution(result);
     } catch (error) {
       console.error('Math solver error:', error);
