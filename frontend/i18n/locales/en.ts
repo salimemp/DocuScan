@@ -190,6 +190,12 @@ export const en = {
   stopped: 'Stopped',
   textToRead: 'Text to read',
   noTextToRead: 'No text available to read',
+  // Compliance
+  complianceSecurity: 'Compliance & Security',
+  yourDataProtected: 'Your Data is Protected',
+  complianceIntro: 'DocScan Pro is committed to protecting your privacy and data security. We comply with major international privacy regulations.',
+  complianceQuestions: 'Have compliance questions?',
+  contact: 'Contact',
 };
 
 export default en;
