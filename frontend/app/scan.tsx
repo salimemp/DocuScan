@@ -463,6 +463,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   topCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  topRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   topTitle: { color: '#FFF', fontSize: 16, fontWeight: '700' },
   pageCountBadge: {
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
