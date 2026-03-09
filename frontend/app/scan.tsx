@@ -363,6 +363,12 @@ export default function ScanScreen() {
           </View>
         </View>
       )}
+
+      {/* Math Solver Modal */}
+      <MathSolverModal 
+        visible={showMathSolver} 
+        onClose={() => setShowMathSolver(false)} 
+      />
     </View>
   );
 }
