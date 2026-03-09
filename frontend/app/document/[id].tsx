@@ -1004,6 +1004,13 @@ export default function DocumentDetailScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      {/* Read Aloud Modal */}
+      <ReadAloudControls
+        text={doc?.formatted_output || doc?.raw_text || doc?.summary || ''}
+        visible={showReadAloud}
+        onClose={() => setShowReadAloud(false)}
+      />
     </SafeAreaView>
   );
 }
