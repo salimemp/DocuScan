@@ -12,6 +12,7 @@ import { useLanguage } from '../../hooks/useLanguage';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { SignatureCanvas } from '../../components/SignatureCanvas';
+import { ReadAloudControls, ReadAloudButton } from '../../components/ReadAloudControls';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 
