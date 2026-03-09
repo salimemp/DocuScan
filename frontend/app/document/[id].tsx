@@ -527,6 +527,8 @@ export default function DocumentDetailScreen() {
             </Text>
             <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
           </TouchableOpacity>
+          {/* Read Aloud Button */}
+          <ReadAloudButton onPress={() => setShowReadAloud(true)} />
         </View>
 
         {/* Pending Signature Requests */}
