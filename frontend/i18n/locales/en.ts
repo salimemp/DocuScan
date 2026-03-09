@@ -171,6 +171,25 @@ export const en = {
   editDocument: 'Edit Document',
   page: 'Page',
   of: 'of',
+  // Math Solver
+  mathSolver: 'Math Solver',
+  typeEquation: 'Type Equation',
+  scanProblem: 'Scan Problem',
+  enterEquation: 'Enter your equation',
+  quickExamples: 'Quick examples:',
+  captureOrSelect: 'Capture or select an image',
+  takePhoto: 'Take Photo',
+  solving: 'Solving...',
+  solveProblem: 'Solve Problem',
+  solution: 'Solution',
+  // Read Aloud
+  readAloud: 'Read Aloud',
+  playbackSpeed: 'Playback Speed',
+  playing: 'Playing',
+  paused: 'Paused',
+  stopped: 'Stopped',
+  textToRead: 'Text to read',
+  noTextToRead: 'No text available to read',
 };
 
 export default en;
