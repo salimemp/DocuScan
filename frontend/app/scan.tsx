@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { addScanPage, getScanPages, clearScanData, removeScanPage, getScanPageCount } from '../utils/scanStore';
 import { useTheme } from '../hooks/useTheme';
 import { useLanguage } from '../hooks/useLanguage';
+import { MathSolverModal } from '../components/MathSolverModal';
 
 export default function ScanScreen() {
   const router = useRouter();
