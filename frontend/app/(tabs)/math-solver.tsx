@@ -17,7 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 export default function MathSolverScreen() {
   const { colors, shadows } = useTheme();
   const [equation, setEquation] = useState('');
-  const [solution, setSolution] = useState<any>(null);
+  const [solution, setSolution] = useState(null);
   const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
 
