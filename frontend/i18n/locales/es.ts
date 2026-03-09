@@ -179,12 +179,32 @@ export const es = {
   solve: 'Resolver',
   solution: 'Solución',
   stepByStep: 'Paso a paso',
+  typeEquation: 'Escribir Ecuación',
+  scanProblem: 'Escanear Problema',
+  enterEquation: 'Ingresa tu ecuación',
+  quickExamples: 'Ejemplos rápidos:',
+  captureOrSelect: 'Captura o selecciona una imagen',
+  takePhoto: 'Tomar Foto',
+  solving: 'Resolviendo...',
+  solveProblem: 'Resolver Problema',
   // Accessibility
   accessibility: 'Accesibilidad',
-  readAloud: 'Leer en voz alta',
+  readAloud: 'Leer en Voz Alta',
   stopReading: 'Detener lectura',
   fontSize: 'Tamaño de fuente',
   highContrast: 'Alto contraste',
+  playbackSpeed: 'Velocidad de Reproducción',
+  playing: 'Reproduciendo',
+  paused: 'Pausado',
+  stopped: 'Detenido',
+  textToRead: 'Texto a leer',
+  noTextToRead: 'No hay texto disponible para leer',
+  // Compliance
+  complianceSecurity: 'Cumplimiento y Seguridad',
+  yourDataProtected: 'Tus Datos Están Protegidos',
+  complianceIntro: 'DocScan Pro está comprometido con la protección de tu privacidad y seguridad de datos. Cumplimos con las principales regulaciones internacionales de privacidad.',
+  complianceQuestions: '¿Tienes preguntas sobre cumplimiento?',
+  contact: 'Contactar',
 };
 
 export default es;
