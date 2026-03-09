@@ -353,9 +353,12 @@ export default function DashboardScreen() {
                   <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                 </TouchableOpacity>
                 <View style={[styles.settingsDivider, { backgroundColor: colors.border }]} />
-                <TouchableOpacity style={styles.settingsItem}>
+                <TouchableOpacity 
+                  style={styles.settingsItem}
+                  onPress={() => { setShowSettings(false); router.push('/compliance'); }}
+                >
                   <Ionicons name="shield-checkmark-outline" size={22} color={colors.primary} />
-                  <Text style={[styles.settingsItemText, { color: colors.textPrimary }]}>Privacy & Security</Text>
+                  <Text style={[styles.settingsItemText, { color: colors.textPrimary }]}>{t('complianceSecurity')}</Text>
                   <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                 </TouchableOpacity>
               </View>
