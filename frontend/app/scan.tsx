@@ -225,19 +225,30 @@ export default function ScanScreen() {
             )}
           </View>
 
-          <TouchableOpacity
-            testID="scan-flash-btn"
-            style={styles.ctrlBtn}
-            onPress={() => setFlash(f => f === 'off' ? 'on' : 'off')}
-            activeOpacity={0.8}
-            accessibilityLabel="Toggle flash"
-          >
-            <Ionicons
-              name={flash === 'on' ? 'flash' : 'flash-off'}
-              size={22}
-              color={flash === 'on' ? '#FBBF24' : '#FFF'}
-            />
-          </TouchableOpacity>
+          <View style={styles.topRight}>
+            <TouchableOpacity
+              testID="math-solver-btn"
+              style={styles.ctrlBtn}
+              onPress={() => setShowMathSolver(true)}
+              activeOpacity={0.8}
+              accessibilityLabel="Math Solver"
+            >
+              <Ionicons name="calculator" size={22} color="#FBBF24" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID="scan-flash-btn"
+              style={styles.ctrlBtn}
+              onPress={() => setFlash(f => f === 'off' ? 'on' : 'off')}
+              activeOpacity={0.8}
+              accessibilityLabel="Toggle flash"
+            >
+              <Ionicons
+                name={flash === 'on' ? 'flash' : 'flash-off'}
+                size={22}
+                color={flash === 'on' ? '#FBBF24' : '#FFF'}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
       </SafeAreaView>
 
