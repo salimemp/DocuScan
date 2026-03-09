@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Dimensions,
   Animated, StatusBar, Platform,
@@ -72,36 +72,48 @@ export default function OnboardingScreen() {
   const { colors } = useTheme();
   const { t } = useLanguage();
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isNavigating, setIsNavigating] = useState(false);
   const scrollX = useRef(new Animated.Value(0)).current;
   const slideRef = useRef<any>(null);
 
-  const completeOnboarding = async () => {
+  const completeOnboarding = useCallback(async () => {
+    if (isNavigating) return; // Prevent double navigation
+    setIsNavigating(true);
+    
     try {
+      // Set the flag BEFORE navigating
       await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
       await analytics.trackOnboardingComplete();
-      router.replace('/dashboard');
+      
+      // Small delay to ensure storage is persisted
+      setTimeout(() => {
+        router.replace('/(tabs)/dashboard');
+      }, 100);
     } catch (e) {
-      router.replace('/dashboard');
+      console.log('Error completing onboarding:', e);
+      router.replace('/(tabs)/dashboard');
     }
-  };
+  }, [isNavigating, router]);
 
-  const goToNext = () => {
+  const goToNext = useCallback(() => {
+    if (isNavigating) return;
+    
     if (currentIndex < slides.length - 1) {
       setCurrentIndex(currentIndex + 1);
     } else {
       completeOnboarding();
     }
-  };
+  }, [currentIndex, isNavigating, completeOnboarding]);
 
-  const goToPrev = () => {
+  const goToPrev = useCallback(() => {
     if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
     }
-  };
+  }, [currentIndex]);
 
-  const skip = () => {
+  const skip = useCallback(() => {
     completeOnboarding();
-  };
+  }, [completeOnboarding]);
 
   const currentSlide = slides[currentIndex];
 
