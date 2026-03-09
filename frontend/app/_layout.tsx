@@ -11,15 +11,29 @@ import { analytics } from '../utils/analytics';
 
 const ONBOARDING_KEY = '@DocScanPro:onboardingComplete';
 
+// Global flag to prevent redirect loop after onboarding completes
+let onboardingJustCompleted = false;
+
+export const markOnboardingComplete = () => {
+  onboardingJustCompleted = true;
+};
+
 function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
   const [isLoading, setIsLoading] = useState(true);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
-  const hasRedirected = useRef(false);
+  const initialCheckDone = useRef(false);
 
   const checkOnboardingStatus = useCallback(async () => {
     try {
+      // If onboarding was just completed, skip the check
+      if (onboardingJustCompleted) {
+        setHasCompletedOnboarding(true);
+        setIsLoading(false);
+        return;
+      }
+      
       const completed = await AsyncStorage.getItem(ONBOARDING_KEY);
       setHasCompletedOnboarding(completed === 'true');
       
@@ -38,16 +52,16 @@ function RootLayoutNav() {
   }, [checkOnboardingStatus]);
 
   useEffect(() => {
-    if (isLoading || hasCompletedOnboarding === null || hasRedirected.current) return;
+    if (isLoading || hasCompletedOnboarding === null) return;
+    if (initialCheckDone.current) return;
 
     const inOnboarding = segments[0] === 'onboarding';
     
-    // Only redirect to onboarding once, at initial load
-    if (!hasCompletedOnboarding && !inOnboarding) {
-      hasRedirected.current = true;
+    // Only redirect to onboarding once, at initial load, and only if not already completed
+    if (!hasCompletedOnboarding && !inOnboarding && !onboardingJustCompleted) {
+      initialCheckDone.current = true;
       router.replace('/onboarding');
     }
-    // Don't redirect away from onboarding - let the onboarding screen handle its own navigation
   }, [isLoading, hasCompletedOnboarding, segments, router]);
 
   if (isLoading) {
