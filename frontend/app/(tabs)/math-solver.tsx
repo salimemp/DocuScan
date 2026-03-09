@@ -14,12 +14,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../hooks/useTheme';
 import * as ImagePicker from 'expo-image-picker';
 
-interface MathSolution {
+type MathSolution = {
   success: boolean;
   solution: string;
   input_type: 'image' | 'text';
   original_equation: string;
-}
+};
 
 export default function MathSolverScreen() {
   const { colors, shadows } = useTheme();
