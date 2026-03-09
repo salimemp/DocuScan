@@ -23,6 +23,7 @@ export default function ScanScreen() {
   const [flash, setFlash] = useState<'off' | 'on'>('off');
   const [isProcessing, setIsProcessing] = useState(false);
   const [pages, setPages] = useState(getScanPages());
+  const [showMathSolver, setShowMathSolver] = useState(false);
   const cameraRef = useRef<CameraView>(null);
 
   const refreshPages = () => setPages(getScanPages());
