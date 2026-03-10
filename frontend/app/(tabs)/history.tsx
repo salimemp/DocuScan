@@ -432,23 +432,18 @@ export default function HistoryScreen() {
         )}
       </View>
 
-      {/* Search */}
-      <View style={[styles.searchBar, { backgroundColor: colors.surface, ...shadows.sm }]}>
-        <Ionicons name="search-outline" size={18} color={colors.textTertiary} />
-        <TextInput
-          testID="history-search-input"
-          style={[styles.searchInput, { color: colors.textPrimary }]}
-          placeholder={`${t('search')} ${t('documents')}...`}
-          placeholderTextColor={colors.textTertiary}
-          value={search}
-          onChangeText={setSearch}
-        />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')}>
-            <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
-          </TouchableOpacity>
-        )}
-      </View>
+      {/* Search with Voice Input */}
+      <SpeechInput
+        testID="history-search-input"
+        containerStyle={[styles.searchBar, shadows.sm]}
+        placeholder={`${t('search')} ${t('documents')}...`}
+        value={search}
+        onChangeText={setSearch}
+        onClear={() => setSearch('')}
+        leftIcon="search-outline"
+        colors={colors}
+        shadows={shadows}
+      />
 
       {/* Filters */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersRow} contentContainerStyle={styles.filtersContent}>
