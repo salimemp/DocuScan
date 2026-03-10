@@ -69,8 +69,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       ]);
 
       if (token && userStr) {
-        setAccessToken(token);
-        setUser(JSON.parse(userStr));
+        if (isMountedRef.current) {
+          setAccessToken(token);
+          setUser(JSON.parse(userStr));
+        }
         
         // Verify token is still valid
         const res = await fetch(`${BACKEND_URL}/api/auth/me`, {
@@ -79,7 +81,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         if (res.ok) {
           const userData = await res.json();
-          setUser(userData);
+          if (isMountedRef.current) {
+            setUser(userData);
+          }
           await AsyncStorage.setItem(USER_KEY, JSON.stringify(userData));
         } else {
           // Token invalid, try refresh
@@ -89,7 +93,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (e) {
       console.log('Error loading auth:', e);
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   };
 
