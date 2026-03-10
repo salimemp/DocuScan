@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -15,6 +14,10 @@ interface AppState {
   // User preferences
   lastOpenedDocumentId: string | null;
   setLastOpenedDocument: (id: string | null) => void;
+  
+  // Hydration tracking
+  _hasHydrated: boolean;
+  setHasHydrated: (state: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -31,6 +34,10 @@ export const useAppStore = create<AppState>()(
       // User preferences
       lastOpenedDocumentId: null,
       setLastOpenedDocument: (id) => set({ lastOpenedDocumentId: id }),
+      
+      // Hydration tracking
+      _hasHydrated: false,
+      setHasHydrated: (state) => set({ _hasHydrated: state }),
     }),
     {
       name: 'docscanpro-app-storage',
@@ -40,29 +47,12 @@ export const useAppStore = create<AppState>()(
         hasCompletedOnboarding: state.hasCompletedOnboarding,
         lastOpenedDocumentId: state.lastOpenedDocumentId,
       }),
+      onRehydrateStorage: () => (state) => {
+        // This is called when rehydration finishes
+        if (state) {
+          state.setHasHydrated(true);
+        }
+      },
     }
   )
 );
-
-// Helper to check if store is hydrated (for SSR/initial load)
-export const useAppStoreHydrated = () => {
-  const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
-    // Wait for async storage hydration
-    const unsubscribe = useAppStore.persist.onFinishHydration(() => {
-      setHydrated(true);
-    });
-    
-    // Check if already hydrated
-    if (useAppStore.persist.hasHydrated()) {
-      setHydrated(true);
-    }
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
-  return hydrated;
-};
