@@ -12,6 +12,10 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 import resend
 
+# Import auth and subscription modules
+from auth import auth_router
+from subscriptions import subscription_router
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
