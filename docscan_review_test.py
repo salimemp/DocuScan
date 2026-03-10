@@ -7,7 +7,7 @@ Focused testing for the specific features requested in the review:
 3. Comments System  
 4. Document Sharing
 
-Tests the production API at https://docuflow-i18n.preview.emergentagent.com
+Tests the production API at https://scanpro-auth-suite.preview.emergentagent.com
 """
 
 import requests
@@ -17,7 +17,7 @@ import time
 from datetime import datetime
 
 # Configuration
-BASE_URL = "https://docuflow-i18n.preview.emergentagent.com/api"
+BASE_URL = "https://scanpro-auth-suite.preview.emergentagent.com/api"
 TEST_PASSWORD = "test1234"
 WRONG_PASSWORD = "wrongpass"
 
