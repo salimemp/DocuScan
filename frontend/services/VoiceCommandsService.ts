@@ -230,19 +230,39 @@ class VoiceCommandsService {
   }
 
   /**
-   * Announce command help
+   * Announce command help - Extended version
    */
   async announceHelp() {
     const helpText = `
-      Available commands:
-      Say "scan" or "capture" to take a photo.
-      Say "flash" to toggle the flash.
-      Say "flip" to switch cameras.
-      Say "gallery" to import from photos.
-      Say "continue" when finished scanning.
-      Say "cancel" to exit.
+      Available voice commands:
+      
+      Scanning: Say "scan", "capture", or "snap" to take a photo.
+      Say "batch" to start continuous scanning.
+      Say "flash" to toggle the flashlight.
+      Say "flip" to switch between front and rear camera.
+      Say "gallery" to import photos from your library.
+      
+      Navigation: Say "continue" or "done" when finished.
+      Say "cancel" or "back" to go back.
+      
+      Reading: Say "read" to have the document read aloud.
+      Say "faster" or "slower" to adjust reading speed.
+      Say "stop reading" to stop.
+      
+      Export: Say "export PDF" or "share" to export your document.
+      
+      Security: Say "encrypt" to password-protect your document.
+      
+      Say "help" anytime to hear these commands again.
     `;
     await this.speak(helpText);
+  }
+
+  /**
+   * Announce quick help (shorter version)
+   */
+  async announceQuickHelp() {
+    await this.speak('Say "scan" to capture, "batch" for continuous mode, "read" to read aloud, or "help" for all commands.');
   }
 
   /**
@@ -257,6 +277,82 @@ class VoiceCommandsService {
    */
   async announceSuccess(message: string) {
     await this.speak(message);
+  }
+
+  /**
+   * Announce document exported
+   */
+  async announceExportComplete(format: string) {
+    await this.speak(`Document exported as ${format} successfully.`);
+  }
+
+  /**
+   * Announce encryption status
+   */
+  async announceEncryption(encrypted: boolean) {
+    if (encrypted) {
+      await this.speak('Document has been encrypted and secured.');
+    } else {
+      await this.speak('Document has been decrypted.');
+    }
+  }
+
+  /**
+   * Announce page navigation
+   */
+  async announcePageChange(currentPage: number, totalPages: number) {
+    await this.speak(`Page ${currentPage} of ${totalPages}.`, { rate: 1.1 });
+  }
+
+  /**
+   * Announce zoom level
+   */
+  async announceZoom(level: number) {
+    const percentage = Math.round(level * 100);
+    await this.speak(`Zoom ${percentage} percent.`, { rate: 1.1 });
+  }
+
+  /**
+   * Announce rotation
+   */
+  async announceRotation(degrees: number) {
+    await this.speak(`Rotated ${degrees} degrees.`, { rate: 1.1 });
+  }
+
+  /**
+   * Announce reading speed change
+   */
+  async announceSpeedChange(speed: number) {
+    const speedLabel = speed < 0.8 ? 'slow' : speed > 1.2 ? 'fast' : 'normal';
+    await this.speak(`Reading speed set to ${speedLabel}.`, { rate: 1.0 });
+  }
+
+  /**
+   * Announce math solution
+   */
+  async announceMathSolution(solution: string) {
+    await this.speak(`The solution is: ${solution}`);
+  }
+
+  /**
+   * Announce confirmation prompt
+   */
+  async askConfirmation(action: string): Promise<void> {
+    await this.speak(`Are you sure you want to ${action}? Say yes to confirm or no to cancel.`);
+  }
+
+  /**
+   * Announce document saved
+   */
+  async announceDocumentSaved(title: string) {
+    await this.speak(`Document "${title}" has been saved.`);
+  }
+
+  /**
+   * Announce welcome message
+   */
+  async announceWelcome() {
+    await this.speak('Welcome to DocScan Pro. Say "scan" to start scanning, or "help" for available commands.');
   }
 
   /**
