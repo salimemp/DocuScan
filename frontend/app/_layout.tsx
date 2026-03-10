@@ -118,6 +118,10 @@ function RootLayoutNav() {
         name="templates"
         options={{ animation: 'slide_from_right' }}
       />
+      <Stack.Screen
+        name="secure-enclave"
+        options={{ animation: 'slide_from_right' }}
+      />
     </Stack>
   );
 }
