@@ -73,17 +73,17 @@ export default function OnboardingScreen() {
   const [isNavigating, setIsNavigating] = useState(false);
   const scrollX = useRef(new Animated.Value(0)).current;
   const slideRef = useRef<any>(null);
+  
+  // Use Zustand store
+  const setOnboardingComplete = useAppStore((state) => state.setOnboardingComplete);
 
   const completeOnboarding = useCallback(async () => {
     if (isNavigating) return; // Prevent double navigation
     setIsNavigating(true);
     
     try {
-      // Mark globally that onboarding is complete (prevents redirect loop)
-      markOnboardingComplete();
-      
-      // Set the flag in storage for persistence
-      await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+      // Mark onboarding complete in Zustand store (persisted automatically)
+      setOnboardingComplete(true);
       await analytics.trackOnboardingComplete();
       
       // Navigate to dashboard
@@ -92,7 +92,7 @@ export default function OnboardingScreen() {
       console.log('Error completing onboarding:', e);
       router.replace('/(tabs)/dashboard');
     }
-  }, [isNavigating, router]);
+  }, [isNavigating, router, setOnboardingComplete]);
 
   const goToNext = useCallback(() => {
     if (isNavigating) return;
