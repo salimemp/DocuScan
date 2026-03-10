@@ -89,17 +89,84 @@ export default function ScanScreen() {
     }
   };
 
-  const takePicture = async () => {
+  const takePicture = async (isBatchCapture: boolean = false) => {
     if (!cameraRef.current || isProcessing) return;
     try {
+      // Haptic feedback for shutter
+      await haptics.shutter();
+      
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.9 });
-      if (photo?.uri) await addPage(photo.uri);
+      if (photo?.uri) {
+        await addPage(photo.uri, isBatchCapture);
+        if (isBatchCapture) {
+          setBatchCount(prev => prev + 1);
+        }
+      }
     } catch {
-      Alert.alert('Error', 'Failed to capture photo.');
+      await haptics.error();
+      if (!isBatchCapture) {
+        Alert.alert('Error', 'Failed to capture photo.');
+      }
+    }
+  };
+
+  // Batch scanning functions
+  const startBatchMode = useCallback(() => {
+    setBatchMode(true);
+    setBatchCount(0);
+    setBatchCountdown(batchInterval);
+    
+    haptics.medium();
+    if (voiceEnabled) {
+      voiceService.announceBatchMode(batchInterval);
+    }
+    
+    // Countdown timer
+    countdownRef.current = setInterval(() => {
+      setBatchCountdown(prev => {
+        if (prev <= 1) {
+          return batchInterval;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    // Auto-capture timer
+    batchTimerRef.current = setInterval(() => {
+      takePicture(true);
+    }, batchInterval * 1000);
+    
+    // Take first picture immediately
+    takePicture(true);
+  }, [batchInterval, voiceEnabled]);
+
+  const stopBatchMode = useCallback(() => {
+    setBatchMode(false);
+    if (batchTimerRef.current) {
+      clearInterval(batchTimerRef.current);
+      batchTimerRef.current = null;
+    }
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+    
+    haptics.batchComplete();
+    if (voiceEnabled && batchCount > 0) {
+      voiceService.speak(`Batch complete. ${batchCount} pages captured.`);
+    }
+  }, [batchCount, voiceEnabled]);
+
+  const toggleBatchMode = () => {
+    if (batchMode) {
+      stopBatchMode();
+    } else {
+      setShowBatchSettings(true);
     }
   };
 
   const pickFromGallery = async () => {
+    await haptics.selection();
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission Required', 'Please allow photo library access in Settings.');
@@ -120,7 +187,9 @@ export default function ScanScreen() {
           }
         }
         refreshPages();
+        await haptics.success();
       } catch {
+        await haptics.error();
         Alert.alert('Error', 'Failed to process some images.');
       } finally {
         setIsProcessing(false);
@@ -129,6 +198,7 @@ export default function ScanScreen() {
   };
 
   const handleRemovePage = (index: number) => {
+    haptics.warning();
     Alert.alert('Remove Page', `Remove page ${index + 1}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -137,6 +207,7 @@ export default function ScanScreen() {
         onPress: () => {
           removeScanPage(index);
           refreshPages();
+          haptics.medium();
         },
       },
     ]);
@@ -144,9 +215,11 @@ export default function ScanScreen() {
 
   const handleContinue = () => {
     if (pages.length === 0) {
+      haptics.warning();
       Alert.alert('No Pages', 'Please scan at least one page.');
       return;
     }
+    haptics.success();
     router.push('/preview');
   };
 
