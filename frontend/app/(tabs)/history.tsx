@@ -88,14 +88,45 @@ export default function HistoryScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordLoading, setPasswordLoading] = useState(false);
+  
+  // Memory leak prevention refs
+  const isMountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    return () => {
+      isMountedRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const fetchDocs = useCallback(async () => {
+    // Abort previous request if still pending
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+    
     try {
-      const res = await fetch(`${BACKEND_URL}/api/documents`);
-      if (res.ok) setDocs(await res.json());
-    } catch {}
-    setLoading(false);
-    setRefreshing(false);
+      const res = await fetch(`${BACKEND_URL}/api/documents`, { signal });
+      if (res.ok && isMountedRef.current) {
+        setDocs(await res.json());
+      }
+    } catch (e: any) {
+      if (e.name === 'AbortError') return;
+    }
+    
+    if (isMountedRef.current) {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
   useFocusEffect(useCallback(() => { fetchDocs(); }, [fetchDocs]));
