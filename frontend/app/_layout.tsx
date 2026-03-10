@@ -7,7 +7,7 @@ import { I18nextProvider } from 'react-i18next';
 import i18n from '../i18n/i18n';
 import { QueryProvider } from '../utils/queryClient';
 import { analytics } from '../utils/analytics';
-import { useAppStore, waitForHydration } from '../utils/appStore';
+import { useAppStore } from '../utils/appStore';
 
 // Prevent the splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -16,36 +16,35 @@ function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
   
-  // Use Zustand store for persistent state
+  // Use Zustand store for state
   const hasCompletedOnboarding = useAppStore((state) => state.hasCompletedOnboarding);
+  const loadFromStorage = useAppStore((state) => state.loadFromStorage);
   const setAppReady = useAppStore((state) => state.setAppReady);
   
-  const [isHydrated, setIsHydrated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [hasNavigated, setHasNavigated] = useState(false);
 
-  // Wait for Zustand to hydrate from AsyncStorage
+  // Load stored state on mount
   useEffect(() => {
     const initApp = async () => {
       try {
-        await waitForHydration();
+        await loadFromStorage();
         await analytics.init();
-        setIsHydrated(true);
         setAppReady(true);
-        SplashScreen.hideAsync();
       } catch (error) {
         console.log('Init error:', error);
-        // Still proceed even if there's an error
-        setIsHydrated(true);
+      } finally {
+        setIsLoading(false);
         SplashScreen.hideAsync();
       }
     };
     
     initApp();
-  }, [setAppReady]);
+  }, [loadFromStorage, setAppReady]);
 
-  // Handle navigation based on onboarding status - only once after hydration
+  // Handle navigation based on onboarding status - only once after loading
   useEffect(() => {
-    if (!isHydrated || hasNavigated) return;
+    if (isLoading || hasNavigated) return;
     
     const currentSegment = segments[0];
     const isOnOnboarding = currentSegment === 'onboarding';
@@ -61,10 +60,10 @@ function RootLayoutNav() {
       setHasNavigated(true);
       router.replace('/(tabs)/dashboard');
     }
-  }, [isHydrated, hasCompletedOnboarding, segments, router, hasNavigated]);
+  }, [isLoading, hasCompletedOnboarding, segments, router, hasNavigated]);
 
-  // Show loading while hydrating
-  if (!isHydrated) {
+  // Show loading
+  if (isLoading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' }}>
         <ActivityIndicator size="large" color="#2563EB" />
