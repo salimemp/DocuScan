@@ -15,6 +15,7 @@ import resend
 # Import auth and subscription modules
 from auth import auth_router
 from subscriptions import subscription_router
+from document_security import security_router
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
