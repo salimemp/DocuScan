@@ -1618,6 +1618,8 @@ Be thorough but concise. Use proper mathematical notation where possible."""
         raise HTTPException(500, f"Failed to solve math problem: {str(e)}")
 
 app.include_router(api_router)
+app.include_router(auth_router, prefix="/api")
+app.include_router(subscription_router, prefix="/api")
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 @app.on_event("shutdown")
