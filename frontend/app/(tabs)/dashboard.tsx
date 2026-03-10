@@ -162,7 +162,7 @@ export default function DashboardScreen() {
   const quickActions = [
     { icon: 'images-outline', label: 'Import Photo', color: '#F59E0B', action: () => router.push('/scan') },
     { icon: 'share-social-outline', label: 'Share Doc', color: '#3B82F6', action: handleShareDoc },
-    { icon: 'folder-outline', label: 'New Folder', color: '#10B981', action: handleNewFolder },
+    { icon: 'shield-checkmark-outline', label: 'Secure Vault', color: '#EF4444', action: () => router.push('/secure-enclave') },
     { icon: 'cloud-upload-outline', label: 'Cloud Backup', color: '#8B5CF6', action: handleCloudBackup },
   ];
 
