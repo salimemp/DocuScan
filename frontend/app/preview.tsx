@@ -132,13 +132,40 @@ export default function PreviewScreen() {
   const pages = getScanPages();
   const pageCount = pages.length;
   const currentPage = pages[selectedPage];
+  
+  // Memory leak prevention refs
+  const isMountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    return () => {
+      isMountedRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const analyze = useCallback(async () => {
     if (pageCount === 0) {
-      setError('No images found. Please scan again.');
-      setIsAnalyzing(false);
+      if (isMountedRef.current) {
+        setError('No images found. Please scan again.');
+        setIsAnalyzing(false);
+      }
       return;
     }
+    
+    // Abort previous request if still pending
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+    
     try {
       // Send all pages to the backend for analysis
       const images = pages.map(p => p.base64);
@@ -146,14 +173,25 @@ export default function PreviewScreen() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ images, mime_type: 'image/jpeg' }),
+        signal,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail ?? 'Analysis failed');
-      setResult(data);
+      
+      if (isMountedRef.current) {
+        setResult(data);
+      }
     } catch (e: any) {
-      setError(e.message ?? 'Failed to analyze document');
+      // Ignore abort errors
+      if (e.name === 'AbortError') return;
+      
+      if (isMountedRef.current) {
+        setError(e.message ?? 'Failed to analyze document');
+      }
     } finally {
-      setIsAnalyzing(false);
+      if (isMountedRef.current) {
+        setIsAnalyzing(false);
+      }
     }
   }, [pages, pageCount]);
 
