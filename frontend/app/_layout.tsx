@@ -85,6 +85,14 @@ function RootLayoutNav() {
         options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
       />
       <Stack.Screen
+        name="profile"
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="notifications"
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
         name="scan"
         options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
       />
