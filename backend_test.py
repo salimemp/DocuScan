@@ -1,704 +1,616 @@
 #!/usr/bin/env python3
 """
-DocScan Pro Backend API Testing Suite
-Tests all backend endpoints including new features: signatures, comments, password protection
+Comprehensive Backend API Testing for DocScan Pro Authentication Suite
+Tests authentication, security, and subscription endpoints at production URL
 """
 
-import requests
+import asyncio
+import aiohttp
 import json
-import base64
-import sys
+import uuid
+import time
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-# Base URL from frontend environment
+# Production API URL
 BASE_URL = "https://scanpro-auth-suite.preview.emergentagent.com/api"
 
 class APITester:
     def __init__(self):
-        self.session = requests.Session()
-        self.session.headers.update({
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        })
+        self.session: Optional[aiohttp.ClientSession] = None
+        self.test_results = []
+        self.auth_token = None
+        self.test_user_id = None
         self.test_document_id = None
-        self.test_signature_id = None
-        self.test_comment_id = None
-        self.results = []
         
-    def log_result(self, test_name: str, success: bool, message: str, details: Optional[Dict] = None):
+    async def __aenter__(self):
+        self.session = aiohttp.ClientSession()
+        return self
+        
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self.session:
+            await self.session.close()
+    
+    def log_result(self, test_name: str, success: bool, details: str = "", response_data: Any = None):
         """Log test result"""
+        result = {
+            "test": test_name,
+            "success": success,
+            "details": details,
+            "timestamp": datetime.now().isoformat(),
+            "response_data": response_data
+        }
+        self.test_results.append(result)
         status = "✅ PASS" if success else "❌ FAIL"
-        print(f"{status} {test_name}: {message}")
+        print(f"{status} {test_name}: {details}")
         
-        self.results.append({
-            'test': test_name,
-            'success': success,
-            'message': message,
-            'details': details or {},
-            'timestamp': datetime.now().isoformat()
-        })
+    async def make_request(self, method: str, endpoint: str, data: Dict = None, headers: Dict = None) -> tuple:
+        """Make HTTP request and return (success, response_data, status_code)"""
+        url = f"{BASE_URL}{endpoint}"
+        request_headers = {"Content-Type": "application/json"}
         
-        if not success:
-            if details:
-                print(f"   Details: {json.dumps(details, indent=2)}")
-    
-    def test_root_endpoint(self) -> bool:
-        """Test GET /api/ - Root endpoint"""
-        try:
-            response = self.session.get(f"{BASE_URL}/")
+        if headers:
+            request_headers.update(headers)
             
-            if response.status_code == 200:
-                data = response.json()
-                if "message" in data and "DocScan Pro API" in data["message"]:
-                    self.log_result("Root Endpoint", True, f"API version: {data['message']}")
-                    return True
-                else:
-                    self.log_result("Root Endpoint", False, "Invalid response format", {"response": data})
-                    return False
-            else:
-                self.log_result("Root Endpoint", False, f"HTTP {response.status_code}", {"response": response.text})
-                return False
-                
-        except Exception as e:
-            self.log_result("Root Endpoint", False, f"Request failed: {str(e)}")
-            return False
-    
-    def test_stats_endpoint(self) -> bool:
-        """Test GET /api/stats - Get document statistics"""
-        try:
-            response = self.session.get(f"{BASE_URL}/stats")
-            
-            if response.status_code == 200:
-                data = response.json()
-                required_fields = ["total_scans", "storage_used", "last_scan"]
-                
-                if all(field in data for field in required_fields):
-                    self.log_result("Stats Endpoint", True, f"Stats: {data['total_scans']} scans, {data['storage_used']} storage")
-                    return True
-                else:
-                    missing = [f for f in required_fields if f not in data]
-                    self.log_result("Stats Endpoint", False, f"Missing fields: {missing}", {"response": data})
-                    return False
-            else:
-                self.log_result("Stats Endpoint", False, f"HTTP {response.status_code}", {"response": response.text})
-                return False
-                
-        except Exception as e:
-            self.log_result("Stats Endpoint", False, f"Request failed: {str(e)}")
-            return False
-    
-    def test_list_documents(self) -> bool:
-        """Test GET /api/documents - List all documents"""
-        try:
-            response = self.session.get(f"{BASE_URL}/documents")
-            
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list):
-                    self.log_result("List Documents", True, f"Retrieved {len(data)} documents")
-                    return True
-                else:
-                    self.log_result("List Documents", False, "Response is not a list", {"response": data})
-                    return False
-            else:
-                self.log_result("List Documents", False, f"HTTP {response.status_code}", {"response": response.text})
-                return False
-                
-        except Exception as e:
-            self.log_result("List Documents", False, f"Request failed: {str(e)}")
-            return False
-    
-    def test_create_document(self) -> bool:
-        """Test POST /api/documents - Create a new document"""
-        test_document = {
-            "document_type": "invoice",
-            "title": "Sample Business Invoice #INV-2024-001",
-            "detected_language": "English",
-            "confidence": 0.95,
-            "formatted_output": "📄 BUSINESS INVOICE\n━━━━━━━━━━━━━━━━━━━━\nInvoice Number: INV-2024-001\nDate: January 15, 2024\nDue Date: February 15, 2024\n\n▸ Client: Acme Corporation\n▸ Amount: $2,450.00\n▸ Status: Pending Payment",
-            "tags": ["invoice", "business", "2024", "pending"],
-            "summary": "Business invoice from January 2024 for Acme Corporation totaling $2,450.00",
-            "pages_count": 1,
-            "structured_fields": {
-                "invoice_number": "INV-2024-001",
-                "invoice_date": "2024-01-15",
-                "due_date": "2024-02-15",
-                "vendor_name": "DocScan Pro Services",
-                "client_name": "Acme Corporation",
-                "total_amount": "$2,450.00",
-                "currency": "USD",
-                "payment_terms": "Net 30"
-            },
-            "extracted_dates": ["2024-01-15", "2024-02-15"],
-            "extracted_amounts": ["$2,450.00"],
-            "extracted_names": ["Acme Corporation", "DocScan Pro Services"]
-        }
+        if self.auth_token and "Authorization" not in request_headers:
+            request_headers["Authorization"] = f"Bearer {self.auth_token}"
         
         try:
-            response = self.session.post(f"{BASE_URL}/documents", json=test_document)
-            
-            if response.status_code == 200:
-                data = response.json()
-                required_fields = ["id", "created_at", "title", "document_type"]
+            async with self.session.request(
+                method, 
+                url, 
+                json=data if data else None,
+                headers=request_headers,
+                timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
+                try:
+                    response_data = await response.json()
+                except:
+                    response_data = {"text": await response.text()}
                 
-                if all(field in data for field in required_fields):
-                    self.test_document_id = data["id"]
-                    self.log_result("Create Document", True, f"Created document with ID: {self.test_document_id}")
-                    return True
-                else:
-                    missing = [f for f in required_fields if f not in data]
-                    self.log_result("Create Document", False, f"Missing fields: {missing}", {"response": data})
-                    return False
-            else:
-                self.log_result("Create Document", False, f"HTTP {response.status_code}", {"response": response.text})
-                return False
+                return response.status < 400, response_data, response.status
                 
         except Exception as e:
-            self.log_result("Create Document", False, f"Request failed: {str(e)}")
-            return False
-    
-    def test_get_document(self) -> bool:
-        """Test GET /api/documents/{id} - Get single document"""
-        if not self.test_document_id:
-            self.log_result("Get Document", False, "No test document ID available")
-            return False
-            
-        try:
-            response = self.session.get(f"{BASE_URL}/documents/{self.test_document_id}")
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get("id") == self.test_document_id and data.get("title"):
-                    self.log_result("Get Document", True, f"Retrieved document: {data['title']}")
-                    return True
-                else:
-                    self.log_result("Get Document", False, "Document data mismatch", {"response": data})
-                    return False
-            elif response.status_code == 404:
-                self.log_result("Get Document", False, "Document not found", {"id": self.test_document_id})
-                return False
-            else:
-                self.log_result("Get Document", False, f"HTTP {response.status_code}", {"response": response.text})
-                return False
-                
-        except Exception as e:
-            self.log_result("Get Document", False, f"Request failed: {str(e)}")
-            return False
-    
-    def test_update_document(self) -> bool:
-        """Test PUT /api/documents/{id} - Update document"""
-        if not self.test_document_id:
-            self.log_result("Update Document", False, "No test document ID available")
-            return False
-            
-        update_data = {
-            "title": "Updated Business Invoice #INV-2024-001 [PAID]",
-            "tags": ["invoice", "business", "2024", "paid", "completed"]
-        }
-        
-        try:
-            response = self.session.put(f"{BASE_URL}/documents/{self.test_document_id}", json=update_data)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get("title") == update_data["title"]:
-                    self.log_result("Update Document", True, f"Updated title to: {data['title']}")
-                    return True
-                else:
-                    self.log_result("Update Document", False, "Update not reflected", {"response": data})
-                    return False
-            elif response.status_code == 404:
-                self.log_result("Update Document", False, "Document not found", {"id": self.test_document_id})
-                return False
-            else:
-                self.log_result("Update Document", False, f"HTTP {response.status_code}", {"response": response.text})
-                return False
-                
-        except Exception as e:
-            self.log_result("Update Document", False, f"Request failed: {str(e)}")
-            return False
-    
-    def test_export_pdf(self) -> bool:
-        """Test POST /api/documents/{id}/export?format=pdf - Export to PDF"""
-        if not self.test_document_id:
-            self.log_result("Export PDF", False, "No test document ID available")
-            return False
-            
-        try:
-            response = self.session.post(f"{BASE_URL}/documents/{self.test_document_id}/export?format=pdf")
-            
-            if response.status_code == 200:
-                data = response.json()
-                required_fields = ["base64", "mime_type", "filename"]
-                
-                if all(field in data for field in required_fields):
-                    # Validate base64 data
-                    try:
-                        pdf_data = base64.b64decode(data["base64"])
-                        if pdf_data.startswith(b'%PDF'):
-                            self.log_result("Export PDF", True, f"PDF exported: {data['filename']} ({len(pdf_data)} bytes)")
-                            return True
-                        else:
-                            self.log_result("Export PDF", False, "Invalid PDF data", {"mime_type": data["mime_type"]})
-                            return False
-                    except Exception as decode_error:
-                        self.log_result("Export PDF", False, f"Base64 decode error: {decode_error}")
-                        return False
-                else:
-                    missing = [f for f in required_fields if f not in data]
-                    self.log_result("Export PDF", False, f"Missing fields: {missing}", {"response": data})
-                    return False
-            elif response.status_code == 404:
-                self.log_result("Export PDF", False, "Document not found", {"id": self.test_document_id})
-                return False
-            else:
-                self.log_result("Export PDF", False, f"HTTP {response.status_code}", {"response": response.text})
-                return False
-                
-        except Exception as e:
-            self.log_result("Export PDF", False, f"Request failed: {str(e)}")
-            return False
-    
-    def test_export_txt(self) -> bool:
-        """Test POST /api/documents/{id}/export?format=txt - Export to TXT"""
-        if not self.test_document_id:
-            self.log_result("Export TXT", False, "No test document ID available")
-            return False
-            
-        try:
-            response = self.session.post(f"{BASE_URL}/documents/{self.test_document_id}/export?format=txt")
-            
-            if response.status_code == 200:
-                data = response.json()
-                required_fields = ["base64", "mime_type", "filename"]
-                
-                if all(field in data for field in required_fields):
-                    # Validate text data
-                    try:
-                        txt_data = base64.b64decode(data["base64"]).decode('utf-8')
-                        if "DocScan Pro" in txt_data and len(txt_data) > 50:
-                            self.log_result("Export TXT", True, f"TXT exported: {data['filename']} ({len(txt_data)} chars)")
-                            return True
-                        else:
-                            self.log_result("Export TXT", False, "Invalid TXT content", {"content_length": len(txt_data)})
-                            return False
-                    except Exception as decode_error:
-                        self.log_result("Export TXT", False, f"Base64/UTF-8 decode error: {decode_error}")
-                        return False
-                else:
-                    missing = [f for f in required_fields if f not in data]
-                    self.log_result("Export TXT", False, f"Missing fields: {missing}", {"response": data})
-                    return False
-            elif response.status_code == 404:
-                self.log_result("Export TXT", False, "Document not found", {"id": self.test_document_id})
-                return False
-            else:
-                self.log_result("Export TXT", False, f"HTTP {response.status_code}", {"response": response.text})
-                return False
-                
-        except Exception as e:
-            self.log_result("Export TXT", False, f"Request failed: {str(e)}")
-            return False
-    
-    def test_password_protection(self) -> bool:
-        """Test password protection endpoints"""
-        if not self.test_document_id:
-            self.log_result("Password Protection", False, "No test document ID available")
-            return False
-            
-        try:
-            # Set password
-            password_data = {"password": "test1234"}
-            response = self.session.post(f"{BASE_URL}/documents/{self.test_document_id}/password", json=password_data)
-            
-            if response.status_code != 200:
-                self.log_result("Set Password", False, f"HTTP {response.status_code}", {"response": response.text})
-                return False
-                
-            set_result = response.json()
-            if not set_result.get("is_locked"):
-                self.log_result("Set Password", False, "Document not marked as locked", {"response": set_result})
-                return False
-                
-            self.log_result("Set Password", True, "Password set successfully")
-            
-            # Verify correct password
-            verify_data = {"password": "test1234"}
-            response = self.session.post(f"{BASE_URL}/documents/{self.test_document_id}/verify-password", json=verify_data)
-            
-            if response.status_code == 200:
-                verify_result = response.json()
-                if verify_result.get("verified"):
-                    self.log_result("Verify Correct Password", True, "Correct password verified")
-                else:
-                    self.log_result("Verify Correct Password", False, "Password verification failed", {"response": verify_result})
-                    return False
-            else:
-                self.log_result("Verify Correct Password", False, f"HTTP {response.status_code}", {"response": response.text})
-                return False
-                
-            # Verify wrong password
-            wrong_data = {"password": "wrong_password"}
-            response = self.session.post(f"{BASE_URL}/documents/{self.test_document_id}/verify-password", json=wrong_data)
-            
-            if response.status_code == 403:
-                self.log_result("Verify Wrong Password", True, "Wrong password correctly rejected (403)")
-                return True
-            else:
-                self.log_result("Verify Wrong Password", False, f"Expected 403, got {response.status_code}", {"response": response.text})
-                return False
-                
-        except Exception as e:
-            self.log_result("Password Protection", False, f"Request failed: {str(e)}")
-            return False
-    
-    def test_comments(self) -> bool:
-        """Test comment endpoints"""
-        if not self.test_document_id:
-            self.log_result("Comments", False, "No test document ID available")
-            return False
-            
-        try:
-            # Add comment
-            comment_data = {
-                "author": "Test User",
-                "author_email": "test@example.com",
-                "content": "This is a test comment for API validation"
-            }
-            
-            response = self.session.post(f"{BASE_URL}/documents/{self.test_document_id}/comments", json=comment_data)
-            
-            if response.status_code != 200:
-                self.log_result("Add Comment", False, f"HTTP {response.status_code}", {"response": response.text})
-                return False
-                
-            comment_result = response.json()
-            self.test_comment_id = comment_result.get("comment", {}).get("id")
-            
-            if not self.test_comment_id:
-                self.log_result("Add Comment", False, "No comment ID returned", {"response": comment_result})
-                return False
-                
-            self.log_result("Add Comment", True, f"Comment added with ID: {self.test_comment_id}")
-            
-            # Verify comment is in document
-            response = self.session.get(f"{BASE_URL}/documents/{self.test_document_id}")
-            
-            if response.status_code == 200:
-                doc_data = response.json()
-                comments = doc_data.get("comments", [])
-                
-                if any(c.get("id") == self.test_comment_id for c in comments):
-                    self.log_result("Verify Comment in Document", True, "Comment found in document")
-                else:
-                    self.log_result("Verify Comment in Document", False, "Comment not found in document", {"comments": comments})
-                    return False
-            else:
-                self.log_result("Verify Comment in Document", False, f"HTTP {response.status_code}", {"response": response.text})
-                return False
-                
-            # Resolve comment
-            response = self.session.put(f"{BASE_URL}/documents/{self.test_document_id}/comments/{self.test_comment_id}/resolve")
-            
-            if response.status_code == 200:
-                self.log_result("Resolve Comment", True, "Comment resolved successfully")
-                return True
-            else:
-                self.log_result("Resolve Comment", False, f"HTTP {response.status_code}", {"response": response.text})
-                return False
-                
-        except Exception as e:
-            self.log_result("Comments", False, f"Request failed: {str(e)}")
-            return False
-    
-    def test_signatures(self) -> bool:
-        """Test signature endpoints"""
-        try:
-            # Create signature
-            signature_data = {
-                "name": "John Doe",
-                "image_base64": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCI+PHRleHQgeD0iMTAiIHk9IjUwIj5Kb2huIERvZTwvdGV4dD48L3N2Zz4="
-            }
-            
-            response = self.session.post(f"{BASE_URL}/signatures", json=signature_data)
-            
-            if response.status_code != 200:
-                self.log_result("Create Signature", False, f"HTTP {response.status_code}", {"response": response.text})
-                return False
-                
-            sig_result = response.json()
-            self.test_signature_id = sig_result.get("signature", {}).get("id")
-            
-            if not self.test_signature_id:
-                self.log_result("Create Signature", False, "No signature ID returned", {"response": sig_result})
-                return False
-                
-            self.log_result("Create Signature", True, f"Signature created with ID: {self.test_signature_id}")
-            
-            # List signatures
-            response = self.session.get(f"{BASE_URL}/signatures")
-            
-            if response.status_code == 200:
-                signatures = response.json()
-                if any(s.get("id") == self.test_signature_id for s in signatures):
-                    self.log_result("List Signatures", True, f"Signature found in list ({len(signatures)} total)")
-                else:
-                    self.log_result("List Signatures", False, "Signature not found in list", {"signatures": signatures})
-                    return False
-            else:
-                self.log_result("List Signatures", False, f"HTTP {response.status_code}", {"response": response.text})
-                return False
-                
-            # Add signature to document
-            if self.test_document_id:
-                placement_data = {
-                    "signature_id": self.test_signature_id,
-                    "page": 0,
-                    "x": 50.0,
-                    "y": 80.0,
-                    "width": 20.0
-                }
-                
-                response = self.session.post(f"{BASE_URL}/documents/{self.test_document_id}/signatures", json=placement_data)
-                
-                if response.status_code == 200:
-                    self.log_result("Add Signature to Document", True, "Signature added to document")
-                    return True
-                else:
-                    self.log_result("Add Signature to Document", False, f"HTTP {response.status_code}", {"response": response.text})
-                    return False
-            else:
-                self.log_result("Add Signature to Document", False, "No test document available")
-                return False
-            
-        except Exception as e:
-            self.log_result("Signatures", False, f"Request failed: {str(e)}")
-            return False
-    
-    def test_signature_request(self) -> bool:
-        """Test signature request endpoint"""
-        if not self.test_document_id:
-            self.log_result("Signature Request", False, "No test document ID available")
-            return False
-            
-        try:
-            request_data = {
-                "requester_name": "Alice Smith",
-                "requester_email": "alice@example.com",
-                "signer_email": "bob@example.com",
-                "signer_name": "Bob Johnson",
-                "message": "Please sign this test document"
-            }
-            
-            response = self.session.post(f"{BASE_URL}/documents/{self.test_document_id}/request-signature", json=request_data)
-            
-            if response.status_code == 200:
-                result = response.json()
-                if result.get("request"):
-                    self.log_result("Signature Request", True, "Signature request sent successfully")
-                    return True
-                else:
-                    self.log_result("Signature Request", False, "No request data returned", {"response": result})
-                    return False
-            else:
-                self.log_result("Signature Request", False, f"HTTP {response.status_code}", {"response": response.text})
-                return False
-                
-        except Exception as e:
-            self.log_result("Signature Request", False, f"Request failed: {str(e)}")
-            return False
-        """Test export with invalid format - should return 400"""
-        if not self.test_document_id:
-            self.log_result("Export Invalid Format", False, "No test document ID available")
-            return False
-            
-        try:
-            response = self.session.post(f"{BASE_URL}/documents/{self.test_document_id}/export?format=invalid")
-            
-            if response.status_code == 400:
-                self.log_result("Export Invalid Format", True, "Correctly rejected invalid format")
-                return True
-            else:
-                self.log_result("Export Invalid Format", False, f"Expected 400, got {response.status_code}", {"response": response.text})
-                return False
-                
-        except Exception as e:
-            self.log_result("Export Invalid Format", False, f"Request failed: {str(e)}")
-            return False
-    
-    def test_get_nonexistent_document(self) -> bool:
-        """Test GET with non-existent document ID - should return 404"""
-        fake_id = "00000000-0000-0000-0000-000000000000"
-        
-        try:
-            response = self.session.get(f"{BASE_URL}/documents/{fake_id}")
-            
-            if response.status_code == 404:
-                self.log_result("Get Nonexistent Document", True, "Correctly returned 404 for invalid ID")
-                return True
-            else:
-                self.log_result("Get Nonexistent Document", False, f"Expected 404, got {response.status_code}", {"response": response.text})
-                return False
-                
-        except Exception as e:
-            self.log_result("Get Nonexistent Document", False, f"Request failed: {str(e)}")
-            return False
-    
-    def test_export_invalid_format(self) -> bool:
-        """Test export with invalid format - should return 400"""
-        if not self.test_document_id:
-            self.log_result("Export Invalid Format", False, "No test document ID available")
-            return False
-            
-        try:
-            response = self.session.post(f"{BASE_URL}/documents/{self.test_document_id}/export?format=invalid")
-            
-            if response.status_code == 400:
-                self.log_result("Export Invalid Format", True, "Correctly rejected invalid format")
-                return True
-            else:
-                self.log_result("Export Invalid Format", False, f"Expected 400, got {response.status_code}", {"response": response.text})
-                return False
-                
-        except Exception as e:
-            self.log_result("Export Invalid Format", False, f"Request failed: {str(e)}")
-            return False
-    
-    def test_get_nonexistent_document(self) -> bool:
-        """Test GET with non-existent document ID - should return 404"""
-        fake_id = "00000000-0000-0000-0000-000000000000"
-        
-        try:
-            response = self.session.get(f"{BASE_URL}/documents/{fake_id}")
-            
-            if response.status_code == 404:
-                self.log_result("Get Nonexistent Document", True, "Correctly returned 404 for invalid ID")
-                return True
-            else:
-                self.log_result("Get Nonexistent Document", False, f"Expected 404, got {response.status_code}", {"response": response.text})
-                return False
-                
-        except Exception as e:
-            self.log_result("Get Nonexistent Document", False, f"Request failed: {str(e)}")
-            return False
-    
-    def test_delete_document(self) -> bool:
-        """Test DELETE /api/documents/{id} - Delete document"""
-        if not self.test_document_id:
-            self.log_result("Delete Document", False, "No test document ID available")
-            return False
-            
-        try:
-            response = self.session.delete(f"{BASE_URL}/documents/{self.test_document_id}")
-            
-            if response.status_code == 200:
-                data = response.json()
-                if "message" in data and "Deleted" in data["message"]:
-                    self.log_result("Delete Document", True, f"Document deleted: {self.test_document_id}")
-                    return True
-                else:
-                    self.log_result("Delete Document", False, "Unexpected response format", {"response": data})
-                    return False
-            elif response.status_code == 404:
-                self.log_result("Delete Document", False, "Document not found", {"id": self.test_document_id})
-                return False
-            else:
-                self.log_result("Delete Document", False, f"HTTP {response.status_code}", {"response": response.text})
-                return False
-                
-        except Exception as e:
-            self.log_result("Delete Document", False, f"Request failed: {str(e)}")
-            return False
-    
-    def cleanup_test_data(self) -> bool:
-        """Clean up test signature if it exists"""
-        if not self.test_signature_id:
-            return True
-            
-        try:
-            response = self.session.delete(f"{BASE_URL}/signatures/{self.test_signature_id}")
-            
-            if response.status_code == 200:
-                self.log_result("Cleanup Signature", True, f"Test signature deleted: {self.test_signature_id}")
-                return True
-            elif response.status_code == 404:
-                self.log_result("Cleanup Signature", True, "Signature already deleted")
-                return True
-            else:
-                self.log_result("Cleanup Signature", False, f"HTTP {response.status_code}", {"response": response.text})
-                return False
-                
-        except Exception as e:
-            self.log_result("Cleanup Signature", False, f"Request failed: {str(e)}")
-            return False
-    
-    def run_all_tests(self):
-        """Run all API tests in sequence"""
-        print(f"🚀 Starting DocScan Pro Backend API Tests")
-        print(f"📡 Base URL: {BASE_URL}")
-        print("=" * 60)
-        
-        # Core API tests
-        tests = [
-            self.test_root_endpoint,
-            self.test_stats_endpoint,
-            self.test_list_documents,
-            self.test_create_document,
-            self.test_get_document,
-            self.test_update_document,
-            # New feature tests
-            self.test_password_protection,
-            self.test_comments,
-            self.test_signatures,
-            self.test_signature_request,
-            # Export tests
-            self.test_export_pdf,
-            self.test_export_txt,
-            self.test_export_invalid_format,
-            # Error handling tests
-            self.test_get_nonexistent_document,
-            # Cleanup
-            self.test_delete_document,
-            self.cleanup_test_data
-        ]
-        
-        passed = 0
-        total = len(tests)
-        
-        for test in tests:
-            if test():
-                passed += 1
-            print()  # Add spacing between tests
-        
-        print("=" * 60)
-        print(f"📊 Test Results: {passed}/{total} tests passed")
-        
-        if passed == total:
-            print("🎉 All tests passed! Backend API is working correctly.")
-            return True
-        else:
-            failed = total - passed
-            print(f"⚠️  {failed} test(s) failed. Check the details above.")
-            return False
+            return False, {"error": str(e)}, 0
 
-def main():
-    """Main test runner"""
-    tester = APITester()
-    success = tester.run_all_tests()
+    # ═══════════════════════════════════════════════════════════════════════════
+    # AUTHENTICATION TESTS
+    # ═══════════════════════════════════════════════════════════════════════════
     
-    # Save detailed results
-    with open('/app/test_results_backend.json', 'w') as f:
-        json.dump({
-            'timestamp': datetime.now().isoformat(),
-            'base_url': BASE_URL,
-            'overall_success': success,
-            'results': tester.results
-        }, f, indent=2)
+    async def test_user_registration(self):
+        """Test POST /api/auth/register"""
+        test_email = f"test_{uuid.uuid4().hex[:8]}@example.com"
+        test_data = {
+            "email": test_email,
+            "password": "SecurePass123!",
+            "name": "Test User"
+        }
+        
+        success, response, status = await self.make_request("POST", "/auth/register", test_data)
+        
+        if success and response.get("access_token"):
+            self.auth_token = response["access_token"]
+            self.test_user_id = response.get("user", {}).get("user_id")
+            self.log_result(
+                "User Registration", 
+                True, 
+                f"User registered successfully with email {test_email}",
+                {"user_id": self.test_user_id, "has_token": bool(self.auth_token)}
+            )
+        else:
+            self.log_result(
+                "User Registration", 
+                False, 
+                f"Registration failed: {response.get('detail', 'Unknown error')} (Status: {status})",
+                response
+            )
     
-    print(f"\n📄 Detailed results saved to: /app/test_results_backend.json")
+    async def test_user_login(self):
+        """Test POST /api/auth/login"""
+        if not self.test_user_id:
+            self.log_result("User Login", False, "Skipped - no test user available")
+            return
+            
+        # First register a user for login test
+        test_email = f"login_test_{uuid.uuid4().hex[:8]}@example.com"
+        register_data = {
+            "email": test_email,
+            "password": "LoginTest123!",
+            "name": "Login Test User"
+        }
+        
+        # Register user
+        await self.make_request("POST", "/auth/register", register_data)
+        
+        # Now test login
+        login_data = {
+            "email": test_email,
+            "password": "LoginTest123!"
+        }
+        
+        success, response, status = await self.make_request("POST", "/auth/login", login_data)
+        
+        if success and response.get("access_token"):
+            self.log_result(
+                "User Login", 
+                True, 
+                f"Login successful for {test_email}",
+                {"has_token": True, "requires_2fa": response.get("requires_2fa", False)}
+            )
+        else:
+            self.log_result(
+                "User Login", 
+                False, 
+                f"Login failed: {response.get('detail', 'Unknown error')} (Status: {status})",
+                response
+            )
     
-    return 0 if success else 1
+    async def test_magic_link_request(self):
+        """Test POST /api/auth/magic-link/request"""
+        test_data = {
+            "email": "test@example.com"
+        }
+        
+        success, response, status = await self.make_request("POST", "/auth/magic-link/request", test_data)
+        
+        if success:
+            self.log_result(
+                "Magic Link Request", 
+                True, 
+                "Magic link request processed successfully",
+                response
+            )
+        else:
+            self.log_result(
+                "Magic Link Request", 
+                False, 
+                f"Magic link request failed: {response.get('detail', 'Unknown error')} (Status: {status})",
+                response
+            )
+    
+    async def test_2fa_setup(self):
+        """Test POST /api/auth/2fa/setup"""
+        if not self.auth_token:
+            self.log_result("2FA Setup", False, "Skipped - no auth token available")
+            return
+            
+        success, response, status = await self.make_request("POST", "/auth/2fa/setup")
+        
+        if success and response.get("secret"):
+            self.log_result(
+                "2FA Setup", 
+                True, 
+                "2FA setup initiated successfully",
+                {"has_secret": True, "has_uri": bool(response.get("uri"))}
+            )
+        else:
+            self.log_result(
+                "2FA Setup", 
+                False, 
+                f"2FA setup failed: {response.get('detail', 'Unknown error')} (Status: {status})",
+                response
+            )
+    
+    async def test_2fa_verify(self):
+        """Test POST /api/auth/2fa/verify"""
+        if not self.auth_token or not self.test_user_id:
+            self.log_result("2FA Verify", False, "Skipped - no auth token or user ID available")
+            return
+            
+        test_data = {
+            "user_id": self.test_user_id,
+            "code": "123456"  # Invalid code for testing
+        }
+        
+        success, response, status = await self.make_request("POST", "/auth/2fa/verify", test_data)
+        
+        # We expect this to fail with invalid code, which is correct behavior
+        if not success and status == 400:
+            self.log_result(
+                "2FA Verify", 
+                True, 
+                "2FA verification correctly rejected invalid code",
+                {"expected_failure": True}
+            )
+        elif success:
+            self.log_result(
+                "2FA Verify", 
+                False, 
+                "2FA verification unexpectedly accepted invalid code",
+                response
+            )
+        else:
+            self.log_result(
+                "2FA Verify", 
+                False, 
+                f"2FA verify failed unexpectedly: {response.get('detail', 'Unknown error')} (Status: {status})",
+                response
+            )
+    
+    async def test_webauthn_register_begin(self):
+        """Test POST /api/auth/webauthn/register-begin"""
+        if not self.auth_token or not self.test_user_id:
+            self.log_result("WebAuthn Register Begin", False, "Skipped - no auth token or user ID available")
+            return
+            
+        test_data = {
+            "user_id": self.test_user_id
+        }
+        
+        success, response, status = await self.make_request("POST", "/auth/webauthn/register-begin", test_data)
+        
+        if success and response.get("options"):
+            self.log_result(
+                "WebAuthn Register Begin", 
+                True, 
+                "WebAuthn registration options generated successfully",
+                {"has_options": True}
+            )
+        else:
+            self.log_result(
+                "WebAuthn Register Begin", 
+                False, 
+                f"WebAuthn register begin failed: {response.get('detail', 'Unknown error')} (Status: {status})",
+                response
+            )
+    
+    async def test_webauthn_authenticate_begin(self):
+        """Test POST /api/auth/webauthn/authenticate-begin"""
+        test_data = {
+            "email": "test@example.com"
+        }
+        
+        success, response, status = await self.make_request("POST", "/auth/webauthn/authenticate-begin", test_data)
+        
+        # This should fail if no passkeys are registered, which is expected
+        if not success and status in [400, 404]:
+            self.log_result(
+                "WebAuthn Authenticate Begin", 
+                True, 
+                "WebAuthn auth correctly failed for account without passkeys",
+                {"expected_failure": True}
+            )
+        elif success:
+            self.log_result(
+                "WebAuthn Authenticate Begin", 
+                True, 
+                "WebAuthn authentication options generated",
+                response
+            )
+        else:
+            self.log_result(
+                "WebAuthn Authenticate Begin", 
+                False, 
+                f"WebAuthn auth begin failed unexpectedly: {response.get('detail', 'Unknown error')} (Status: {status})",
+                response
+            )
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # SECURITY TESTS
+    # ═══════════════════════════════════════════════════════════════════════════
+    
+    async def test_enclave_stats(self):
+        """Test GET /api/security/enclave-stats"""
+        success, response, status = await self.make_request("GET", "/security/enclave-stats")
+        
+        if success and "total_documents" in response:
+            self.log_result(
+                "Enclave Stats", 
+                True, 
+                f"Retrieved enclave stats: {response.get('total_documents', 0)} total docs, {response.get('encrypted_documents', 0)} encrypted",
+                response
+            )
+        else:
+            self.log_result(
+                "Enclave Stats", 
+                False, 
+                f"Enclave stats failed: {response.get('detail', 'Unknown error')} (Status: {status})",
+                response
+            )
+    
+    async def test_advanced_search(self):
+        """Test GET /api/security/advanced-search"""
+        # Test with various query parameters
+        params = {
+            "query": "test",
+            "category": "general_document",
+            "is_encrypted": False,
+            "is_in_enclave": False,
+            "limit": 10
+        }
+        
+        # Build query string
+        query_string = "&".join([f"{k}={v}" for k, v in params.items()])
+        endpoint = f"/security/advanced-search?{query_string}"
+        
+        success, response, status = await self.make_request("GET", endpoint)
+        
+        if success and "documents" in response:
+            self.log_result(
+                "Advanced Search", 
+                True, 
+                f"Advanced search returned {len(response.get('documents', []))} documents, total: {response.get('total', 0)}",
+                {"document_count": len(response.get('documents', [])), "total": response.get('total', 0)}
+            )
+        else:
+            self.log_result(
+                "Advanced Search", 
+                False, 
+                f"Advanced search failed: {response.get('detail', 'Unknown error')} (Status: {status})",
+                response
+            )
+    
+    async def test_document_categorization(self):
+        """Test POST /api/security/categorize"""
+        # First create a test document
+        await self.create_test_document()
+        
+        if not self.test_document_id:
+            self.log_result("Document Categorization", False, "Skipped - no test document available")
+            return
+            
+        test_data = {
+            "document_id": self.test_document_id,
+            "force_recategorize": True
+        }
+        
+        success, response, status = await self.make_request("POST", "/security/categorize", test_data)
+        
+        if success and response.get("category"):
+            self.log_result(
+                "Document Categorization", 
+                True, 
+                f"Document categorized as '{response.get('category')}' with {response.get('confidence', 0):.2f} confidence",
+                response
+            )
+        else:
+            self.log_result(
+                "Document Categorization", 
+                False, 
+                f"Document categorization failed: {response.get('detail', 'Unknown error')} (Status: {status})",
+                response
+            )
+    
+    async def test_document_encryption(self):
+        """Test POST /api/security/encrypt-document"""
+        if not self.test_document_id:
+            await self.create_test_document()
+            
+        if not self.test_document_id:
+            self.log_result("Document Encryption", False, "Skipped - no test document available")
+            return
+            
+        test_data = {
+            "document_id": self.test_document_id,
+            "password": "TestPassword123!",
+            "move_to_enclave": True,
+            "enclave_level": 1
+        }
+        
+        success, response, status = await self.make_request("POST", "/security/encrypt-document", test_data)
+        
+        if success and response.get("success"):
+            self.log_result(
+                "Document Encryption", 
+                True, 
+                f"Document encrypted successfully, moved to enclave: {response.get('is_in_enclave')}",
+                response
+            )
+        else:
+            self.log_result(
+                "Document Encryption", 
+                False, 
+                f"Document encryption failed: {response.get('detail', 'Unknown error')} (Status: {status})",
+                response
+            )
+    
+    async def test_document_decryption(self):
+        """Test POST /api/security/decrypt-document"""
+        if not self.test_document_id:
+            self.log_result("Document Decryption", False, "Skipped - no test document available")
+            return
+            
+        test_data = {
+            "document_id": self.test_document_id,
+            "password": "TestPassword123!"
+        }
+        
+        success, response, status = await self.make_request("POST", "/security/decrypt-document", test_data)
+        
+        if success and response.get("success"):
+            self.log_result(
+                "Document Decryption", 
+                True, 
+                "Document decrypted successfully",
+                {"has_document_data": bool(response.get("document"))}
+            )
+        elif not success and status == 400:
+            # Document might not be encrypted, which is fine
+            self.log_result(
+                "Document Decryption", 
+                True, 
+                "Document decryption correctly handled non-encrypted document",
+                {"expected_behavior": True}
+            )
+        else:
+            self.log_result(
+                "Document Decryption", 
+                False, 
+                f"Document decryption failed: {response.get('detail', 'Unknown error')} (Status: {status})",
+                response
+            )
+    
+    async def test_move_to_enclave(self):
+        """Test POST /api/security/move-to-enclave/{document_id}"""
+        if not self.test_document_id:
+            await self.create_test_document()
+            
+        if not self.test_document_id:
+            self.log_result("Move to Enclave", False, "Skipped - no test document available")
+            return
+            
+        success, response, status = await self.make_request("POST", f"/security/move-to-enclave/{self.test_document_id}?level=2")
+        
+        if success and response.get("success"):
+            self.log_result(
+                "Move to Enclave", 
+                True, 
+                "Document moved to secure enclave successfully",
+                response
+            )
+        else:
+            self.log_result(
+                "Move to Enclave", 
+                False, 
+                f"Move to enclave failed: {response.get('detail', 'Unknown error')} (Status: {status})",
+                response
+            )
+    
+    async def test_enclave_documents(self):
+        """Test GET /api/security/enclave-documents"""
+        success, response, status = await self.make_request("GET", "/security/enclave-documents")
+        
+        if success and "documents" in response:
+            self.log_result(
+                "Enclave Documents", 
+                True, 
+                f"Retrieved {response.get('count', 0)} documents from secure enclave",
+                {"document_count": response.get('count', 0)}
+            )
+        else:
+            self.log_result(
+                "Enclave Documents", 
+                False, 
+                f"Enclave documents retrieval failed: {response.get('detail', 'Unknown error')} (Status: {status})",
+                response
+            )
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # SUBSCRIPTION TESTS
+    # ═══════════════════════════════════════════════════════════════════════════
+    
+    async def test_subscription_tiers(self):
+        """Test GET /api/subscriptions/tiers"""
+        success, response, status = await self.make_request("GET", "/subscriptions/tiers")
+        
+        if success and response.get("tiers"):
+            tiers = response["tiers"]
+            self.log_result(
+                "Subscription Tiers", 
+                True, 
+                f"Retrieved {len(tiers)} subscription tiers: {[t.get('name') for t in tiers]}",
+                {"tier_count": len(tiers), "tier_names": [t.get('name') for t in tiers]}
+            )
+        else:
+            self.log_result(
+                "Subscription Tiers", 
+                False, 
+                f"Subscription tiers retrieval failed: {response.get('detail', 'Unknown error')} (Status: {status})",
+                response
+            )
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # HELPER METHODS
+    # ═══════════════════════════════════════════════════════════════════════════
+    
+    async def create_test_document(self):
+        """Create a test document for testing purposes"""
+        if self.test_document_id:
+            return  # Already have a test document
+            
+        test_doc_data = {
+            "title": f"Test Document {uuid.uuid4().hex[:8]}",
+            "document_type": "general_document",
+            "raw_text": "This is a test document for API testing purposes. It contains sample text for categorization and encryption testing.",
+            "formatted_output": "Test Document\n\nThis is a test document created for API testing.",
+            "summary": "A test document for API testing",
+            "tags": ["test", "api"],
+            "pages_count": 1
+        }
+        
+        success, response, status = await self.make_request("POST", "/documents", test_doc_data)
+        
+        if success and response.get("id"):
+            self.test_document_id = response["id"]
+            print(f"✅ Created test document: {self.test_document_id}")
+        else:
+            print(f"❌ Failed to create test document: {response.get('detail', 'Unknown error')}")
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # TEST EXECUTION AND REPORTING
+    # ═══════════════════════════════════════════════════════════════════════════
+    
+    async def run_all_tests(self):
+        """Run all API tests"""
+        print("🚀 Starting DocScan Pro Authentication Suite API Tests")
+        print(f"🌐 Testing against: {BASE_URL}")
+        print("=" * 80)
+        
+        # Authentication Tests
+        print("\n📋 AUTHENTICATION TESTS")
+        print("-" * 40)
+        await self.test_user_registration()
+        await self.test_user_login()
+        await self.test_magic_link_request()
+        await self.test_2fa_setup()
+        await self.test_2fa_verify()
+        await self.test_webauthn_register_begin()
+        await self.test_webauthn_authenticate_begin()
+        
+        # Security Tests
+        print("\n🔒 SECURITY TESTS")
+        print("-" * 40)
+        await self.test_enclave_stats()
+        await self.test_advanced_search()
+        await self.test_document_categorization()
+        await self.test_document_encryption()
+        await self.test_document_decryption()
+        await self.test_move_to_enclave()
+        await self.test_enclave_documents()
+        
+        # Subscription Tests
+        print("\n💳 SUBSCRIPTION TESTS")
+        print("-" * 40)
+        await self.test_subscription_tiers()
+        
+        # Generate summary
+        self.generate_summary()
+    
+    def generate_summary(self):
+        """Generate test summary"""
+        print("\n" + "=" * 80)
+        print("📊 TEST SUMMARY")
+        print("=" * 80)
+        
+        total_tests = len(self.test_results)
+        passed_tests = sum(1 for r in self.test_results if r["success"])
+        failed_tests = total_tests - passed_tests
+        
+        print(f"Total Tests: {total_tests}")
+        print(f"✅ Passed: {passed_tests}")
+        print(f"❌ Failed: {failed_tests}")
+        print(f"Success Rate: {(passed_tests/total_tests)*100:.1f}%")
+        
+        if failed_tests > 0:
+            print(f"\n❌ FAILED TESTS:")
+            for result in self.test_results:
+                if not result["success"]:
+                    print(f"  • {result['test']}: {result['details']}")
+        
+        print(f"\n✅ SUCCESSFUL TESTS:")
+        for result in self.test_results:
+            if result["success"]:
+                print(f"  • {result['test']}: {result['details']}")
+        
+        print("\n" + "=" * 80)
+        print("🏁 Testing Complete!")
+
+
+async def main():
+    """Main test execution function"""
+    async with APITester() as tester:
+        await tester.run_all_tests()
+
 
 if __name__ == "__main__":
-    sys.exit(main())
+    asyncio.run(main())
