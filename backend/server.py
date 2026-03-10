@@ -1617,6 +1617,256 @@ Be thorough but concise. Use proper mathematical notation where possible."""
         logger.error(f"Math solver error: {e}")
         raise HTTPException(500, f"Failed to solve math problem: {str(e)}")
 
+
+# ── AI Document Categorization ────────────────────────────────────────────────
+class CategorizeRequest(BaseModel):
+    text: str
+    image_base64: Optional[str] = None
+
+DOCUMENT_CATEGORIES = [
+    "Invoice", "Receipt", "Contract", "Letter", "Resume", "ID Document",
+    "Bank Statement", "Tax Form", "Medical Record", "Legal Document",
+    "Certificate", "Report", "Meeting Notes", "Handwritten Notes",
+    "Business Card", "Form", "Other"
+]
+
+@api_router.post("/categorize")
+async def categorize_document(request: CategorizeRequest):
+    """AI-powered document categorization"""
+    try:
+        api_key = get_api_key()
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"categorize-{uuid.uuid4()}",
+            system_message=f"""You are a document classification expert. Analyze the document content and classify it into one of these categories:
+{', '.join(DOCUMENT_CATEGORIES)}
+
+Also extract:
+- Key information (dates, amounts, names, etc.)
+- Suggested tags
+- Confidence level (high/medium/low)
+
+Return JSON format:
+{{
+    "category": "Category Name",
+    "confidence": "high|medium|low",
+    "key_info": {{"field": "value"}},
+    "suggested_tags": ["tag1", "tag2"],
+    "summary": "Brief document summary"
+}}"""
+        ).with_model("gemini", "gemini-2.5-flash")
+        
+        if request.image_base64:
+            clean_base64 = strip_b64_prefix(request.image_base64)
+            image_content = ImageContent(image_base64=clean_base64)
+            user_message = UserMessage(
+                text="Classify this document and extract key information.",
+                image_contents=[image_content]
+            )
+        else:
+            user_message = UserMessage(
+                text=f"Classify this document and extract key information:\n\n{request.text[:2000]}"
+            )
+        
+        response = await chat.send_message(user_message)
+        
+        # Try to parse as JSON
+        try:
+            import json
+            # Extract JSON from response
+            json_match = re.search(r'\{[\s\S]*\}', response)
+            if json_match:
+                result = json.loads(json_match.group())
+            else:
+                result = {
+                    "category": "Other",
+                    "confidence": "low",
+                    "key_info": {},
+                    "suggested_tags": [],
+                    "summary": response[:200]
+                }
+        except:
+            result = {
+                "category": "Other",
+                "confidence": "low",
+                "key_info": {},
+                "suggested_tags": [],
+                "summary": response[:200]
+            }
+        
+        return {"success": True, **result}
+        
+    except Exception as e:
+        logger.error(f"Categorization error: {e}")
+        raise HTTPException(500, f"Failed to categorize document: {str(e)}")
+
+
+# ── Batch Scanning Endpoint ────────────────────────────────────────────────
+class BatchScanRequest(BaseModel):
+    images: List[str]  # List of base64 images
+    title_prefix: str = "Batch Scan"
+    auto_categorize: bool = True
+
+@api_router.post("/batch-scan")
+async def batch_scan_documents(request: BatchScanRequest):
+    """Process multiple scanned images as a batch"""
+    if not request.images:
+        raise HTTPException(400, "No images provided")
+    
+    results = []
+    for i, image_b64 in enumerate(request.images):
+        try:
+            # Process each image
+            clean_b64 = strip_b64_prefix(image_b64)
+            
+            # OCR extraction
+            api_key = get_api_key()
+            chat = LlmChat(
+                api_key=api_key,
+                session_id=f"batch-{uuid.uuid4()}",
+                system_message="Extract all text from this document image accurately."
+            ).with_model("gemini", "gemini-2.5-flash")
+            
+            image_content = ImageContent(image_base64=clean_b64)
+            user_message = UserMessage(
+                text="Extract all text from this document.",
+                image_contents=[image_content]
+            )
+            
+            extracted_text = await chat.send_message(user_message)
+            
+            # Create document
+            doc_id = str(uuid.uuid4())
+            doc = {
+                "_id": doc_id,
+                "title": f"{request.title_prefix} - Page {i + 1}",
+                "raw_text": extracted_text,
+                "formatted_output": extracted_text,
+                "pages": [{"page_number": 1, "image_base64": clean_b64, "text": extracted_text}],
+                "tags": ["batch-scan"],
+                "scannedAt": datetime.now(timezone.utc),
+                "batch_id": request.title_prefix.replace(" ", "_").lower() + f"_{int(datetime.now().timestamp())}",
+            }
+            
+            await db.documents.insert_one(doc)
+            
+            results.append({
+                "page": i + 1,
+                "document_id": doc_id,
+                "title": doc["title"],
+                "text_preview": extracted_text[:200] + "..." if len(extracted_text) > 200 else extracted_text,
+                "success": True
+            })
+            
+        except Exception as e:
+            results.append({
+                "page": i + 1,
+                "success": False,
+                "error": str(e)
+            })
+    
+    return {
+        "total_pages": len(request.images),
+        "successful": sum(1 for r in results if r.get("success")),
+        "failed": sum(1 for r in results if not r.get("success")),
+        "results": results
+    }
+
+
+# ── Advanced Search/Filter Endpoint ────────────────────────────────────────────────
+class AdvancedSearchRequest(BaseModel):
+    query: Optional[str] = None
+    tags: Optional[List[str]] = None
+    category: Optional[str] = None
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+    has_password: Optional[bool] = None
+    has_signature: Optional[bool] = None
+    sort_by: str = "scannedAt"
+    sort_order: str = "desc"
+    page: int = 1
+    limit: int = 20
+
+@api_router.post("/documents/search")
+async def advanced_search(request: AdvancedSearchRequest):
+    """Advanced document search with filters"""
+    query = {}
+    
+    # Text search
+    if request.query:
+        query["$or"] = [
+            {"title": {"$regex": request.query, "$options": "i"}},
+            {"raw_text": {"$regex": request.query, "$options": "i"}},
+            {"summary": {"$regex": request.query, "$options": "i"}},
+        ]
+    
+    # Tag filter
+    if request.tags:
+        query["tags"] = {"$all": request.tags}
+    
+    # Category filter
+    if request.category:
+        query["category"] = request.category
+    
+    # Date range filter
+    if request.date_from or request.date_to:
+        date_query = {}
+        if request.date_from:
+            date_query["$gte"] = datetime.fromisoformat(request.date_from.replace("Z", "+00:00"))
+        if request.date_to:
+            date_query["$lte"] = datetime.fromisoformat(request.date_to.replace("Z", "+00:00"))
+        query["scannedAt"] = date_query
+    
+    # Password filter
+    if request.has_password is not None:
+        if request.has_password:
+            query["password_hash"] = {"$exists": True, "$ne": None}
+        else:
+            query["$or"] = query.get("$or", []) + [
+                {"password_hash": {"$exists": False}},
+                {"password_hash": None}
+            ]
+    
+    # Signature filter
+    if request.has_signature is not None:
+        if request.has_signature:
+            query["signatures"] = {"$exists": True, "$ne": []}
+        else:
+            query["$or"] = query.get("$or", []) + [
+                {"signatures": {"$exists": False}},
+                {"signatures": []}
+            ]
+    
+    # Sort
+    sort_direction = -1 if request.sort_order == "desc" else 1
+    
+    # Execute query with pagination
+    skip = (request.page - 1) * request.limit
+    cursor = db.documents.find(query, {"_id": 1, "title": 1, "tags": 1, "scannedAt": 1, "category": 1})
+    cursor = cursor.sort(request.sort_by, sort_direction).skip(skip).limit(request.limit)
+    
+    docs = await cursor.to_list(length=request.limit)
+    total = await db.documents.count_documents(query)
+    
+    # Format results
+    results = []
+    for doc in docs:
+        results.append({
+            "id": str(doc["_id"]),
+            "title": doc.get("title", "Untitled"),
+            "tags": doc.get("tags", []),
+            "category": doc.get("category"),
+            "scannedAt": doc.get("scannedAt").isoformat() if doc.get("scannedAt") else None,
+        })
+    
+    return {
+        "results": results,
+        "total": total,
+        "page": request.page,
+        "limit": request.limit,
+        "total_pages": (total + request.limit - 1) // request.limit
+    }
+
 app.include_router(api_router)
 app.include_router(auth_router, prefix="/api")
 app.include_router(subscription_router, prefix="/api")
