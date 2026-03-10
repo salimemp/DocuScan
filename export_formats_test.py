@@ -11,7 +11,7 @@ import sys
 from typing import Dict, Any, Optional
 
 # Backend URL from environment
-BACKEND_URL = "https://scanpro-auth-suite.preview.emergentagent.com/api"
+BACKEND_URL = "https://secure-doc-scanner.preview.emergentagent.com/api"
 
 class ExportFormatTester:
     def __init__(self):
