@@ -24,12 +24,14 @@ SUBSCRIPTION_TIERS = {
         "name": "Plus",
         "monthly_price": 499,  # $4.99 in cents
         "annual_price": 4792,  # $47.92 (20% off)
+        "trial_days": 7,  # 7-day free trial
         "features": [
             "Unlimited scans",
             "Basic OCR extraction", 
             "5GB cloud storage",
             "Export to PDF, DOCX",
-            "Email support"
+            "Email support",
+            "7-day free trial"
         ],
         "limits": {
             "scans_per_day": -1,  # unlimited
@@ -41,6 +43,7 @@ SUBSCRIPTION_TIERS = {
         "name": "Pro",
         "monthly_price": 999,  # $9.99 in cents
         "annual_price": 9592,  # $95.92 (20% off)
+        "trial_days": 7,  # 7-day free trial
         "features": [
             "Everything in Plus",
             "AI Math Solver",
@@ -48,7 +51,8 @@ SUBSCRIPTION_TIERS = {
             "All 18+ export formats",
             "50GB cloud storage",
             "E-signatures",
-            "Priority support"
+            "Priority support",
+            "7-day free trial"
         ],
         "limits": {
             "scans_per_day": -1,
@@ -65,6 +69,7 @@ SUBSCRIPTION_TIERS = {
         "monthly_price": 1999,  # $19.99 per user in cents
         "annual_price": 19192,  # $191.92 per user (20% off)
         "per_seat": True,
+        "trial_days": 14,  # 14-day free trial for business
         "features": [
             "Everything in Pro",
             "Team collaboration",
@@ -73,7 +78,8 @@ SUBSCRIPTION_TIERS = {
             "Custom branding",
             "API access",
             "Dedicated account manager",
-            "99.9% uptime SLA"
+            "99.9% uptime SLA",
+            "14-day free trial"
         ],
         "limits": {
             "scans_per_day": -1,
