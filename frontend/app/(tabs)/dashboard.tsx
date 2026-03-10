@@ -61,6 +61,10 @@ export default function DashboardScreen() {
   
   // Folder state
   const [folderName, setFolderName] = useState('');
+  
+  // Memory leak prevention refs
+  const isMountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const greeting = (() => {
@@ -69,21 +73,52 @@ export default function DashboardScreen() {
     if (h < 17) return t('goodAfternoon');
     return t('goodEvening');
   })();
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    return () => {
+      isMountedRef.current = false;
+      // Abort any pending fetch requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const fetchData = useCallback(async () => {
+    // Abort previous request if still pending
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+    
     try {
       const [statsRes, docsRes] = await Promise.all([
-        fetch(`${BACKEND_URL}/api/stats`),
-        fetch(`${BACKEND_URL}/api/documents`),
+        fetch(`${BACKEND_URL}/api/stats`, { signal }),
+        fetch(`${BACKEND_URL}/api/documents`, { signal }),
       ]);
+      
+      if (!isMountedRef.current) return;
+      
       if (statsRes.ok) setStats(await statsRes.json());
       if (docsRes.ok) {
         const docs = await docsRes.json();
         setRecentDocs(docs.slice(0, 5));
       }
-    } catch {}
-    setLoading(false);
-    setRefreshing(false);
+    } catch (e: any) {
+      // Ignore abort errors
+      if (e.name === 'AbortError') return;
+    }
+    
+    if (isMountedRef.current) {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
   useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
