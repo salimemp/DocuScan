@@ -8,6 +8,7 @@ import i18n from '../i18n/i18n';
 import { QueryProvider } from '../utils/queryClient';
 import { analytics } from '../utils/analytics';
 import { useAppStore } from '../utils/appStore';
+import { AuthProvider } from '../contexts/AuthContext';
 
 // Prevent the splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
