@@ -20,6 +20,7 @@ interface SubscriptionTier {
   features: string[];
   recommended: boolean;
   per_seat: boolean;
+  trial_days?: number;
 }
 
 export default function SubscriptionScreen() {
