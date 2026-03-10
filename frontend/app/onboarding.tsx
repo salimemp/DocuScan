@@ -205,15 +205,7 @@ export default function OnboardingScreen() {
   );
 }
 
-// Helper to check if onboarding is complete
-export const checkOnboardingComplete = async (): Promise<boolean> => {
-  try {
-    const value = await AsyncStorage.getItem(ONBOARDING_KEY);
-    return value === 'true';
-  } catch {
-    return false;
-  }
-};
+// Styles remain below
 
 const styles = StyleSheet.create({
   container: {
