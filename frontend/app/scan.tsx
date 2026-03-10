@@ -821,4 +821,158 @@ const styles = StyleSheet.create({
   grantBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
   cancelPermBtn: { paddingVertical: 12, paddingHorizontal: 24 },
   cancelPermText: { color: 'rgba(255,255,255,0.5)', fontSize: 15 },
+
+  // Batch Mode Styles
+  batchIndicator: {
+    position: 'absolute',
+    top: 120,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  batchIndicatorCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 10,
+  },
+  batchIndicatorText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  countdownBadge: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  countdownText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  stopBatchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 6,
+  },
+  stopBatchText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  // Batch Settings Modal
+  batchModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  batchModalContent: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 24,
+    padding: 24,
+  },
+  batchModalHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  batchModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginTop: 12,
+  },
+  batchModalSubtitle: {
+    fontSize: 14,
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  intervalLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  intervalOptions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 20,
+  },
+  intervalOption: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: 'center',
+  },
+  intervalValue: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  voiceToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 20,
+    gap: 12,
+  },
+  voiceToggleText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  voiceToggleSwitch: {
+    width: 44,
+    height: 26,
+    borderRadius: 13,
+    padding: 2,
+  },
+  voiceToggleKnob: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FFF',
+  },
+  batchModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  batchCancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: 'center',
+  },
+  batchCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  batchStartBtn: {
+    flex: 1.5,
+    flexDirection: 'row',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  batchStartText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
 });
