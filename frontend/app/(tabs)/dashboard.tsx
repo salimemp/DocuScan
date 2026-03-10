@@ -341,13 +341,19 @@ export default function DashboardScreen() {
               {/* Account Section */}
               <Text style={[styles.settingsSection, { color: colors.textSecondary }]}>ACCOUNT</Text>
               <View style={[styles.settingsCard, { backgroundColor: colors.surface, ...shadows.sm }]}>
-                <TouchableOpacity style={styles.settingsItem}>
+                <TouchableOpacity 
+                  style={styles.settingsItem}
+                  onPress={() => { setShowSettings(false); router.push('/profile'); }}
+                >
                   <Ionicons name="person-outline" size={22} color={colors.primary} />
                   <Text style={[styles.settingsItemText, { color: colors.textPrimary }]}>Profile</Text>
                   <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                 </TouchableOpacity>
                 <View style={[styles.settingsDivider, { backgroundColor: colors.border }]} />
-                <TouchableOpacity style={styles.settingsItem}>
+                <TouchableOpacity 
+                  style={styles.settingsItem}
+                  onPress={() => { setShowSettings(false); router.push('/notifications'); }}
+                >
                   <Ionicons name="notifications-outline" size={22} color={colors.primary} />
                   <Text style={[styles.settingsItemText, { color: colors.textPrimary }]}>Notifications</Text>
                   <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
