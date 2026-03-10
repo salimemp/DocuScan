@@ -14,10 +14,6 @@ interface AppState {
   // User preferences
   lastOpenedDocumentId: string | null;
   setLastOpenedDocument: (id: string | null) => void;
-  
-  // Hydration tracking
-  _hasHydrated: boolean;
-  setHasHydrated: (state: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -34,10 +30,6 @@ export const useAppStore = create<AppState>()(
       // User preferences
       lastOpenedDocumentId: null,
       setLastOpenedDocument: (id) => set({ lastOpenedDocumentId: id }),
-      
-      // Hydration tracking
-      _hasHydrated: false,
-      setHasHydrated: (state) => set({ _hasHydrated: state }),
     }),
     {
       name: 'docscanpro-app-storage',
@@ -47,12 +39,29 @@ export const useAppStore = create<AppState>()(
         hasCompletedOnboarding: state.hasCompletedOnboarding,
         lastOpenedDocumentId: state.lastOpenedDocumentId,
       }),
-      onRehydrateStorage: () => (state) => {
-        // This is called when rehydration finishes
-        if (state) {
-          state.setHasHydrated(true);
-        }
-      },
     }
   )
 );
+
+// Direct check for hydration status
+export const waitForHydration = (): Promise<void> => {
+  return new Promise((resolve) => {
+    // Check if already hydrated
+    if (useAppStore.persist?.hasHydrated?.()) {
+      resolve();
+      return;
+    }
+    
+    // Try to subscribe to hydration finish
+    const unsubscribe = useAppStore.persist?.onFinishHydration?.(() => {
+      unsubscribe?.();
+      resolve();
+    });
+    
+    // Fallback timeout in case hydration doesn't trigger
+    setTimeout(() => {
+      unsubscribe?.();
+      resolve();
+    }, 2000);
+  });
+};
