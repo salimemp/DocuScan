@@ -125,13 +125,15 @@ function RootLayoutNav() {
 export default function RootLayout() {
   return (
     <QueryProvider>
-      <I18nextProvider i18n={i18n}>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <SafeAreaProvider>
-            <RootLayoutNav />
-          </SafeAreaProvider>
-        </GestureHandlerRootView>
-      </I18nextProvider>
+      <AuthProvider>
+        <I18nextProvider i18n={i18n}>
+          <GestureHandlerRootView style={{ flex: 1 }}>
+            <SafeAreaProvider>
+              <RootLayoutNav />
+            </SafeAreaProvider>
+          </GestureHandlerRootView>
+        </I18nextProvider>
+      </AuthProvider>
     </QueryProvider>
   );
 }
