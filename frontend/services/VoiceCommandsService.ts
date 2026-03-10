@@ -22,15 +22,64 @@ export const SUPPORTED_LANGUAGES = {
   'bn': { name: 'Bengali', code: 'bn-IN' },
 };
 
-// Voice command patterns
+// Voice command patterns - Extended with more commands
 export const VOICE_COMMANDS = {
-  SCAN: ['scan', 'capture', 'take photo', 'photograph', 'shoot'],
-  FLASH: ['flash', 'light', 'torch', 'flashlight'],
-  FLIP: ['flip', 'switch', 'front', 'back', 'selfie'],
-  CONTINUE: ['continue', 'done', 'finish', 'next', 'proceed'],
-  CANCEL: ['cancel', 'stop', 'exit', 'close', 'back'],
-  GALLERY: ['gallery', 'import', 'photos', 'library', 'album'],
-  HELP: ['help', 'commands', 'what can you do'],
+  // Scanning commands
+  SCAN: ['scan', 'capture', 'take photo', 'photograph', 'shoot', 'snap', 'take picture', 'click', 'camera'],
+  FLASH: ['flash', 'light', 'torch', 'flashlight', 'flash on', 'flash off', 'toggle flash'],
+  FLIP: ['flip', 'switch', 'front', 'back', 'selfie', 'rear camera', 'front camera', 'switch camera', 'rotate camera'],
+  
+  // Navigation commands
+  CONTINUE: ['continue', 'done', 'finish', 'next', 'proceed', 'save', 'confirm', 'submit', 'complete'],
+  CANCEL: ['cancel', 'stop', 'exit', 'close', 'back', 'go back', 'return', 'dismiss', 'abort'],
+  GALLERY: ['gallery', 'import', 'photos', 'library', 'album', 'photo library', 'camera roll', 'pick photo', 'select image'],
+  
+  // Batch scanning commands
+  BATCH_START: ['batch', 'batch mode', 'start batch', 'auto scan', 'continuous', 'multi scan', 'multiple pages'],
+  BATCH_STOP: ['stop batch', 'end batch', 'stop scanning', 'pause', 'halt'],
+  
+  // Document management commands
+  DELETE: ['delete', 'remove', 'trash', 'discard', 'erase', 'clear'],
+  UNDO: ['undo', 'reverse', 'go back', 'revert'],
+  REDO: ['redo', 'repeat', 'do again'],
+  SELECT_ALL: ['select all', 'choose all', 'pick all'],
+  DESELECT: ['deselect', 'unselect', 'clear selection'],
+  
+  // View commands
+  ZOOM_IN: ['zoom in', 'enlarge', 'bigger', 'magnify', 'make bigger'],
+  ZOOM_OUT: ['zoom out', 'smaller', 'shrink', 'make smaller', 'reduce'],
+  ROTATE: ['rotate', 'turn', 'spin', 'rotate left', 'rotate right'],
+  
+  // Read aloud commands
+  READ: ['read', 'read aloud', 'speak', 'read text', 'text to speech', 'narrate', 'read document'],
+  STOP_READING: ['stop reading', 'stop speaking', 'silence', 'quiet', 'mute', 'hush'],
+  SLOWER: ['slower', 'slow down', 'decrease speed', 'speak slower'],
+  FASTER: ['faster', 'speed up', 'increase speed', 'speak faster'],
+  
+  // Export commands
+  EXPORT: ['export', 'download', 'save as', 'convert'],
+  EXPORT_PDF: ['export pdf', 'save as pdf', 'create pdf', 'make pdf'],
+  EXPORT_DOCX: ['export word', 'save as word', 'export docx', 'create document'],
+  SHARE: ['share', 'send', 'share document', 'send to'],
+  
+  // Security commands
+  ENCRYPT: ['encrypt', 'lock', 'secure', 'password protect', 'add password'],
+  DECRYPT: ['decrypt', 'unlock', 'open', 'remove password'],
+  
+  // Math solver commands
+  SOLVE: ['solve', 'calculate', 'math', 'solve math', 'equation', 'compute'],
+  
+  // Settings commands
+  SETTINGS: ['settings', 'preferences', 'options', 'configure'],
+  LANGUAGE: ['language', 'change language', 'switch language'],
+  THEME: ['theme', 'dark mode', 'light mode', 'appearance'],
+  
+  // Help commands
+  HELP: ['help', 'commands', 'what can you do', 'assistance', 'guide', 'instructions', 'how to'],
+  
+  // Confirmation commands
+  YES: ['yes', 'yeah', 'yep', 'correct', 'affirmative', 'okay', 'ok', 'sure', 'confirm'],
+  NO: ['no', 'nope', 'negative', 'cancel', 'deny', 'reject'],
 };
 
 export interface VoiceCommandResult {
