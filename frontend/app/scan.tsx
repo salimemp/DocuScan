@@ -332,6 +332,15 @@ export default function ScanScreen() {
 
           <View style={styles.topRight}>
             <TouchableOpacity
+              testID="batch-mode-btn"
+              style={[styles.ctrlBtn, batchMode && { backgroundColor: colors.primary }]}
+              onPress={toggleBatchMode}
+              activeOpacity={0.8}
+              accessibilityLabel="Batch scanning mode"
+            >
+              <Ionicons name="layers" size={22} color={batchMode ? '#FFF' : '#FFF'} />
+            </TouchableOpacity>
+            <TouchableOpacity
               testID="math-solver-btn"
               style={styles.ctrlBtn}
               onPress={() => setShowMathSolver(true)}
@@ -343,7 +352,10 @@ export default function ScanScreen() {
             <TouchableOpacity
               testID="scan-flash-btn"
               style={styles.ctrlBtn}
-              onPress={() => setFlash(f => f === 'off' ? 'on' : 'off')}
+              onPress={() => {
+                haptics.selection();
+                setFlash(f => f === 'off' ? 'on' : 'off');
+              }}
               activeOpacity={0.8}
               accessibilityLabel="Toggle flash"
             >
