@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -65,6 +66,3 @@ export const useAppStoreHydrated = () => {
 
   return hydrated;
 };
-
-// Need to import these for the hook
-import { useState, useEffect } from 'react';
