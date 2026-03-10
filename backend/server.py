@@ -1871,6 +1871,7 @@ async def advanced_search(request: AdvancedSearchRequest):
 app.include_router(api_router)
 app.include_router(auth_router, prefix="/api")
 app.include_router(subscription_router, prefix="/api")
+app.include_router(security_router, prefix="/api")
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 @app.on_event("shutdown")
