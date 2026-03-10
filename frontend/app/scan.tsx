@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Platform,
-  ScrollView, Image,
+  ScrollView, Image, Modal, Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -13,6 +13,11 @@ import { addScanPage, getScanPages, clearScanData, removeScanPage, getScanPageCo
 import { useTheme } from '../hooks/useTheme';
 import { useLanguage } from '../hooks/useLanguage';
 import { MathSolverModal } from '../components/MathSolverModal';
+import haptics from '../utils/haptics';
+import { voiceService } from '../services/VoiceCommandsService';
+
+// Batch scan intervals in seconds
+const BATCH_INTERVALS = [2, 3, 5, 10];
 
 export default function ScanScreen() {
   const router = useRouter();
@@ -25,8 +30,29 @@ export default function ScanScreen() {
   const [pages, setPages] = useState(getScanPages());
   const [showMathSolver, setShowMathSolver] = useState(false);
   const cameraRef = useRef<CameraView>(null);
+  
+  // Batch scanning state
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchInterval, setBatchInterval] = useState(3);
+  const [batchCount, setBatchCount] = useState(0);
+  const [showBatchSettings, setShowBatchSettings] = useState(false);
+  const [batchCountdown, setBatchCountdown] = useState(0);
+  const batchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Voice commands state
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
 
   const refreshPages = () => setPages(getScanPages());
+
+  // Cleanup batch mode on unmount
+  useEffect(() => {
+    return () => {
+      if (batchTimerRef.current) clearInterval(batchTimerRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+      voiceService.stopAll();
+    };
+  }, []);
 
   const processImage = async (uri: string) => {
     // Compress main image for AI analysis (max 1024px wide)
@@ -44,14 +70,20 @@ export default function ScanScreen() {
     return { base64: compressed.base64!, thumbnailBase64: thumbnail.base64!, uri };
   };
 
-  const addPage = async (uri: string) => {
+  const addPage = async (uri: string, silent: boolean = false) => {
     setIsProcessing(true);
     try {
       const pageData = await processImage(uri);
       addScanPage(pageData);
       refreshPages();
+      if (!silent) {
+        await haptics.success();
+      }
     } catch {
-      Alert.alert('Error', 'Failed to process image. Please try again.');
+      await haptics.error();
+      if (!silent) {
+        Alert.alert('Error', 'Failed to process image. Please try again.');
+      }
     } finally {
       setIsProcessing(false);
     }
