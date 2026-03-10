@@ -469,6 +469,131 @@ export default function ScanScreen() {
         </View>
       )}
 
+      {/* Batch Mode Indicator */}
+      {batchMode && (
+        <View style={styles.batchIndicator}>
+          <View style={[styles.batchIndicatorCard, { backgroundColor: colors.primary }]}>
+            <Ionicons name="layers" size={20} color="#FFF" />
+            <Text style={styles.batchIndicatorText}>
+              Batch Mode: {batchCount} captured
+            </Text>
+            <View style={styles.countdownBadge}>
+              <Text style={styles.countdownText}>{batchCountdown}s</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.stopBatchBtn}
+            onPress={stopBatchMode}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="stop-circle" size={24} color="#EF4444" />
+            <Text style={styles.stopBatchText}>Stop</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Batch Settings Modal */}
+      <Modal
+        visible={showBatchSettings}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowBatchSettings(false)}
+      >
+        <Pressable 
+          style={styles.batchModalOverlay}
+          onPress={() => setShowBatchSettings(false)}
+        >
+          <View 
+            style={[styles.batchModalContent, { backgroundColor: colors.surface }]}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={styles.batchModalHeader}>
+              <Ionicons name="layers" size={32} color={colors.primary} />
+              <Text style={[styles.batchModalTitle, { color: colors.textPrimary }]}>
+                Batch Scanning
+              </Text>
+              <Text style={[styles.batchModalSubtitle, { color: colors.textSecondary }]}>
+                Auto-capture multiple pages at set intervals
+              </Text>
+            </View>
+
+            <Text style={[styles.intervalLabel, { color: colors.textSecondary }]}>
+              Capture Interval
+            </Text>
+            <View style={styles.intervalOptions}>
+              {BATCH_INTERVALS.map(interval => (
+                <TouchableOpacity
+                  key={interval}
+                  style={[
+                    styles.intervalOption,
+                    { borderColor: batchInterval === interval ? colors.primary : colors.border },
+                    batchInterval === interval && { backgroundColor: colors.primary + '18' },
+                  ]}
+                  onPress={() => {
+                    haptics.selection();
+                    setBatchInterval(interval);
+                  }}
+                >
+                  <Text style={[
+                    styles.intervalValue,
+                    { color: batchInterval === interval ? colors.primary : colors.textPrimary }
+                  ]}>
+                    {interval}s
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={[styles.voiceToggle, { backgroundColor: colors.surfaceHighlight }]}
+              onPress={() => {
+                haptics.selection();
+                setVoiceEnabled(!voiceEnabled);
+              }}
+            >
+              <Ionicons 
+                name={voiceEnabled ? 'mic' : 'mic-off'} 
+                size={22} 
+                color={voiceEnabled ? colors.primary : colors.textTertiary} 
+              />
+              <Text style={[styles.voiceToggleText, { color: colors.textPrimary }]}>
+                Voice Announcements
+              </Text>
+              <View style={[
+                styles.voiceToggleSwitch,
+                { backgroundColor: voiceEnabled ? colors.primary : colors.border }
+              ]}>
+                <View style={[
+                  styles.voiceToggleKnob,
+                  voiceEnabled && { marginLeft: 16 }
+                ]} />
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.batchModalActions}>
+              <TouchableOpacity
+                style={[styles.batchCancelBtn, { borderColor: colors.border }]}
+                onPress={() => setShowBatchSettings(false)}
+              >
+                <Text style={[styles.batchCancelText, { color: colors.textSecondary }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.batchStartBtn, { backgroundColor: colors.primary }]}
+                onPress={() => {
+                  setShowBatchSettings(false);
+                  startBatchMode();
+                }}
+              >
+                <Ionicons name="play" size={18} color="#FFF" />
+                <Text style={styles.batchStartText}>Start Batch</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
+
       {/* Math Solver Modal */}
       <MathSolverModal 
         visible={showMathSolver} 
