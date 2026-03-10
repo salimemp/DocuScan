@@ -553,7 +553,7 @@ index 2f8038b..aca7e6b 100644
 --+from typing import Dict, Any, Optional
 --+
 --+# Backend URL from environment
---+BACKEND_URL = "https://docuflow-i18n.preview.emergentagent.com/api"
+--+BACKEND_URL = "https://scanpro-auth-suite.preview.emergentagent.com/api"
 --+
 --+class ExportFormatTester:
 --+    def __init__(self):
@@ -797,7 +797,7 @@ index 2f8038b..aca7e6b 100644
 ---+3. Comments System  
 ---+4. Document Sharing
 ---+
----+Tests the production API at https://docuflow-i18n.preview.emergentagent.com
+---+Tests the production API at https://scanpro-auth-suite.preview.emergentagent.com
 ---+"""
 ---+
 ---+import requests
@@ -807,7 +807,7 @@ index 2f8038b..aca7e6b 100644
 ---+from datetime import datetime
 ---+
 ---+# Configuration
----+BASE_URL = "https://docuflow-i18n.preview.emergentagent.com/api"
+---+BASE_URL = "https://scanpro-auth-suite.preview.emergentagent.com/api"
 ---+TEST_PASSWORD = "test1234"
 ---+WRONG_PASSWORD = "wrongpass"
 ---+
@@ -1294,7 +1294,7 @@ index 2f8038b..aca7e6b 100644
 -----+from typing import Dict, Any, Optional
 -----+
 -----+# Configuration
------+BASE_URL = "https://docuflow-i18n.preview.emergentagent.com/api"
+-----+BASE_URL = "https://scanpro-auth-suite.preview.emergentagent.com/api"
 -----+TIMEOUT = 30
 -----+
 -----+class DocScanV5Tester:
@@ -1878,7 +1878,7 @@ index 2f8038b..aca7e6b 100644
 ---\ No newline at end of file
 ---+    message: "Dashboard button fixes verified working (Settings, Share Doc, New Folder, Cloud Backup all functional with modals). Now testing password protection, e-signatures, and comments features end-to-end."
 ---+  - agent: "testing"
----+    message: "DocScan Pro Review Testing Completed Successfully: Comprehensive end-to-end testing of all requested features at production URL https://docuflow-i18n.preview.emergentagent.com completed. Results: 4/4 critical features working (100% success rate). ✅ WORKING: Password Protection Flow (set/verify/reject/remove), E-Signature System (create/list/add to document), Comments System (add/verify storage/resolve), Document Sharing (email notifications). All features are production-ready and functioning correctly. No critical issues detected."
+---+    message: "DocScan Pro Review Testing Completed Successfully: Comprehensive end-to-end testing of all requested features at production URL https://scanpro-auth-suite.preview.emergentagent.com completed. Results: 4/4 critical features working (100% success rate). ✅ WORKING: Password Protection Flow (set/verify/reject/remove), E-Signature System (create/list/add to document), Comments System (add/verify storage/resolve), Document Sharing (email notifications). All features are production-ready and functioning correctly. No critical issues detected."
 ---\ No newline at end of file
 --diff --git a/test_result.md b/test_result.md
 --index 605190b..3f61161 100644
@@ -1896,11 +1896,11 @@ index 2f8038b..aca7e6b 100644
 --     implemented: true
 --@@ -363,4 +366,6 @@ agent_communication:
 --   - agent: "testing"
---     message: "DocScan Pro Review Testing Completed Successfully: Comprehensive end-to-end testing of all requested features at production URL https://docuflow-i18n.preview.emergentagent.com completed. Results: 4/4 critical features working (100% success rate). ✅ WORKING: Password Protection Flow (set/verify/reject/remove), E-Signature System (create/list/add to document), Comments System (add/verify storage/resolve), Document Sharing (email notifications). All features are production-ready and functioning correctly. No critical issues detected."
+--     message: "DocScan Pro Review Testing Completed Successfully: Comprehensive end-to-end testing of all requested features at production URL https://scanpro-auth-suite.preview.emergentagent.com completed. Results: 4/4 critical features working (100% success rate). ✅ WORKING: Password Protection Flow (set/verify/reject/remove), E-Signature System (create/list/add to document), Comments System (add/verify storage/resolve), Document Sharing (email notifications). All features are production-ready and functioning correctly. No critical issues detected."
 --   - agent: "main"
 ---    message: "NEW FEATURE: Implemented multi-language support (i18n) with 13 languages including English, Korean, Tamil, Bengali, Hebrew. Added language persistence with AsyncStorage. Also added new export formats to backend (HTML, JSON, Markdown, EPUB). Need testing for: 1) New backend export formats (HTML, JSON, MD, EPUB, PPTX), 2) Language switching and persistence."
 --\ No newline at end of file
 --+    message: "NEW FEATURE: Implemented multi-language support (i18n) with 13 languages including English, Korean, Tamil, Bengali, Hebrew. Added language persistence with AsyncStorage. Also added new export formats to backend (HTML, JSON, Markdown, EPUB). Need testing for: 1) New backend export formats (HTML, JSON, MD, EPUB, PPTX), 2) Language switching and persistence."
 --+  - agent: "testing"
---+    message: "NEW EXPORT FORMATS TESTING COMPLETED SUCCESSFULLY: Tested all 5 requested new export formats at https://docuflow-i18n.preview.emergentagent.com/api. Results: 100% success rate (5/5 formats working). ✅ WORKING: HTML export (2678 bytes, text/html), JSON export (1903 bytes, application/json), Markdown export (974 bytes, text/markdown), EPUB export (2470 bytes, application/epub+zip), PPTX export (29504 bytes, correct MIME type). Fixed JSON serialization issue with datetime objects during testing. Error handling validated (400 for invalid formats). All formats return correct MIME types and valid base64 data. Export functionality is production-ready."
+--+    message: "NEW EXPORT FORMATS TESTING COMPLETED SUCCESSFULLY: Tested all 5 requested new export formats at https://scanpro-auth-suite.preview.emergentagent.com/api. Results: 100% success rate (5/5 formats working). ✅ WORKING: HTML export (2678 bytes, text/html), JSON export (1903 bytes, application/json), Markdown export (974 bytes, text/markdown), EPUB export (2470 bytes, application/epub+zip), PPTX export (29504 bytes, correct MIME type). Fixed JSON serialization issue with datetime objects during testing. Error handling validated (400 for invalid formats). All formats return correct MIME types and valid base64 data. Export functionality is production-ready."
 --\ No newline at end of file

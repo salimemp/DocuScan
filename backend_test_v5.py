@@ -12,7 +12,7 @@ import time
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://docuflow-i18n.preview.emergentagent.com/api"
+BASE_URL = "https://scanpro-auth-suite.preview.emergentagent.com/api"
 TIMEOUT = 30
 
 class DocScanV5Tester:
