@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const STORAGE_KEY = 'docscanpro-app-storage';
 
 interface AppState {
   // Onboarding
@@ -14,54 +15,55 @@ interface AppState {
   // User preferences
   lastOpenedDocumentId: string | null;
   setLastOpenedDocument: (id: string | null) => void;
+  
+  // Load state from storage
+  loadFromStorage: () => Promise<void>;
 }
 
-export const useAppStore = create<AppState>()(
-  persist(
-    (set) => ({
-      // Onboarding state
-      hasCompletedOnboarding: false,
-      setOnboardingComplete: (complete) => set({ hasCompletedOnboarding: complete }),
-      
-      // App readiness
-      isAppReady: false,
-      setAppReady: (ready) => set({ isAppReady: ready }),
-      
-      // User preferences
-      lastOpenedDocumentId: null,
-      setLastOpenedDocument: (id) => set({ lastOpenedDocumentId: id }),
-    }),
-    {
-      name: 'docscanpro-app-storage',
-      storage: createJSONStorage(() => AsyncStorage),
-      // Only persist these fields
-      partialize: (state) => ({
-        hasCompletedOnboarding: state.hasCompletedOnboarding,
-        lastOpenedDocumentId: state.lastOpenedDocumentId,
-      }),
+export const useAppStore = create<AppState>((set, get) => ({
+  // Onboarding state
+  hasCompletedOnboarding: false,
+  setOnboardingComplete: async (complete) => {
+    set({ hasCompletedOnboarding: complete });
+    // Persist to storage
+    try {
+      const state = { hasCompletedOnboarding: complete, lastOpenedDocumentId: get().lastOpenedDocumentId };
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+      console.log('Error saving to storage:', e);
     }
-  )
-);
-
-// Direct check for hydration status
-export const waitForHydration = (): Promise<void> => {
-  return new Promise((resolve) => {
-    // Check if already hydrated
-    if (useAppStore.persist?.hasHydrated?.()) {
-      resolve();
-      return;
+  },
+  
+  // App readiness
+  isAppReady: false,
+  setAppReady: (ready) => set({ isAppReady: ready }),
+  
+  // User preferences
+  lastOpenedDocumentId: null,
+  setLastOpenedDocument: async (id) => {
+    set({ lastOpenedDocumentId: id });
+    // Persist to storage
+    try {
+      const state = { hasCompletedOnboarding: get().hasCompletedOnboarding, lastOpenedDocumentId: id };
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+      console.log('Error saving to storage:', e);
     }
-    
-    // Try to subscribe to hydration finish
-    const unsubscribe = useAppStore.persist?.onFinishHydration?.(() => {
-      unsubscribe?.();
-      resolve();
-    });
-    
-    // Fallback timeout in case hydration doesn't trigger
-    setTimeout(() => {
-      unsubscribe?.();
-      resolve();
-    }, 2000);
-  });
-};
+  },
+  
+  // Load state from storage
+  loadFromStorage: async () => {
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const data = JSON.parse(stored);
+        set({
+          hasCompletedOnboarding: data.hasCompletedOnboarding ?? false,
+          lastOpenedDocumentId: data.lastOpenedDocumentId ?? null,
+        });
+      }
+    } catch (e) {
+      console.log('Error loading from storage:', e);
+    }
+  },
+}));
