@@ -1,15 +1,16 @@
 # DocScan Pro
 
-A comprehensive document management application built with Expo (React Native) and FastAPI backend.
+A comprehensive, enterprise-grade document management application built with Expo (React Native) and FastAPI backend. Features AI-powered scanning, multi-language support, authentication, and subscription management.
 
-## Features
+## 🚀 Features
 
 ### Core Features
 - **Document Scanning**: Capture documents using device camera with multi-page support
 - **AI-Powered OCR**: Automatic text extraction using Google Gemini AI
+- **Math Solver**: AI-powered math problem solving from images or text input
+- **Read Aloud**: Text-to-speech accessibility feature with speed controls
 - **Smart Organization**: Automatic document classification and tagging
-- **Multi-language Support**: 13 languages including English, Korean, Tamil, Bengali, Hebrew
-- **Cloud Backup**: Integration support for Google Drive, Dropbox, OneDrive, Box, iCloud
+- **Multi-language Support**: 13 languages with RTL support
 
 ### Document Management
 - **Password Protection**: Secure documents with PIN/password
@@ -20,166 +21,211 @@ A comprehensive document management application built with Expo (React Native) a
   - Images: PNG, JPEG, TIFF, BMP, WebP, SVG
   - E-books: EPUB, MOBI
 
-### Editor Features
-- Rich text formatting (bold, italic, headers, lists)
-- Page management (add, delete, merge, split pages)
-- Watermarks and redaction
-- AI assistant for document queries
+### 🔐 Authentication System
+- **Email/Password**: Traditional authentication with email confirmation
+- **Magic Link**: Passwordless email-based login
+- **Social Login**: Google OAuth and Apple Sign-In
+- **Biometrics**: Face ID / Fingerprint authentication
+- **2FA (Two-Factor Authentication)**:
+  - TOTP (Authenticator apps like Google Authenticator)
+  - Email-based backup codes
+  - Hardware security keys (WebAuthn/FIDO2)
+- **Passkeys**: WebAuthn-based passwordless authentication
+- **JWT Tokens**: Secure access and refresh token management
+
+### 💳 Subscription Plans
+
+| Plan | Monthly | Annual (20% off) | Features |
+|------|---------|------------------|----------|
+| **Free** | $0 | $0 | 5 scans/day, basic export, 100MB storage |
+| **Plus** | $4.99 | $47.92/yr | Unlimited scans, 5GB storage, PDF/DOCX export |
+| **Pro** | $9.99 | $95.92/yr | All formats, Math Solver, Read Aloud, 50GB, E-signatures |
+| **Business** | $19.99/user | $191.92/user/yr | Team features, 200GB/user, API access, Admin console |
+
+### 🛡️ Compliance & Security
+- **GDPR** (European Union)
+- **CCPA** (California Consumer Privacy Act)
+- **HIPAA** (Health data protection)
+- **PIPEDA** (Canada)
+- **SOC 2** (International)
 
 ## Tech Stack
 
 ### Frontend
 - **Framework**: Expo (React Native)
 - **Router**: Expo Router (file-based routing)
-- **State Management**: React Hooks + Zustand
-- **Internationalization**: i18next + react-i18next
-- **Storage**: AsyncStorage for language persistence
+- **State Management**: React Query + Zustand
+- **Internationalization**: i18next (13 languages)
+- **Authentication**: expo-local-authentication, expo-web-browser
+- **Storage**: AsyncStorage for persistence
 
 ### Backend
 - **Framework**: FastAPI (Python)
 - **Database**: MongoDB
-- **AI**: Google Gemini for OCR and AI assistant
-- **Email**: Resend for signature requests
+- **AI**: Google Gemini (OCR, Math Solver)
+- **Email**: Resend (transactional emails)
+- **Payments**: Stripe (subscriptions)
+- **Auth**: JWT + WebAuthn
 
 ## Project Structure
 
 ```
 /app
 ├── backend/
-│   ├── server.py          # FastAPI backend
+│   ├── server.py          # Main FastAPI application
+│   ├── auth.py            # Authentication module
+│   ├── subscriptions.py   # Stripe subscription handling
 │   ├── requirements.txt   # Python dependencies
-│   └── .env              # Backend environment variables
+│   └── .env               # Environment variables
 │
-└── frontend/
-    ├── app/              # Expo Router screens
-    │   ├── (tabs)/       # Tab navigation screens
-    │   │   ├── dashboard.tsx
-    │   │   └── history.tsx
-    │   ├── document/     # Document detail screens
-    │   ├── scan.tsx      # Camera scanner
-    │   ├── preview.tsx   # Scan preview
-    │   └── editor.tsx    # Document editor
-    ├── components/       # Reusable components
-    ├── hooks/            # Custom hooks
-    ├── i18n/             # Internationalization
-    │   ├── i18n.ts       # i18next configuration
-    │   └── translations.ts # All language strings
-    └── utils/            # Utility functions
+├── frontend/
+│   ├── app/               # Expo Router screens
+│   │   ├── (tabs)/        # Tab navigation
+│   │   │   ├── dashboard.tsx
+│   │   │   └── history.tsx
+│   │   ├── document/[id].tsx  # Document detail
+│   │   ├── auth.tsx       # Authentication screen
+│   │   ├── subscription.tsx   # Paywall/subscription
+│   │   ├── compliance.tsx # Compliance info
+│   │   ├── onboarding.tsx # User onboarding
+│   │   ├── scan.tsx       # Camera scanner
+│   │   ├── preview.tsx    # Scan preview
+│   │   └── editor.tsx     # Document editor
+│   │
+│   ├── components/
+│   │   ├── MathSolverModal.tsx    # AI Math solver
+│   │   ├── ReadAloudControls.tsx  # Text-to-speech
+│   │   ├── SignatureCanvas.tsx    # E-signatures
+│   │   └── CookieConsentBanner.tsx
+│   │
+│   ├── hooks/
+│   │   ├── useLanguage.ts  # i18n hook
+│   │   └── useTheme.ts     # Theme management
+│   │
+│   ├── i18n/
+│   │   ├── i18n.ts         # i18next config
+│   │   └── locales/        # Language files (13 languages)
+│   │
+│   └── utils/
+│       ├── queryClient.tsx  # React Query setup
+│       └── analytics.ts     # Analytics tracking
+│
+├── README.md
+├── PRIVACY_POLICY.md
+└── TERMS_OF_USE.md
 ```
-
-## Setup Instructions
-
-### Prerequisites
-- Node.js 18+
-- Python 3.10+
-- MongoDB
-- Expo CLI
-
-### Backend Setup
-
-1. Navigate to backend directory:
-   ```bash
-   cd /app/backend
-   ```
-
-2. Create virtual environment:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate
-   ```
-
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. Configure environment variables in `.env`:
-   ```
-   MONGO_URL=mongodb://localhost:27017
-   GEMINI_API_KEY=your_gemini_api_key
-   RESEND_API_KEY=your_resend_api_key
-   ```
-
-5. Start the backend:
-   ```bash
-   uvicorn server:app --reload --port 8001
-   ```
-
-### Frontend Setup
-
-1. Navigate to frontend directory:
-   ```bash
-   cd /app/frontend
-   ```
-
-2. Install dependencies:
-   ```bash
-   yarn install
-   ```
-
-3. Start the Expo development server:
-   ```bash
-   npx expo start
-   ```
 
 ## API Endpoints
 
-### Documents
-- `GET /api/documents` - List all documents
-- `POST /api/documents` - Create document
-- `GET /api/documents/{id}` - Get document details
-- `PUT /api/documents/{id}` - Update document
-- `DELETE /api/documents/{id}` - Delete document
-- `POST /api/documents/{id}/export` - Export document
+### Authentication (`/api/auth`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/register` | Register with email/password |
+| POST | `/login` | Login with credentials |
+| POST | `/login/2fa` | Verify 2FA code |
+| POST | `/magic-link/request` | Request magic link |
+| GET | `/magic-link/verify` | Verify magic link |
+| GET | `/confirm-email` | Confirm email address |
+| POST | `/2fa/setup` | Setup 2FA (TOTP) |
+| POST | `/2fa/verify-setup` | Verify 2FA setup |
+| POST | `/2fa/disable` | Disable 2FA |
+| GET | `/google` | Google OAuth redirect |
+| POST | `/google/callback` | Google OAuth callback |
+| GET | `/me` | Get current user |
+| POST | `/refresh` | Refresh access token |
+| POST | `/logout` | Logout user |
+| POST | `/password/reset-request` | Request password reset |
+| POST | `/password/reset-confirm` | Confirm password reset |
 
-### Scanning
-- `POST /api/scan` - Analyze scanned images with AI
+### Subscriptions (`/api/subscriptions`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/tiers` | Get subscription tiers |
+| POST | `/create` | Create subscription |
+| GET | `/current` | Get current subscription |
+| POST | `/cancel` | Cancel subscription |
+| POST | `/reactivate` | Reactivate subscription |
+| POST | `/upgrade` | Upgrade/change plan |
+| GET | `/invoices` | Get invoice history |
+| POST | `/portal` | Stripe customer portal |
+| POST | `/webhook` | Stripe webhook handler |
 
-### Signatures
-- `GET /api/signatures` - List saved signatures
-- `POST /api/signatures` - Save new signature
-- `DELETE /api/signatures/{id}` - Delete signature
-
-### Password Protection
-- `POST /api/documents/{id}/password` - Set/remove password
-- `POST /api/documents/{id}/verify-password` - Verify password
+### Documents (`/api`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/documents` | List all documents |
+| POST | `/documents` | Create document |
+| GET | `/documents/{id}` | Get document |
+| PUT | `/documents/{id}` | Update document |
+| DELETE | `/documents/{id}` | Delete document |
+| POST | `/documents/{id}/export` | Export document |
+| POST | `/scan` | Analyze with AI OCR |
+| POST | `/math/solve` | Solve math problem |
 
 ## Supported Languages
 
-| Language | Code | RTL |
-|----------|------|-----|
-| English | en | No |
-| Spanish | es | No |
-| French | fr | No |
-| German | de | No |
-| Arabic | ar | Yes |
-| Chinese | zh | No |
-| Japanese | ja | No |
-| Portuguese | pt | No |
-| Hindi | hi | No |
-| Korean | ko | No |
-| Tamil | ta | No |
-| Bengali | bn | No |
-| Hebrew | he | Yes |
+| Language | Code | RTL | Status |
+|----------|------|-----|--------|
+| English | en | No | ✅ Full |
+| Spanish | es | No | ✅ Full |
+| French | fr | No | ✅ Full |
+| German | de | No | ✅ Full |
+| Portuguese | pt | No | ✅ Full |
+| Chinese | zh | No | ✅ Full |
+| Japanese | ja | No | ✅ Full |
+| Korean | ko | No | ✅ Full |
+| Hindi | hi | No | ✅ Full |
+| Tamil | ta | No | ✅ Full |
+| Bengali | bn | No | ✅ Full |
+| Arabic | ar | Yes | ✅ Full |
+| Hebrew | he | Yes | ✅ Full |
 
 ## Environment Variables
 
 ### Backend (.env)
-| Variable | Description |
-|----------|-------------|
-| MONGO_URL | MongoDB connection string |
-| GEMINI_API_KEY | Google Gemini API key for OCR |
-| RESEND_API_KEY | Resend API key for emails |
+```env
+MONGO_URL=mongodb://localhost:27017
+GEMINI_API_KEY=your_gemini_api_key
+RESEND_API_KEY=your_resend_api_key
+STRIPE_SECRET_KEY=sk_test_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+JWT_SECRET=your_jwt_secret
+```
 
 ### Frontend (.env)
-| Variable | Description |
-|----------|-------------|
-| EXPO_PUBLIC_BACKEND_URL | Backend API URL |
+```env
+EXPO_PUBLIC_BACKEND_URL=http://localhost:8001
+```
+
+## Setup Instructions
+
+### Backend Setup
+```bash
+cd /app/backend
+pip install -r requirements.txt
+uvicorn server:app --reload --port 8001
+```
+
+### Frontend Setup
+```bash
+cd /app/frontend
+yarn install
+npx expo start
+```
+
+## Security Features
+- End-to-end encryption for sensitive documents
+- Secure JWT token management with refresh tokens
+- WebAuthn/FIDO2 support for hardware security keys
+- TOTP-based 2FA with backup codes
+- Rate limiting on authentication endpoints
+- Secure password hashing with salt
 
 ## License
-
 Proprietary - All rights reserved.
 
 ## Support
+For support, contact: support@docscanpro.com
 
-For support, please contact the development team.
+---
+**Powered by Elixio Digital**
