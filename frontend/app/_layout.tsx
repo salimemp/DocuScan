@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments, SplashScreen } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -16,46 +16,33 @@ function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
   
-  // Use Zustand store for persistent state
+  // Use Zustand store for persistent state - subscribe to hydration state
   const hasCompletedOnboarding = useAppStore((state) => state.hasCompletedOnboarding);
+  const hasHydrated = useAppStore((state) => state._hasHydrated);
   const setAppReady = useAppStore((state) => state.setAppReady);
   
-  const [isHydrated, setIsHydrated] = useState(false);
   const [hasNavigated, setHasNavigated] = useState(false);
+  const [initComplete, setInitComplete] = useState(false);
 
-  // Wait for Zustand to hydrate from AsyncStorage
+  // Initialize analytics and hide splash when hydrated
   useEffect(() => {
-    const checkHydration = async () => {
-      // Check if store is already hydrated
-      if (useAppStore.persist.hasHydrated()) {
-        setIsHydrated(true);
+    if (hasHydrated && !initComplete) {
+      const init = async () => {
         await analytics.init();
         setAppReady(true);
         SplashScreen.hideAsync();
-        return;
-      }
-      
-      // Wait for hydration
-      const unsubscribe = useAppStore.persist.onFinishHydration(async () => {
-        setIsHydrated(true);
-        await analytics.init();
-        setAppReady(true);
-        SplashScreen.hideAsync();
-      });
-
-      return () => unsubscribe();
-    };
-
-    checkHydration();
-  }, [setAppReady]);
+        setInitComplete(true);
+      };
+      init();
+    }
+  }, [hasHydrated, initComplete, setAppReady]);
 
   // Handle navigation based on onboarding status - only once after hydration
   useEffect(() => {
-    if (!isHydrated || hasNavigated) return;
+    if (!hasHydrated || !initComplete || hasNavigated) return;
     
     const currentSegment = segments[0];
     const isOnOnboarding = currentSegment === 'onboarding';
-    const isOnTabs = currentSegment === '(tabs)';
     const isOnIndex = currentSegment === undefined || currentSegment === 'index';
     
     // If user hasn't completed onboarding and is not already there, redirect
@@ -68,10 +55,10 @@ function RootLayoutNav() {
       setHasNavigated(true);
       router.replace('/(tabs)/dashboard');
     }
-  }, [isHydrated, hasCompletedOnboarding, segments, router, hasNavigated]);
+  }, [hasHydrated, initComplete, hasCompletedOnboarding, segments, router, hasNavigated]);
 
   // Show loading while hydrating
-  if (!isHydrated) {
+  if (!hasHydrated || !initComplete) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' }}>
         <ActivityIndicator size="large" color="#2563EB" />
