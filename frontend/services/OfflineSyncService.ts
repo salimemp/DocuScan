@@ -43,6 +43,7 @@ class OfflineSyncService {
   private isOnline: boolean = true;
   private isSyncing: boolean = false;
   private listeners: Set<(status: SyncStatus) => void> = new Set();
+  private unsubscribeNetInfo: (() => void) | null = null;
 
   constructor() {
     this.initNetworkListener();
@@ -52,7 +53,8 @@ class OfflineSyncService {
    * Initialize network status listener
    */
   private initNetworkListener() {
-    NetInfo.addEventListener((state) => {
+    // Store unsubscribe function to prevent memory leaks
+    this.unsubscribeNetInfo = NetInfo.addEventListener((state) => {
       const wasOffline = !this.isOnline;
       this.isOnline = state.isConnected ?? false;
       
@@ -63,6 +65,17 @@ class OfflineSyncService {
       
       this.notifyListeners();
     });
+  }
+
+  /**
+   * Cleanup network listener - call when service is no longer needed
+   */
+  destroy() {
+    if (this.unsubscribeNetInfo) {
+      this.unsubscribeNetInfo();
+      this.unsubscribeNetInfo = null;
+    }
+    this.listeners.clear();
   }
 
   /**
