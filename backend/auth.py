@@ -235,7 +235,7 @@ async def send_verification_email(email: str, token: str, email_type: str = "con
         else:
             return False
 
-        resend.emails.send({
+        resend.Emails.send({
             "from": "DocScan Pro <noreply@docscanpro.com>",
             "to": [email],
             "subject": subject,
