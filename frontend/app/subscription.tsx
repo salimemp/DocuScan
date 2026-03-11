@@ -28,6 +28,7 @@ export default function SubscriptionScreen() {
   const router = useRouter();
   const { colors, shadows } = useTheme();
   const { t } = useLanguage();
+  const { user, isAuthenticated, accessToken, refreshUser } = useAuth();
   
   const [tiers, setTiers] = useState<SubscriptionTier[]>([]);
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('annual');
@@ -35,32 +36,52 @@ export default function SubscriptionScreen() {
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState(false);
   const [currentSub, setCurrentSub] = useState<any>(null);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
     fetchTiers();
-    fetchCurrentSubscription();
-  }, []);
+    if (isAuthenticated && accessToken) {
+      fetchCurrentSubscription();
+    }
+    
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [isAuthenticated, accessToken]);
 
   const fetchTiers = async () => {
     try {
       const res = await fetch(`${BACKEND_URL}/api/subscriptions/tiers`);
       const data = await res.json();
-      setTiers(data.tiers);
+      if (isMountedRef.current) {
+        setTiers(data.tiers);
+      }
     } catch (e) {
       console.error('Failed to fetch tiers:', e);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   const fetchCurrentSubscription = async () => {
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+      
       const res = await fetch(`${BACKEND_URL}/api/subscriptions/current`, {
+        headers,
         credentials: 'include',
       });
       if (res.ok) {
         const data = await res.json();
-        setCurrentSub(data.subscription);
+        if (isMountedRef.current) {
+          setCurrentSub(data.subscription);
+        }
       }
     } catch (e) {
       console.error('Failed to fetch current subscription:', e);
