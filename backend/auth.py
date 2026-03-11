@@ -45,6 +45,58 @@ BACKEND_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'http://localhost:8001')
 
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 
+# ── Password Validation ──────────────────────────────────────────────────────
+
+import re
+import aiohttp
+
+def validate_password_strength(password: str) -> tuple[bool, list[str]]:
+    """Validate password meets security requirements."""
+    errors = []
+    
+    if len(password) < 8:
+        errors.append("Password must be at least 8 characters")
+    if not re.search(r'[A-Z]', password):
+        errors.append("Password must contain at least one uppercase letter")
+    if not re.search(r'[a-z]', password):
+        errors.append("Password must contain at least one lowercase letter")
+    if not re.search(r'[0-9]', password):
+        errors.append("Password must contain at least one number")
+    if not re.search(r'[!@#$%^&*()_+\-=\[\]{};\':"\\|,.<>\/?]', password):
+        errors.append("Password must contain at least one special character")
+    
+    return len(errors) == 0, errors
+
+async def check_password_breach(password: str) -> tuple[bool, int]:
+    """Check if password has been exposed in data breaches using HaveIBeenPwned API."""
+    try:
+        # Hash the password using SHA-1
+        password_hash = hashlib.sha1(password.encode('utf-8')).hexdigest().upper()
+        prefix = password_hash[:5]
+        suffix = password_hash[5:]
+        
+        # Query HaveIBeenPwned API with k-anonymity
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f'https://api.pwnedpasswords.com/range/{prefix}',
+                headers={'Add-Padding': 'true'}
+            ) as response:
+                if response.status != 200:
+                    return False, 0
+                
+                text = await response.text()
+                lines = text.split('\n')
+                
+                for line in lines:
+                    parts = line.strip().split(':')
+                    if len(parts) == 2 and parts[0] == suffix:
+                        return True, int(parts[1])
+                
+                return False, 0
+    except Exception as e:
+        print(f"Error checking breached password: {e}")
+        return False, 0
+
 # ── Pydantic Models ────────────────────────────────────────────────────────
 
 class UserRegister(BaseModel):
