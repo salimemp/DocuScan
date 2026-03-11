@@ -25,7 +25,7 @@ EbookLib==0.20
 ecdsa==0.19.1
 email-validator==2.3.0
 emergentintegrations==0.1.0
-fastapi==0.110.1
+fastapi==0.135.1
 fastuuid==0.14.0
 filelock==3.24.3
 flake8==7.3.0
@@ -90,7 +90,7 @@ pyasn1_modules==0.4.2
 pycodestyle==2.14.0
 pycparser==3.0
 pydantic==2.12.5
-pydantic_core==2.41.5
+pydantic_core==2.42.0
 pyflakes==3.4.0
 Pygments==2.19.2
 PyJWT==2.11.0
@@ -133,7 +133,7 @@ typing_extensions==4.15.0
 tzdata==2025.3
 uritemplate==4.2.0
 urllib3==2.6.3
-uvicorn==0.25.0
+uvicorn==0.41.0
 watchfiles==1.1.1
 webauthn==2.7.1
 webencodings==0.5.1
