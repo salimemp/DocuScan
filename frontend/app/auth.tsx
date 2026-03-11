@@ -28,6 +28,7 @@ export default function AuthScreen() {
   const router = useRouter();
   const { colors, shadows } = useTheme();
   const { t } = useLanguage();
+  const { login, register, isAuthenticated, isLoading: authLoading, user } = useAuth();
   
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
@@ -37,6 +38,13 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      router.replace('/(tabs)/dashboard');
+    }
+  }, [isAuthenticated, user]);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -48,26 +56,20 @@ export default function AuthScreen() {
     setError(null);
     
     try {
-      const res = await fetch(`${BACKEND_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
+      const result = await login(email, password);
       
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.detail || 'Login failed');
+      if (!result.success) {
+        throw new Error(result.error || 'Login failed');
       }
       
-      if (data.requires_2fa) {
+      if (result.requires_2fa) {
         // Navigate to 2FA verification
-        router.push({ pathname: '/auth/2fa', params: { token: data.access_token } });
+        Alert.alert('2FA Required', 'Two-factor authentication is enabled. Please enter your code.');
         return;
       }
       
-      await saveAuth(data);
-      router.replace('/(tabs)/dashboard');
+      setSuccess('Login successful!');
+      setTimeout(() => router.replace('/(tabs)/dashboard'), 500);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -90,19 +92,12 @@ export default function AuthScreen() {
     setError(null);
     
     try {
-      const res = await fetch(`${BACKEND_URL}/api/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name }),
-      });
+      const result = await register(email, password, name);
       
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.detail || 'Registration failed');
+      if (!result.success) {
+        throw new Error(result.error || 'Registration failed');
       }
       
-      await saveAuth(data);
       setSuccess('Account created! Please check your email to verify.');
       setTimeout(() => router.replace('/(tabs)/dashboard'), 2000);
     } catch (e: any) {
