@@ -97,26 +97,106 @@ export default function SubscriptionScreen() {
   };
 
   const handleSubscribe = async (tier: SubscriptionTier) => {
+    // Check if user is authenticated
+    if (!isAuthenticated || !accessToken) {
+      Alert.alert(
+        'Login Required',
+        'Please sign in or create an account to subscribe to a plan.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Sign In', 
+            onPress: () => router.push('/auth')
+          }
+        ]
+      );
+      return;
+    }
+
     setSelectedTier(tier.id);
     setSubscribing(true);
     
     try {
-      // For now, show a demo message since Stripe isn't fully configured
-      Alert.alert(
-        'Subscription Demo',
-        `You selected the ${tier.name} plan (${billingPeriod}).\n\nPrice: ${formatPrice(billingPeriod === 'monthly' ? tier.monthly_price : tier.annual_price)}/${billingPeriod === 'monthly' ? 'month' : 'year'}\n\nTo complete the subscription, Stripe payment integration would be triggered here.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Continue', onPress: () => {
-            Alert.alert('Success!', 'This is a demo. In production, payment would be processed via Stripe.');
-          }}
-        ]
-      );
+      // Try to create a subscription via the backend
+      const headers: Record<string, string> = { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      };
+
+      const res = await fetch(`${BACKEND_URL}/api/subscriptions/create`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          tier: tier.id,
+          billing_period: billingPeriod,
+          seats: 1
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        // Subscription initiated successfully
+        if (data.client_secret) {
+          // In production, this would open Stripe payment sheet
+          Alert.alert(
+            'Complete Payment',
+            `To complete your ${tier.name} subscription, you would be redirected to Stripe.\n\nPrice: ${formatPrice(billingPeriod === 'monthly' ? tier.monthly_price : tier.annual_price)}/${billingPeriod === 'monthly' ? 'month' : 'year'}`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { 
+                text: 'Open Stripe Portal', 
+                onPress: async () => {
+                  try {
+                    // Try to open customer portal
+                    const portalRes = await fetch(`${BACKEND_URL}/api/subscriptions/portal`, {
+                      method: 'POST',
+                      headers,
+                    });
+                    if (portalRes.ok) {
+                      const portalData = await portalRes.json();
+                      if (portalData.url) {
+                        Linking.openURL(portalData.url);
+                      }
+                    }
+                  } catch (e) {
+                    console.log('Portal error:', e);
+                  }
+                }
+              }
+            ]
+          );
+        } else {
+          // Subscription created successfully (likely trial)
+          Alert.alert(
+            'Subscription Active!',
+            `You are now subscribed to the ${tier.name} plan!`,
+            [{ text: 'Great!', onPress: () => {
+              refreshUser();
+              router.back();
+            }}]
+          );
+        }
+      } else {
+        // Handle errors
+        throw new Error(data.detail || 'Failed to create subscription');
+      }
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to start subscription');
+      // Show informative error message
+      if (e.message.includes('Stripe')) {
+        Alert.alert(
+          'Stripe Configuration Required',
+          'The payment system requires Stripe to be configured. Please contact support or try again later.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Subscription Error', e.message || 'Failed to start subscription. Please try again.');
+      }
     } finally {
-      setSubscribing(false);
-      setSelectedTier(null);
+      if (isMountedRef.current) {
+        setSubscribing(false);
+        setSelectedTier(null);
+      }
     }
   };
 
