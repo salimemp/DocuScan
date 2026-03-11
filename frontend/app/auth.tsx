@@ -100,8 +100,16 @@ export default function AuthScreen() {
       return;
     }
     
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters');
+    // Validate password strength
+    const validation = validatePassword(password);
+    if (!validation.valid) {
+      setError(validation.errors[0]);
+      return;
+    }
+    
+    // Check for breached password
+    if (isPasswordBreached) {
+      setError('This password has been exposed in a data breach. Please choose a different password.');
       return;
     }
     
