@@ -1536,7 +1536,7 @@ IMPORTANT:
         ))
         
         # Parse the response
-        response_text = result.text.strip()
+        response_text = result.strip()
         
         # Remove markdown code blocks if present
         if response_text.startswith('```'):
