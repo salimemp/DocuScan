@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 # Production API URL
-BASE_URL = "https://secure-doc-scanner.preview.emergentagent.com/api"
+BASE_URL = "https://math-solver-app-8.preview.emergentagent.com/api"
 
 class APITester:
     def __init__(self):

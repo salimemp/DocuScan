@@ -12,7 +12,7 @@ import time
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://secure-doc-scanner.preview.emergentagent.com/api"
+BASE_URL = "https://math-solver-app-8.preview.emergentagent.com/api"
 TIMEOUT = 30
 
 class DocScanV5Tester:
