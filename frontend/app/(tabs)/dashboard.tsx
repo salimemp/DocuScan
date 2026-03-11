@@ -225,9 +225,16 @@ export default function DashboardScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <View>
-            <Text style={[styles.greeting, { color: colors.textSecondary }]}>{greeting} 👋</Text>
-            <Text style={[styles.appTitle, { color: colors.textPrimary }]}>DocScan Pro</Text>
+          <View style={styles.headerLeft}>
+            <Image 
+              source={require('../../assets/images/icon.png')} 
+              style={styles.headerLogo}
+              resizeMode="contain"
+            />
+            <View>
+              <Text style={[styles.greeting, { color: colors.textSecondary }]}>{greeting} 👋</Text>
+              <Text style={[styles.appTitle, { color: colors.textPrimary }]}>DocScan Pro</Text>
+            </View>
           </View>
           <TouchableOpacity
             testID="settings-btn"
