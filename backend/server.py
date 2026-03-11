@@ -1526,14 +1526,14 @@ IMPORTANT:
 - Format phone numbers consistently with country code if visible
 - Clean up email addresses (remove spaces)
 - Return ONLY the JSON object, no other text"""
-        )
+        ).with_model("gemini", "gemini-3-flash-preview")
         
         image_data = strip_b64_prefix(request.image_base64)
         
-        result = await chat.send_message([
-            UserMessage(content="Extract all contact information from this business card image."),
-            ImageContent(base64_data=image_data, media_type="image/jpeg")
-        ])
+        result = await chat.send_message(UserMessage(
+            text="Extract all contact information from this business card image.",
+            file_contents=[ImageContent(image_base64=image_data)]
+        ))
         
         # Parse the response
         response_text = result.text.strip()
