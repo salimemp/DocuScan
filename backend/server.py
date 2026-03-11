@@ -1501,8 +1501,8 @@ async def scan_business_card(request: BusinessCardScanRequest):
         # Use Gemini to extract contact info
         chat = LlmChat(
             api_key=api_key,
-            model="gemini-2.0-flash",
-            system_prompt="""You are a business card scanner AI. Extract contact information from business card images.
+            session_id=str(uuid.uuid4()),
+            system_message="""You are a business card scanner AI. Extract contact information from business card images.
             
 Return a JSON object with the following fields (use null for missing info):
 {
