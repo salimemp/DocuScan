@@ -1470,6 +1470,149 @@ async def share_document(doc_id: str, request: ShareDocumentRequest, background_
     
     return {"message": f"Document shared with {request.recipient_email}"}
 
+# ── Business Card Scanner ──────────────────────────────────────────────────
+
+class BusinessCardScanRequest(BaseModel):
+    image_base64: str
+
+class ContactInfo(BaseModel):
+    name: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    job_title: Optional[str] = None
+    company: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    mobile: Optional[str] = None
+    website: Optional[str] = None
+    address: Optional[str] = None
+    linkedin: Optional[str] = None
+    twitter: Optional[str] = None
+    notes: Optional[str] = None
+
+@api_router.post("/business-cards/scan")
+async def scan_business_card(request: BusinessCardScanRequest):
+    """
+    Scan a business card image and extract contact information using AI.
+    """
+    try:
+        api_key = get_api_key()
+        
+        # Use Gemini to extract contact info
+        chat = LlmChat(
+            api_key=api_key,
+            model="gemini-2.0-flash",
+            system_prompt="""You are a business card scanner AI. Extract contact information from business card images.
+            
+Return a JSON object with the following fields (use null for missing info):
+{
+  "name": "Full name",
+  "first_name": "First name",
+  "last_name": "Last name", 
+  "job_title": "Job title or position",
+  "company": "Company or organization name",
+  "email": "Email address",
+  "phone": "Primary phone number",
+  "mobile": "Mobile phone if different from primary",
+  "website": "Website URL",
+  "address": "Full address",
+  "linkedin": "LinkedIn URL or username",
+  "twitter": "Twitter/X handle",
+  "notes": "Any other relevant info"
+}
+
+IMPORTANT:
+- Extract ALL visible information
+- Format phone numbers consistently with country code if visible
+- Clean up email addresses (remove spaces)
+- Return ONLY the JSON object, no other text"""
+        )
+        
+        image_data = strip_b64_prefix(request.image_base64)
+        
+        result = await chat.send_message([
+            UserMessage(content="Extract all contact information from this business card image."),
+            ImageContent(base64_data=image_data, media_type="image/jpeg")
+        ])
+        
+        # Parse the response
+        response_text = result.text.strip()
+        
+        # Remove markdown code blocks if present
+        if response_text.startswith('```'):
+            response_text = response_text.split('```')[1]
+            if response_text.startswith('json'):
+                response_text = response_text[4:]
+        if response_text.endswith('```'):
+            response_text = response_text[:-3]
+        
+        contact_data = json.loads(response_text.strip())
+        
+        # Save to database
+        card_id = str(uuid.uuid4())
+        card_doc = {
+            "id": card_id,
+            "contact_info": contact_data,
+            "image_base64": request.image_base64[:100] + "...",  # Store truncated for reference
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "source": "business_card_scan"
+        }
+        
+        await db.contacts.insert_one(card_doc)
+        
+        return {
+            "success": True,
+            "card_id": card_id,
+            "contact": contact_data,
+            "message": "Business card scanned successfully"
+        }
+        
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse AI response: {e}")
+        raise HTTPException(500, "Failed to parse business card data")
+    except Exception as e:
+        logger.error(f"Business card scan error: {e}")
+        raise HTTPException(500, f"Failed to scan business card: {str(e)}")
+
+@api_router.get("/contacts")
+async def list_contacts():
+    """List all saved contacts from business card scans"""
+    contacts = await db.contacts.find({}, {"_id": 0, "image_base64": 0}).sort("created_at", -1).to_list(100)
+    return {"contacts": contacts}
+
+@api_router.get("/contacts/{contact_id}")
+async def get_contact(contact_id: str):
+    """Get a specific contact"""
+    contact = await db.contacts.find_one({"id": contact_id}, {"_id": 0})
+    if not contact:
+        raise HTTPException(404, "Contact not found")
+    return contact
+
+@api_router.delete("/contacts/{contact_id}")
+async def delete_contact(contact_id: str):
+    """Delete a contact"""
+    result = await db.contacts.delete_one({"id": contact_id})
+    if result.deleted_count == 0:
+        raise HTTPException(404, "Contact not found")
+    return {"message": "Contact deleted"}
+
+@api_router.put("/contacts/{contact_id}")
+async def update_contact(contact_id: str, contact_info: ContactInfo):
+    """Update a contact's information"""
+    update_data = {k: v for k, v in contact_info.dict().items() if v is not None}
+    if not update_data:
+        raise HTTPException(400, "No data to update")
+    
+    result = await db.contacts.update_one(
+        {"id": contact_id},
+        {"$set": {"contact_info": update_data, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(404, "Contact not found")
+    
+    return {"message": "Contact updated"}
+
 # ── Export ─────────────────────────────────────────────────────────────────
 @api_router.post("/documents/{doc_id}/export")
 async def export_document(doc_id: str, format: str = Query("pdf")):
