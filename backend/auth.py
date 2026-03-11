@@ -352,6 +352,19 @@ async def register(data: UserRegister, request: Request):
     """Register new user with email/password"""
     db = get_db()
     
+    # Validate password strength
+    is_valid, errors = validate_password_strength(data.password)
+    if not is_valid:
+        raise HTTPException(400, errors[0])
+    
+    # Check if password has been breached
+    is_breached, breach_count = await check_password_breach(data.password)
+    if is_breached:
+        raise HTTPException(
+            400, 
+            f"This password has been exposed in {breach_count:,} data breaches. Please choose a different password."
+        )
+    
     # Check if email exists
     existing = await db.users.find_one({"email": data.email.lower()})
     if existing:
