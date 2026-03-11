@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, TextInput, 
   ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform,
@@ -14,6 +14,7 @@ import * as Linking from 'expo-linking';
 import { useTheme } from '../hooks/useTheme';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuth } from '../contexts/AuthContext';
+import { PasswordStrengthMeter, validatePassword } from '../components/PasswordStrengthMeter';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 const AUTH_TOKEN_KEY = '@DocScanPro:authToken';
@@ -38,6 +39,11 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  
+  // Password validation state
+  const [isPasswordValid, setIsPasswordValid] = useState(false);
+  const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
+  const [isPasswordBreached, setIsPasswordBreached] = useState(false);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -45,6 +51,17 @@ export default function AuthScreen() {
       router.replace('/(tabs)/dashboard');
     }
   }, [isAuthenticated, user]);
+
+  // Password validity callback
+  const handlePasswordValidityChange = useCallback((valid: boolean, errors: string[]) => {
+    setIsPasswordValid(valid);
+    setPasswordErrors(errors);
+  }, []);
+
+  // Password breach check callback
+  const handleBreachCheck = useCallback((breached: boolean) => {
+    setIsPasswordBreached(breached);
+  }, []);
 
   const handleLogin = async () => {
     if (!email || !password) {
