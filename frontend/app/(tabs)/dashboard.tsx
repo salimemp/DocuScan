@@ -722,6 +722,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4,
   },
+  headerLeft: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+  },
+  headerLogo: {
+    width: 48, height: 48, borderRadius: 12,
+  },
   greeting: { fontSize: 14, fontWeight: '500' },
   appTitle: { fontSize: 26, fontWeight: '700', letterSpacing: -0.5 },
   dateText: { fontSize: 13, paddingHorizontal: 20, marginBottom: 20 },
