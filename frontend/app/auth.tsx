@@ -333,7 +333,7 @@ export default function AuthScreen() {
       <View style={styles.passwordContainer}>
         <TextInput
           style={[styles.input, styles.passwordInput, { backgroundColor: colors.surface, color: colors.textPrimary, borderColor: colors.border }]}
-          placeholder="Password (min 8 characters)"
+          placeholder="Create a strong password"
           placeholderTextColor={colors.textTertiary}
           value={password}
           onChangeText={setPassword}
@@ -347,10 +347,22 @@ export default function AuthScreen() {
         </TouchableOpacity>
       </View>
       
+      {/* Password Strength Meter */}
+      <PasswordStrengthMeter
+        password={password}
+        onValidityChange={handlePasswordValidityChange}
+        onBreachCheck={handleBreachCheck}
+        showRequirements={true}
+      />
+      
       <TouchableOpacity
-        style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
+        style={[
+          styles.primaryBtn, 
+          { backgroundColor: colors.primary },
+          (!isPasswordValid || isPasswordBreached) && { opacity: 0.6 }
+        ]}
         onPress={handleRegister}
-        disabled={loading}
+        disabled={loading || !isPasswordValid || isPasswordBreached}
       >
         {loading ? (
           <ActivityIndicator color="#FFF" />
