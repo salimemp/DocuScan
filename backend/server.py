@@ -976,6 +976,83 @@ def generate_svg(doc: dict) -> bytes:
     return svg.encode('utf-8')
 
 # ── Routes ────────────────────────────────────────────────────────────────
+
+# Rate limit status endpoint
+@api_router.get("/rate-limit/status")
+async def get_rate_limit_status_endpoint(request: Request):
+    """Get current rate limit status for the client"""
+    status = {}
+    for endpoint_type in RATE_LIMITS.keys():
+        status[endpoint_type] = get_rate_limit_status(request, endpoint_type)
+    return {"rate_limits": status}
+
+# Turnstile verification endpoint
+class TurnstileRequest(BaseModel):
+    token: str
+
+@api_router.post("/verify-turnstile")
+async def verify_turnstile(request: Request, data: TurnstileRequest):
+    """Verify Cloudflare Turnstile token for bot protection"""
+    # Get client IP
+    forwarded_for = request.headers.get('X-Forwarded-For')
+    ip = forwarded_for.split(',')[0].strip() if forwarded_for else (request.client.host if request.client else None)
+    
+    is_valid, result = await verify_turnstile_token(data.token, ip)
+    
+    if not is_valid:
+        raise HTTPException(400, detail=result)
+    
+    return {"success": True, "message": "Verification successful"}
+
+# Rate-limited middleware for sensitive endpoints
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        
+        # Determine rate limit category
+        if '/auth/' in path:
+            endpoint_type = 'auth'
+        elif '/scan' in path or '/process' in path or '/ai-' in path:
+            endpoint_type = 'ai'
+        elif '/upload' in path:
+            endpoint_type = 'upload'
+        elif '/search' in path:
+            endpoint_type = 'search'
+        else:
+            endpoint_type = 'api'
+        
+        config = RATE_LIMITS.get(endpoint_type, RATE_LIMITS['api'])
+        allowed, info = rate_limiter.check_rate_limit(
+            request,
+            limit=config['limit'],
+            window_seconds=config['window'],
+            endpoint=endpoint_type
+        )
+        
+        if not allowed:
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "error": "Too many requests",
+                    "detail": f"Rate limit exceeded. Try again in {info['reset']} seconds.",
+                    "retry_after": info['reset']
+                },
+                headers=rate_limiter.get_rate_limit_headers(info)
+            )
+        
+        response = await call_next(request)
+        
+        # Add rate limit headers to response
+        for key, value in rate_limiter.get_rate_limit_headers(info).items():
+            response.headers[key] = value
+        
+        return response
+
+# Add middleware to app (placed after CORS)
+app.add_middleware(RateLimitMiddleware)
+
 @api_router.get("/")
 async def root():
     return {"message": "DocScan Pro API v5 - Full Featured Document Management"}
