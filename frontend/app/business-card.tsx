@@ -14,6 +14,30 @@ import { useTheme } from '../hooks/useTheme';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 
+// Helper function to open device settings
+const openAppSettings = async () => {
+  try {
+    if (Platform.OS === 'ios') {
+      await Linking.openURL('app-settings:');
+    } else if (Platform.OS === 'android') {
+      await Linking.openURL('package:com.docscanpro.app');
+    } else {
+      // Web - show alert with instructions
+      Alert.alert(
+        'Camera Permission Required',
+        'Please enable camera permissions in your browser settings to scan business cards.',
+        [{ text: 'OK' }]
+      );
+    }
+  } catch (error) {
+    Alert.alert(
+      'Cannot Open Settings',
+      'Please manually enable camera permissions in your device settings.',
+      [{ text: 'OK' }]
+    );
+  }
+};
+
 interface ContactInfo {
   name?: string;
   first_name?: string;
