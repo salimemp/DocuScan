@@ -430,7 +430,7 @@ export default function BusinessCardScanner() {
       {mode === 'result' && contactInfo && (
         <ScrollView style={styles.resultContainer} contentContainerStyle={styles.resultContent}>
           {/* Contact Card */}
-          <View style={[styles.contactCard, { backgroundColor: colors.surface }, shadows.medium]}>
+          <View style={[styles.contactCard, { backgroundColor: colors.surface }, shadows.md]}>
             <View style={styles.contactHeader}>
               <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
                 <Text style={styles.avatarText}>
@@ -488,7 +488,7 @@ export default function BusinessCardScanner() {
           </View>
 
           {/* Contact Details */}
-          <View style={[styles.detailsCard, { backgroundColor: colors.surface }, shadows.small]}>
+          <View style={[styles.detailsCard, { backgroundColor: colors.surface }, shadows.sm]}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Contact Details</Text>
             
             {/* Email */}

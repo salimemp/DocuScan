@@ -37,8 +37,8 @@ export default function ScanScreen() {
   const [batchCount, setBatchCount] = useState(0);
   const [showBatchSettings, setShowBatchSettings] = useState(false);
   const [batchCountdown, setBatchCountdown] = useState(0);
-  const batchTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const batchTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
   // Voice commands state
   const [voiceEnabled, setVoiceEnabled] = useState(false);
@@ -429,7 +429,7 @@ export default function ScanScreen() {
           <TouchableOpacity
             testID="shutter-btn"
             style={[styles.shutterBtn, isProcessing && { opacity: 0.5 }]}
-            onPress={takePicture}
+            onPress={() => takePicture()}
             disabled={isProcessing}
             activeOpacity={0.85}
             accessibilityLabel="Take photo"

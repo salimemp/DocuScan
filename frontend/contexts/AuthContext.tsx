@@ -24,7 +24,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   accessToken: string | null;
   login: (email: string, password: string) => Promise<{ success: boolean; requires_2fa?: boolean; error?: string }>;
-  register: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
+  register: (email: string, password: string, name: string, turnstileToken?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateUser: (updates: Partial<User>) => void;
@@ -167,12 +167,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const register = async (email: string, password: string, name: string): Promise<{ success: boolean; error?: string }> => {
+  const register = async (email: string, password: string, name: string, turnstileToken?: string): Promise<{ success: boolean; error?: string }> => {
     try {
+      const body: Record<string, string> = { email, password, name };
+      if (turnstileToken) {
+        body.turnstile_token = turnstileToken;
+      }
+      
       const res = await fetch(`${BACKEND_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
