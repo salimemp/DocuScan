@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Query, BackgroundTasks, UploadFile, File
+from fastapi import FastAPI, APIRouter, HTTPException, Query, BackgroundTasks, UploadFile, File, Request
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -16,6 +16,7 @@ import resend
 from auth import auth_router
 from subscriptions import subscription_router
 from document_security import security_router
+from rate_limit import rate_limiter, verify_turnstile_token, RATE_LIMITS, get_rate_limit_status
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
