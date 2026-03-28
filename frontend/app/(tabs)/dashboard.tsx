@@ -53,6 +53,41 @@ export default function DashboardScreen() {
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [showCloudBackup, setShowCloudBackup] = useState(false);
   const [showLanguagePicker, setShowLanguagePicker] = useState(false);
+  const [showCloudSync, setShowCloudSync] = useState(false);
+  const [showDefaultFormat, setShowDefaultFormat] = useState(false);
+  const [showHelpCenter, setShowHelpCenter] = useState(false);
+  
+  // Settings state
+  const [cloudSyncEnabled, setCloudSyncEnabled] = useState(false);
+  const [selectedFormat, setSelectedFormat] = useState('auto');
+  
+  // Format options
+  const formatOptions = [
+    { id: 'auto', label: 'Auto-detect', icon: 'sparkles-outline' },
+    { id: 'pdf', label: 'PDF', icon: 'document-outline' },
+    { id: 'jpg', label: 'JPG Image', icon: 'image-outline' },
+    { id: 'png', label: 'PNG Image', icon: 'image-outline' },
+    { id: 'docx', label: 'Word Document', icon: 'document-text-outline' },
+    { id: 'txt', label: 'Plain Text', icon: 'text-outline' },
+  ];
+  
+  // Cloud providers
+  const cloudProviders = [
+    { id: 'icloud', name: 'iCloud', icon: 'cloud-outline', color: '#007AFF' },
+    { id: 'gdrive', name: 'Google Drive', icon: 'logo-google', color: '#4285F4' },
+    { id: 'dropbox', name: 'Dropbox', icon: 'cube-outline', color: '#0061FF' },
+    { id: 'onedrive', name: 'OneDrive', icon: 'cloud-upload-outline', color: '#0078D4' },
+  ];
+  
+  // Help Center topics
+  const helpTopics = [
+    { id: 'getting-started', title: 'Getting Started', icon: 'rocket-outline', description: 'Learn the basics of DocScan Pro' },
+    { id: 'scanning', title: 'Scanning Documents', icon: 'scan-outline', description: 'How to scan and capture documents' },
+    { id: 'organizing', title: 'Organizing Files', icon: 'folder-outline', description: 'Tips for organizing your documents' },
+    { id: 'sharing', title: 'Sharing & Export', icon: 'share-outline', description: 'Export and share your documents' },
+    { id: 'security', title: 'Security & Privacy', icon: 'shield-checkmark-outline', description: 'Keep your documents safe' },
+    { id: 'troubleshooting', title: 'Troubleshooting', icon: 'build-outline', description: 'Common issues and solutions' },
+  ];
   
   // Share form state
   const [shareEmail, setShareEmail] = useState('');
