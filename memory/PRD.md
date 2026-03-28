@@ -51,11 +51,12 @@ Build an enterprise-grade document scanning and management mobile application us
 
 ### Infrastructure
 - [x] CI/CD pipeline (GitHub Actions: lint, typecheck, build, E2E, deploy)
-- [x] Playwright E2E testing (35+ tests across 6 suites)
+- [x] Playwright E2E testing (114 tests across 14 suites)
 - [x] TypeScript strict mode — zero errors
 - [x] MongoDB indexes on hot fields
 - [x] SEO metadata for web build
 - [x] Email delivery via Resend (`notify.docscanpro.app`)
+- [x] Cloudflare Turnstile with production keys (bot protection active)
 
 ## Known Limitations
 - Native iOS WidgetKit / Android AppWidget requires config plugins or ejecting
