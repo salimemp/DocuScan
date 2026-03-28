@@ -542,6 +542,30 @@ class DocumentResponse(DocumentCreate):
     signature_requests: List[Dict[str, Any]] = []
     pages_data: List[Dict[str, Any]] = []
 
+# Lightweight response model for list view (optimized)
+class DocumentListItem(BaseModel):
+    id: str
+    title: str
+    document_type: str
+    document_subtype: Optional[str] = None
+    detected_language: str = "Unknown"
+    created_at: datetime
+    size_kb: float = 0.0
+    is_locked: bool = False
+    tags: List[str] = []
+    image_thumbnail: Optional[str] = None
+    pages_count: int = 1
+    confidence: float = 0.0
+
+class PaginatedDocumentsResponse(BaseModel):
+    documents: List[DocumentListItem]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+    has_next: bool
+    has_prev: bool
+
 # ── Gemini Prompts ────────────────────────────────────────────────────────
 SYSTEM_PROMPT = """You are DocScan AI — a world-class multilingual document OCR and classification system.
 You support ALL world languages. Extract ALL visible text EXACTLY as written — preserve the original language.
