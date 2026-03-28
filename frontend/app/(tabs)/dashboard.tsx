@@ -10,9 +10,11 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import * as StoreReview from 'expo-store-review';
 import { useTheme } from '../../hooks/useTheme';
 import { useLanguage } from '../../hooks/useLanguage';
+import { useVoiceCommands } from '../../hooks/useVoiceCommands';
 import { CookieConsentBanner } from '../../components/CookieConsentBanner';
 import { PoweredByElixio } from '../../components/PoweredByElixio';
 import { CloudProviderIcon } from '../../components/CloudProviderIcon';
+import { VoiceCommandsHelp } from '../../components/VoiceCommandsHelp';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 
@@ -57,6 +59,10 @@ export default function DashboardScreen() {
   const [showCloudSync, setShowCloudSync] = useState(false);
   const [showDefaultFormat, setShowDefaultFormat] = useState(false);
   const [showHelpCenter, setShowHelpCenter] = useState(false);
+  const [showVoiceHelp, setShowVoiceHelp] = useState(false);
+  
+  // Voice commands (global)
+  const { voiceEnabled, toggleVoice, announceAction } = useVoiceCommands();
   
   // Settings state
   const [cloudSyncEnabled, setCloudSyncEnabled] = useState(false);
@@ -572,6 +578,34 @@ export default function DashboardScreen() {
                 </TouchableOpacity>
               </View>
 
+              {/* Voice & Accessibility */}
+              <Text style={[styles.settingsSection, { color: colors.textSecondary }]}>VOICE & ACCESSIBILITY</Text>
+              <View style={[styles.settingsCard, { backgroundColor: colors.surface, ...shadows.sm }]}>
+                <TouchableOpacity style={styles.settingsItem} onPress={toggleVoice}>
+                  <Ionicons name={voiceEnabled ? 'mic' : 'mic-off'} size={22} color={voiceEnabled ? '#10B981' : colors.textTertiary} />
+                  <Text style={[styles.settingsItemText, { color: colors.textPrimary }]}>Voice Feedback</Text>
+                  <View style={[styles.toggleSwitch, { backgroundColor: voiceEnabled ? '#10B981' : colors.border }]}>
+                    <View style={[styles.toggleKnob, voiceEnabled && { marginLeft: 16 }]} />
+                  </View>
+                </TouchableOpacity>
+                <View style={[styles.settingsDivider, { backgroundColor: colors.border }]} />
+                <TouchableOpacity style={styles.settingsItem} onPress={() => { setShowSettings(false); setShowVoiceHelp(true); }}>
+                  <Ionicons name="list-outline" size={22} color={colors.primary} />
+                  <Text style={[styles.settingsItemText, { color: colors.textPrimary }]}>Voice Commands Guide</Text>
+                  <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Widgets */}
+              <Text style={[styles.settingsSection, { color: colors.textSecondary }]}>WIDGETS</Text>
+              <View style={[styles.settingsCard, { backgroundColor: colors.surface, ...shadows.sm }]}>
+                <TouchableOpacity style={styles.settingsItem} onPress={() => { setShowSettings(false); router.push('/widgets' as any); }}>
+                  <Ionicons name="apps-outline" size={22} color={colors.primary} />
+                  <Text style={[styles.settingsItemText, { color: colors.textPrimary }]}>Home Screen Widgets</Text>
+                  <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                </TouchableOpacity>
+              </View>
+
               <Text style={[styles.versionText, { color: colors.textTertiary }]}>DocScan Pro v2.0.0</Text>
             </ScrollView>
           </SafeAreaView>
@@ -976,6 +1010,12 @@ export default function DashboardScreen() {
         </View>
       </Modal>
 
+      {/* Voice Commands Help Modal */}
+      <VoiceCommandsHelp
+        visible={showVoiceHelp}
+        onClose={() => setShowVoiceHelp(false)}
+      />
+
       {/* Powered By Elixio Digital */}
       <PoweredByElixio style={{ bottom: 90 }} />
 
@@ -1141,4 +1181,8 @@ const styles = StyleSheet.create({
   helpTopicDesc: { fontSize: 12, marginTop: 2 },
   helpContactBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16, borderRadius: 12, marginTop: 20, marginBottom: 8 },
   helpContactBtnText: { color: '#FFF', fontSize: 15, fontWeight: '700' },
+  
+  // Voice toggle switch
+  toggleSwitch: { width: 36, height: 20, borderRadius: 10, justifyContent: 'center', paddingHorizontal: 2 },
+  toggleKnob: { width: 16, height: 16, borderRadius: 8, backgroundColor: '#FFF' },
 });
