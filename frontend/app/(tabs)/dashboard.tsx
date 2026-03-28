@@ -230,6 +230,74 @@ export default function DashboardScreen() {
     );
   };
 
+  // Handle Cloud Sync toggle
+  const handleCloudSyncToggle = (providerId: string) => {
+    Alert.alert(
+      'Enable Cloud Sync',
+      `Sync your documents automatically with ${providerId === 'gdrive' ? 'Google Drive' : providerId === 'icloud' ? 'iCloud' : providerId === 'dropbox' ? 'Dropbox' : 'OneDrive'}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Enable', 
+          onPress: () => {
+            setCloudSyncEnabled(true);
+            Alert.alert('Cloud Sync Enabled', 'Your documents will sync automatically.');
+            setShowCloudSync(false);
+          }
+        },
+      ]
+    );
+  };
+
+  // Handle Contact Support
+  const handleContactSupport = async () => {
+    const email = 'support@docscanpro.app';
+    const subject = 'DocScan Pro Support Request';
+    const body = `\n\n---\nApp Version: 2.0.0\nPlatform: ${Platform.OS}\n`;
+    const url = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+      if (canOpen) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert(
+          'Contact Support',
+          'Email: support@docscanpro.app\n\nPlease reach out to us for any questions or issues.',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Could not open email client');
+    }
+  };
+
+  // Handle Rate App
+  const handleRateApp = async () => {
+    try {
+      const isAvailable = await StoreReview.isAvailableAsync();
+      if (isAvailable) {
+        await StoreReview.requestReview();
+      } else {
+        // Fallback to app store links
+        const storeUrl = Platform.OS === 'ios' 
+          ? 'https://apps.apple.com/app/docscan-pro/id123456789'
+          : 'https://play.google.com/store/apps/details?id=com.docscanpro.app';
+        
+        Alert.alert(
+          'Rate DocScan Pro',
+          'Would you like to rate us on the App Store?',
+          [
+            { text: 'Not Now', style: 'cancel' },
+            { text: 'Rate Now', onPress: () => Linking.openURL(storeUrl) },
+          ]
+        );
+      }
+    } catch (error) {
+      Alert.alert('Thank You!', 'We appreciate your support!');
+    }
+  };
+
   const quickActions = [
     { icon: 'images-outline', label: 'Import Photo', color: '#F59E0B', action: () => router.push('/scan') },
     { icon: 'card-outline', label: 'Business Card', color: '#10B981', action: () => router.push('/business-card') },
