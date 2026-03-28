@@ -230,7 +230,7 @@ async def send_email(to_email: str, template_type: str, data: dict):
         subject, html = get_email_template(template_type, data)
         
         params = {
-            "from": "DocScan Pro <onboarding@resend.dev>",
+            "from": "DocScan Pro <noreply@notify.docscanpro.app>",
             "to": [to_email],
             "subject": subject,
             "html": html,
