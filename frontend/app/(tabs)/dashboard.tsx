@@ -73,11 +73,11 @@ export default function DashboardScreen() {
   ];
   
   // Cloud providers
-  const cloudProviders = [
-    { id: 'icloud', name: 'iCloud', icon: 'cloud-outline', color: '#007AFF' },
-    { id: 'gdrive', name: 'Google Drive', icon: 'logo-google', color: '#4285F4' },
-    { id: 'dropbox', name: 'Dropbox', icon: 'cube-outline', color: '#0061FF' },
-    { id: 'onedrive', name: 'OneDrive', icon: 'cloud-upload-outline', color: '#0078D4' },
+  const cloudProviders: Array<{ id: 'icloud' | 'gdrive' | 'dropbox' | 'onedrive' | 'box'; name: string; color: string }> = [
+    { id: 'icloud', name: 'iCloud', color: '#007AFF' },
+    { id: 'gdrive', name: 'Google Drive', color: '#4285F4' },
+    { id: 'dropbox', name: 'Dropbox', color: '#0061FF' },
+    { id: 'onedrive', name: 'OneDrive', color: '#0078D4' },
   ];
   
   // Help Center topics
