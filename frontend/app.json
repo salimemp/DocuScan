@@ -3,24 +3,33 @@
     "name": "DocScan Pro",
     "slug": "docscan-pro",
     "version": "2.0.0",
+    "description": "Professional document scanner with AI-powered OCR, math solver, business card scanning, and secure vault. The ultimate productivity app for scanning, organizing, and managing documents.",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "docscanpro",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "primaryColor": "#2563EB",
+    "githubUrl": "https://github.com/docscanpro/app",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.docscanpro.app",
+      "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "Scan documents with your camera",
         "NSPhotoLibraryUsageDescription": "Import documents from your photo library",
         "NSContactsUsageDescription": "Save business card contacts",
         "NSMicrophoneUsageDescription": "Voice input for search and commands",
-        "NSSpeechRecognitionUsageDescription": "Convert speech to text for search"
+        "NSSpeechRecognitionUsageDescription": "Convert speech to text for search",
+        "CFBundleAllowMixedLocalizations": true
+      },
+      "config": {
+        "usesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.docscanpro.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#2563EB"
@@ -38,7 +47,18 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "name": "DocScan Pro - AI Document Scanner & Math Solver",
+      "shortName": "DocScan Pro",
+      "description": "Professional document scanner with AI-powered OCR, math equation solver, business card scanning, secure vault, and cloud sync. Scan, organize, and manage documents effortlessly.",
+      "lang": "en",
+      "themeColor": "#2563EB",
+      "backgroundColor": "#ffffff",
+      "startUrl": "/",
+      "display": "standalone",
+      "orientation": "portrait",
+      "scope": "/",
+      "preferRelatedApplications": false
     },
     "plugins": [
       "expo-router",
@@ -55,6 +75,43 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "seo": {
+        "title": "DocScan Pro - AI Document Scanner, Math Solver & Business Card Scanner",
+        "description": "Transform your phone into a powerful document scanner. AI-powered OCR, math equation solver, business card scanning with contact extraction, secure encrypted vault, cloud backup, and 18+ export formats. Free to download!",
+        "keywords": [
+          "document scanner",
+          "ocr app",
+          "pdf scanner",
+          "math solver",
+          "equation solver",
+          "business card scanner",
+          "contact scanner",
+          "document management",
+          "secure vault",
+          "encrypted documents",
+          "cloud backup",
+          "scan to pdf",
+          "mobile scanner",
+          "ai scanner",
+          "text recognition",
+          "photo to text",
+          "receipt scanner",
+          "scan documents",
+          "paperless office",
+          "document organizer"
+        ],
+        "author": "DocScan Pro Team",
+        "ogType": "website",
+        "twitterCard": "summary_large_image"
+      },
+      "appStore": {
+        "category": "PRODUCTIVITY",
+        "subcategory": "BUSINESS",
+        "contentRating": "4+",
+        "releaseNotes": "Version 2.0 - Major update with AI Math Solver, Business Card Scanner, Enhanced Security with Secure Vault, Rate Limiting, and improved performance."
+      }
     }
   }
 }
