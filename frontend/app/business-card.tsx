@@ -309,7 +309,7 @@ export default function BusinessCardScanner() {
                     'Camera permission is required to scan business cards. Please enable it in your device settings.',
                     [
                       { text: 'Cancel', style: 'cancel' },
-                      { text: 'Open Settings', onPress: () => Linking.openSettings() }
+                      { text: 'Open Settings', onPress: () => openAppSettings() }
                     ]
                   );
                 }
@@ -323,7 +323,7 @@ export default function BusinessCardScanner() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.permissionSecondaryBtn, { borderColor: colors.border }]}
-            onPress={() => Linking.openSettings()}
+            onPress={() => openAppSettings()}
           >
             <Ionicons name="settings-outline" size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
             <Text style={[styles.permissionSecondaryBtnText, { color: colors.textSecondary }]}>
