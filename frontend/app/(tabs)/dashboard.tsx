@@ -144,8 +144,10 @@ export default function DashboardScreen() {
       
       if (statsRes.ok) setStats(await statsRes.json());
       if (docsRes.ok) {
-        const docs = await docsRes.json();
-        setRecentDocs(docs.slice(0, 5));
+        const data = await docsRes.json();
+        // API returns paginated response: { documents: [...], total, page, ... }
+        const docs = data.documents || data;
+        setRecentDocs(Array.isArray(docs) ? docs.slice(0, 5) : []);
       }
     } catch (e: any) {
       // Ignore abort errors

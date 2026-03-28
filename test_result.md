@@ -250,6 +250,18 @@ backend:
         agent: "testing"
         comment: "Signature request system working. POST /request-signature accepts requester/signer details, background email task queued successfully, request tracking implemented. Email sending is mocked but request flow is complete."
 
+  - task: "Paginated Documents API - GET /api/documents with pagination, search, sort"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "COMPREHENSIVE PAGINATION API TESTING COMPLETED: All 10 tests passed (100% success rate). ✅ WORKING: Default pagination (page=1, page_size=20), Custom pagination (page=1&page_size=2 returns 2 docs with has_next=true), Page navigation (page=2&page_size=2 with has_prev=true, page=3&page_size=2 returns 1 doc with has_next=false), Server-side search (?search=test returns 2 matching documents), Sorting (title A-Z/Z-A, created_at oldest-first), Document structure (all required lightweight fields: id, title, document_type, detected_language, created_at, is_locked, tags, image_thumbnail, pages_count, confidence), Legacy endpoint (/api/documents/all returns full document data as array). Pagination response structure verified: documents, total, page, page_size, total_pages, has_next, has_prev. Total documents: 5. All pagination logic, search functionality, and sorting working correctly."
+
 frontend:
   - task: "Dashboard screen"
     implemented: true
@@ -263,17 +275,20 @@ frontend:
         agent: "main"
         comment: "Dashboard with stats, recent docs, quick actions"
 
-  - task: "History screen"
+  - task: "History screen with pagination"
     implemented: true
     working: true
     file: "/app/frontend/app/(tabs)/history.tsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: true
         agent: "main"
         comment: "History with search, filters, sort, grid/list view"
+      - working: true
+        agent: "main"
+        comment: "Refactored to use paginated API (server-side search, filter, sort). Added infinite scroll with onEndReached, debounced search, loading-more indicator, and footer showing total count. Also fixed dashboard.tsx to handle paginated response."
 
   - task: "Scan screen with multi-page support"
     implemented: true
@@ -343,9 +358,8 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Document detail screen"
-    - "Export functionality"
-    - "Multi-page scanning flow"
+    - "History screen pagination"
+    - "Dashboard paginated response handling"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -364,20 +378,24 @@ agent_communication:
   - agent: "main"
     message: "VERIFICATION COMPLETE: All advanced features tested and working. Password protection UI (selection mode, lock/unlock modals), Signatures (draw new, saved signatures list, request signature), Comments (add/resolve/delete), Export (PDF/DOCX/TXT/PNG/JPEG). Backend API tests passed: 100% for password/signatures/comments. Cloud Backup UI shows 5 providers (Google Drive, Dropbox, OneDrive, Box, iCloud)."
   - agent: "testing"
-    message: "DocScan Pro Review Testing Completed Successfully: Comprehensive end-to-end testing of all requested features at production URL https://math-solver-app-8.preview.emergentagent.com completed. Results: 4/4 critical features working (100% success rate). ✅ WORKING: Password Protection Flow (set/verify/reject/remove), E-Signature System (create/list/add to document), Comments System (add/verify storage/resolve), Document Sharing (email notifications). All features are production-ready and functioning correctly. No critical issues detected."
+    message: "DocScan Pro Review Testing Completed Successfully: Comprehensive end-to-end testing of all requested features at production URL https://secure-docs-42.preview.emergentagent.com completed. Results: 4/4 critical features working (100% success rate). ✅ WORKING: Password Protection Flow (set/verify/reject/remove), E-Signature System (create/list/add to document), Comments System (add/verify storage/resolve), Document Sharing (email notifications). All features are production-ready and functioning correctly. No critical issues detected."
   - agent: "main"
     message: "NEW FEATURE: Implemented multi-language support (i18n) with 13 languages including English, Korean, Tamil, Bengali, Hebrew. Added language persistence with AsyncStorage. Also added new export formats to backend (HTML, JSON, Markdown, EPUB). Need testing for: 1) New backend export formats (HTML, JSON, MD, EPUB, PPTX), 2) Language switching and persistence."
   - agent: "testing"
-    message: "NEW EXPORT FORMATS TESTING COMPLETED SUCCESSFULLY: Tested all 5 requested new export formats at https://math-solver-app-8.preview.emergentagent.com/api. Results: 100% success rate (5/5 formats working). ✅ WORKING: HTML export (2678 bytes, text/html), JSON export (1903 bytes, application/json), Markdown export (974 bytes, text/markdown), EPUB export (2470 bytes, application/epub+zip), PPTX export (29504 bytes, correct MIME type). Fixed JSON serialization issue with datetime objects during testing. Error handling validated (400 for invalid formats). All formats return correct MIME types and valid base64 data. Export functionality is production-ready."
+    message: "NEW EXPORT FORMATS TESTING COMPLETED SUCCESSFULLY: Tested all 5 requested new export formats at https://secure-docs-42.preview.emergentagent.com/api. Results: 100% success rate (5/5 formats working). ✅ WORKING: HTML export (2678 bytes, text/html), JSON export (1903 bytes, application/json), Markdown export (974 bytes, text/markdown), EPUB export (2470 bytes, application/epub+zip), PPTX export (29504 bytes, correct MIME type). Fixed JSON serialization issue with datetime objects during testing. Error handling validated (400 for invalid formats). All formats return correct MIME types and valid base64 data. Export functionality is production-ready."
   - agent: "main"
     message: "ADVANCED FEATURES IMPLEMENTED: Added comprehensive security features including: 1) Document encryption at rest (AES-256-GCM) with /api/security/encrypt-document and /api/security/decrypt-document, 2) Secure enclave for sensitive docs with /api/security/move-to-enclave, 3) AI-powered document categorization with /api/security/categorize, 4) Advanced search filters with /api/security/advanced-search. Also created frontend Secure Enclave screen. Need testing for: Authentication endpoints (register, login, 2FA, passkeys) and new security endpoints."
   - agent: "testing"
-    message: "COMPREHENSIVE AUTHENTICATION & SECURITY TESTING COMPLETED: Tested all requested endpoints at https://math-solver-app-8.preview.emergentagent.com/api. Results: 15/15 tests executed, 13/15 passed (86.7% success rate). ✅ WORKING: User registration/login, magic link requests, 2FA setup, passkey registration, document encryption/decryption, secure enclave operations, AI categorization, advanced search, subscription tiers. ❌ MINOR ISSUES: 2 endpoint naming mismatches in test (used wrong endpoint names - actual endpoints work correctly). All core authentication and security features are fully functional and production-ready. Full registration→login→2FA→passkey flow tested successfully."
+    message: "COMPREHENSIVE AUTHENTICATION & SECURITY TESTING COMPLETED: Tested all requested endpoints at https://secure-docs-42.preview.emergentagent.com/api. Results: 15/15 tests executed, 13/15 passed (86.7% success rate). ✅ WORKING: User registration/login, magic link requests, 2FA setup, passkey registration, document encryption/decryption, secure enclave operations, AI categorization, advanced search, subscription tiers. ❌ MINOR ISSUES: 2 endpoint naming mismatches in test (used wrong endpoint names - actual endpoints work correctly). All core authentication and security features are fully functional and production-ready. Full registration→login→2FA→passkey flow tested successfully."
   - agent: "main"
     message: "AUTH & SUBSCRIPTION INTEGRATION COMPLETED: 1) Enhanced auth.tsx to use AuthContext's login/register functions properly with useAuth hook, 2) Enhanced subscription.tsx to properly connect with backend APIs using authentication tokens, 3) Added proper memory leak prevention with isMountedRef pattern in subscription screen, 4) Subscription now checks authentication before subscribing and redirects to login if needed. Backend verification: Registration API (✅ returns JWT tokens), Login API (✅ returns user data), Subscription tiers API (✅ returns 3 tiers), Current subscription API (✅ returns free tier limits for unauthenticated users). All auth and subscription flows are now connected to backend endpoints."
   - agent: "testing"
-    message: "AUTHENTICATION & SUBSCRIPTION ENDPOINTS TESTING COMPLETED: Comprehensive testing of all requested endpoints at https://math-solver-app-8.preview.emergentagent.com/api completed successfully. Results: 7/7 tests passed (100% success rate). ✅ WORKING: POST /api/auth/register (returns access_token, refresh_token, user object with proper structure), POST /api/auth/login (JWT authentication working), GET /api/auth/me (user info retrieval with token validation), POST /api/auth/magic-link/request (magic link email system), GET /api/subscriptions/tiers (returns 3 tiers: Plus, Pro, Business with correct pricing and features), GET /api/subscriptions/current (returns free tier limits for authenticated users, proper auth validation). All critical authentication and subscription features are production-ready and functioning correctly. No issues detected."
+    message: "AUTHENTICATION & SUBSCRIPTION ENDPOINTS TESTING COMPLETED: Comprehensive testing of all requested endpoints at https://secure-docs-42.preview.emergentagent.com/api completed successfully. Results: 7/7 tests passed (100% success rate). ✅ WORKING: POST /api/auth/register (returns access_token, refresh_token, user object with proper structure), POST /api/auth/login (JWT authentication working), GET /api/auth/me (user info retrieval with token validation), POST /api/auth/magic-link/request (magic link email system), GET /api/subscriptions/tiers (returns 3 tiers: Plus, Pro, Business with correct pricing and features), GET /api/subscriptions/current (returns free tier limits for authenticated users, proper auth validation). All critical authentication and subscription features are production-ready and functioning correctly. No issues detected."
   - agent: "testing"
-    message: "PASSWORD POLICY & BUSINESS CARD SCANNER TESTING COMPLETED: Comprehensive testing of requested new features at https://math-solver-app-8.preview.emergentagent.com/api completed successfully. Results: 8/8 tests passed (100% success rate). ✅ WORKING: Password Policy Enforcement (weak passwords rejected with 422 error, passwords without special characters rejected with 400 error, strong passwords accepted with JWT tokens), Business Card Scanner API (POST /api/business-cards/scan working with AI extraction, GET /api/contacts returning contact list), Authentication Endpoints (login and subscription tiers working correctly). Fixed business card scanner LlmChat initialization issue during testing. All requested features are production-ready and functioning correctly. No critical issues detected."
+    message: "PASSWORD POLICY & BUSINESS CARD SCANNER TESTING COMPLETED: Comprehensive testing of requested new features at https://secure-docs-42.preview.emergentagent.com/api completed successfully. Results: 8/8 tests passed (100% success rate). ✅ WORKING: Password Policy Enforcement (weak passwords rejected with 422 error, passwords without special characters rejected with 400 error, strong passwords accepted with JWT tokens), Business Card Scanner API (POST /api/business-cards/scan working with AI extraction, GET /api/contacts returning contact list), Authentication Endpoints (login and subscription tiers working correctly). Fixed business card scanner LlmChat initialization issue during testing. All requested features are production-ready and functioning correctly. No critical issues detected."
   - agent: "testing"
-    message: "COMPREHENSIVE REVIEW TESTING COMPLETED: Full end-to-end testing of all requested endpoints at https://math-solver-app-8.preview.emergentagent.com/api completed successfully. Results: 10/10 tests passed (100% success rate). ✅ WORKING: Rate Limiting (GET /api/rate-limit/status returns proper rate limits for auth, api, upload, ai, search with correct structure), Turnstile Verification (POST /api/verify-turnstile working correctly), Authentication Flow (register/login/me endpoints with strong password and JWT tokens), Document APIs (GET /api/documents returns 5 documents, GET /api/stats returns statistics), Security APIs (GET /api/security/enclave-stats and /api/security/advanced-search working), Subscription APIs (GET /api/subscriptions/tiers returns 3 tiers). All endpoints properly return rate limit headers (X-RateLimit-Limit, X-RateLimit-Remaining, etc.) as requested. DocScan Pro API is fully functional and production-ready with no critical issues detected."
+    message: "COMPREHENSIVE REVIEW TESTING COMPLETED: Full end-to-end testing of all requested endpoints at https://secure-docs-42.preview.emergentagent.com/api completed successfully. Results: 10/10 tests passed (100% success rate). ✅ WORKING: Rate Limiting (GET /api/rate-limit/status returns proper rate limits for auth, api, upload, ai, search with correct structure), Turnstile Verification (POST /api/verify-turnstile working correctly), Authentication Flow (register/login/me endpoints with strong password and JWT tokens), Document APIs (GET /api/documents returns 5 documents, GET /api/stats returns statistics), Security APIs (GET /api/security/enclave-stats and /api/security/advanced-search working), Subscription APIs (GET /api/subscriptions/tiers returns 3 tiers). All endpoints properly return rate limit headers (X-RateLimit-Limit, X-RateLimit-Remaining, etc.) as requested. DocScan Pro API is fully functional and production-ready with no critical issues detected."
+  - agent: "main"
+    message: "PAGINATION INTEGRATION COMPLETED: 1) Updated history.tsx to use the paginated /api/documents endpoint with server-side search, filter, and sort params. 2) Implemented infinite scroll via FlatList onEndReached + loading-more indicator. 3) Added debounced search (400ms) to avoid excessive API calls. 4) Added footer showing total document count. 5) Fixed dashboard.tsx to correctly handle paginated response (data.documents instead of raw array). 6) Added proper TypeScript types (DocumentListItem, PaginatedResponse). Both screens verified working via screenshots."
+  - agent: "testing"
+    message: "PAGINATED DOCUMENTS API TESTING COMPLETED SUCCESSFULLY: Comprehensive testing of all requested pagination functionality at https://secure-docs-42.preview.emergentagent.com/api completed with 100% success rate (10/10 tests passed). ✅ WORKING: Default pagination (page=1, page_size=20 returns 5 total docs), Custom pagination (page=1&page_size=2 returns 2 docs with has_next=true, page=2&page_size=2 with has_prev=true, page=3&page_size=2 returns 1 doc with has_next=false), Server-side search (?search=test returns 2 matching documents), Sorting (title A-Z/Z-A working correctly, created_at oldest-first working), Document structure (all required lightweight fields present: id, title, document_type, detected_language, created_at, is_locked, tags, image_thumbnail, pages_count, confidence), Legacy endpoint (/api/documents/all returns full document data as array with additional fields). Pagination response structure verified with all required keys: documents, total, page, page_size, total_pages, has_next, has_prev. All pagination logic, search functionality, and sorting working correctly. API is production-ready."

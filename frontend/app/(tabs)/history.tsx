@@ -12,6 +12,33 @@ import { useLanguage } from '../../hooks/useLanguage';
 import { SpeechInput } from '../../components/SpeechInput';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
+const PAGE_SIZE = 20;
+
+// ---------- Types ----------
+interface DocumentListItem {
+  id: string;
+  title: string;
+  document_type: string;
+  document_subtype?: string;
+  detected_language: string;
+  created_at: string;
+  size_kb: number;
+  is_locked: boolean;
+  tags: string[];
+  image_thumbnail?: string;
+  pages_count: number;
+  confidence: number;
+}
+
+interface PaginatedResponse {
+  documents: DocumentListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
 
 type FilterType = 'All' | 'passport' | 'invoice' | 'receipt' | 'business_card' | 'contract' | 'handwritten_note' | 'general_document' | 'locked';
 type SortType = 'Latest' | 'Oldest' | 'A–Z' | 'Z–A';
@@ -64,11 +91,26 @@ const formatDate = (iso: string) => {
   } catch { return ''; }
 };
 
+// Map frontend sort options to backend params
+const SORT_MAP: Record<SortType, { sort_by: string; sort_order: string }> = {
+  'Latest': { sort_by: 'created_at', sort_order: 'desc' },
+  'Oldest': { sort_by: 'created_at', sort_order: 'asc' },
+  'A–Z': { sort_by: 'title', sort_order: 'asc' },
+  'Z–A': { sort_by: 'title', sort_order: 'desc' },
+};
+
 export default function HistoryScreen() {
   const { colors, shadows, isDark } = useTheme();
   const { t } = useLanguage();
   const router = useRouter();
-  const [docs, setDocs] = useState<any[]>([]);
+
+  // Documents state
+  const [docs, setDocs] = useState<DocumentListItem[]>([]);
+  const [totalDocs, setTotalDocs] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(false);
+
+  // UI state
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('All');
   const [sortBy, setSortBy] = useState<SortType>('Latest');
@@ -76,11 +118,12 @@ export default function HistoryScreen() {
   const [showSort, setShowSort] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  
+  const [loadingMore, setLoadingMore] = useState(false);
+
   // Selection mode for bulk actions
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set());
-  
+
   // Password modals
   const [showSetPassword, setShowSetPassword] = useState(false);
   const [showUnlockPassword, setShowUnlockPassword] = useState(false);
@@ -88,51 +131,140 @@ export default function HistoryScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordLoading, setPasswordLoading] = useState(false);
-  
-  // Memory leak prevention refs
+
+  // Refs for cleanup and debounce
   const isMountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
-  
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Cleanup on unmount
   useEffect(() => {
     isMountedRef.current = true;
-    
     return () => {
       isMountedRef.current = false;
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
     };
   }, []);
 
-  const fetchDocs = useCallback(async () => {
+  // Build query URL with all parameters
+  const buildQueryUrl = useCallback((page: number) => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('page_size', String(PAGE_SIZE));
+
+    // Search
+    if (search.trim()) {
+      params.set('search', search.trim());
+    }
+
+    // Filter by document type (skip 'All' and 'locked' which are handled client-side)
+    if (activeFilter !== 'All' && activeFilter !== 'locked') {
+      params.set('document_type', activeFilter);
+    }
+
+    // Sort
+    const sortConfig = SORT_MAP[sortBy];
+    params.set('sort_by', sortConfig.sort_by);
+    params.set('sort_order', sortConfig.sort_order);
+
+    return `${BACKEND_URL}/api/documents?${params.toString()}`;
+  }, [search, activeFilter, sortBy]);
+
+  // Fetch documents (page 1 = fresh load, page > 1 = load more)
+  const fetchDocs = useCallback(async (page: number = 1, isLoadMore: boolean = false) => {
     // Abort previous request if still pending
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
-    
+
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
-    
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/documents`, { signal });
-      if (res.ok && isMountedRef.current) {
-        setDocs(await res.json());
-      }
-    } catch (e: any) {
-      if (e.name === 'AbortError') return;
+
+    if (!isLoadMore) {
+      setLoading(true);
     }
-    
+
+    try {
+      const url = buildQueryUrl(page);
+      const res = await fetch(url, { signal });
+
+      if (res.ok && isMountedRef.current) {
+        const data: PaginatedResponse = await res.json();
+
+        if (isLoadMore) {
+          // Append to existing documents, avoiding duplicates
+          setDocs(prev => {
+            const existingIds = new Set(prev.map(d => d.id));
+            const newDocs = data.documents.filter(d => !existingIds.has(d.id));
+            return [...prev, ...newDocs];
+          });
+        } else {
+          setDocs(data.documents);
+        }
+
+        setTotalDocs(data.total);
+        setCurrentPage(data.page);
+        setHasNextPage(data.has_next);
+      }
+    } catch (e: unknown) {
+      const error = e as { name?: string };
+      if (error.name === 'AbortError') return;
+      // Silently handle errors on load more; show empty state for fresh load
+    }
+
     if (isMountedRef.current) {
       setLoading(false);
       setRefreshing(false);
+      setLoadingMore(false);
     }
-  }, []);
+  }, [buildQueryUrl]);
 
-  useFocusEffect(useCallback(() => { fetchDocs(); }, [fetchDocs]));
+  // Initial load and refocus
+  useFocusEffect(useCallback(() => {
+    fetchDocs(1, false);
+  }, [fetchDocs]));
 
-  const onRefresh = () => { setRefreshing(true); fetchDocs(); };
+  // Debounced search: re-fetch when search query changes
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      fetchDocs(1, false);
+    }, 400);
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
 
+  // Re-fetch when filter or sort changes
+  useEffect(() => {
+    fetchDocs(1, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFilter, sortBy]);
+
+  // Pull-to-refresh
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchDocs(1, false);
+  }, [fetchDocs]);
+
+  // Load more (infinite scroll)
+  const onEndReached = useCallback(() => {
+    if (!hasNextPage || loadingMore || loading) return;
+    setLoadingMore(true);
+    fetchDocs(currentPage + 1, true);
+  }, [hasNextPage, loadingMore, loading, currentPage, fetchDocs]);
+
+  // ---------- Document actions ----------
   const deleteDoc = async (id: string) => {
     Alert.alert('Delete Document', 'Are you sure you want to delete this document?', [
       { text: 'Cancel', style: 'cancel' },
@@ -142,6 +274,7 @@ export default function HistoryScreen() {
           try {
             await fetch(`${BACKEND_URL}/api/documents/${id}`, { method: 'DELETE' });
             setDocs(prev => prev.filter(d => d.id !== id));
+            setTotalDocs(prev => Math.max(0, prev - 1));
           } catch { Alert.alert('Error', 'Failed to delete'); }
         },
       },
@@ -169,7 +302,7 @@ export default function HistoryScreen() {
       Alert.alert('Error', 'Passwords do not match');
       return;
     }
-    
+
     setPasswordLoading(true);
     try {
       const docsToLock = Array.from(selectedDocs);
@@ -180,15 +313,16 @@ export default function HistoryScreen() {
           body: JSON.stringify({ password }),
         });
       }
-      await fetchDocs();
+      await fetchDocs(1, false);
       setShowSetPassword(false);
       setSelectionMode(false);
       setSelectedDocs(new Set());
       setPassword('');
       setConfirmPassword('');
       Alert.alert('Success', `${docsToLock.length} document(s) are now password protected`);
-    } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to set password');
+    } catch (e: unknown) {
+      const error = e as { message?: string };
+      Alert.alert('Error', error.message || 'Failed to set password');
     } finally {
       setPasswordLoading(false);
     }
@@ -196,7 +330,7 @@ export default function HistoryScreen() {
 
   const handleUnlockDocument = async () => {
     if (!password || !unlockDocId) return;
-    
+
     setPasswordLoading(true);
     try {
       const res = await fetch(`${BACKEND_URL}/api/documents/${unlockDocId}/verify-password`, {
@@ -204,18 +338,18 @@ export default function HistoryScreen() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
       });
-      
+
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.detail || 'Incorrect password');
       }
-      
+
       setShowUnlockPassword(false);
       setPassword('');
-      // Navigate to document
       router.push({ pathname: '/document/[id]', params: { id: unlockDocId } });
-    } catch (e: any) {
-      Alert.alert('Error', e.message || 'Incorrect password');
+    } catch (e: unknown) {
+      const error = e as { message?: string };
+      Alert.alert('Error', error.message || 'Incorrect password');
     } finally {
       setPasswordLoading(false);
     }
@@ -229,7 +363,7 @@ export default function HistoryScreen() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Remove',
-          onPress: async (pwd) => {
+          onPress: async (pwd?: string) => {
             if (!pwd) return;
             try {
               const res = await fetch(`${BACKEND_URL}/api/documents/${docId}/password`, {
@@ -238,10 +372,11 @@ export default function HistoryScreen() {
                 body: JSON.stringify({ password: pwd }),
               });
               if (!res.ok) throw new Error('Incorrect password');
-              await fetchDocs();
+              await fetchDocs(1, false);
               Alert.alert('Success', 'Password protection removed');
-            } catch (e: any) {
-              Alert.alert('Error', e.message || 'Failed to remove password');
+            } catch (e: unknown) {
+              const error = e as { message?: string };
+              Alert.alert('Error', error.message || 'Failed to remove password');
             }
           },
         },
@@ -250,12 +385,12 @@ export default function HistoryScreen() {
     );
   };
 
-  const handleDocPress = (item: any) => {
+  const handleDocPress = (item: DocumentListItem) => {
     if (selectionMode) {
       toggleSelection(item.id);
       return;
     }
-    
+
     if (item.is_locked) {
       setUnlockDocId(item.id);
       setShowUnlockPassword(true);
@@ -264,26 +399,43 @@ export default function HistoryScreen() {
     }
   };
 
+  // Client-side filter for 'locked' (server doesn't have a locked filter)
   const filtered = useMemo(() => {
-    let list = [...docs];
     if (activeFilter === 'locked') {
-      list = list.filter(d => d.is_locked);
-    } else if (activeFilter !== 'All') {
-      list = list.filter(d => d.document_type === activeFilter);
+      return docs.filter(d => d.is_locked);
     }
-    if (search.trim()) list = list.filter(d => d.title?.toLowerCase().includes(search.toLowerCase()) || d.summary?.toLowerCase().includes(search.toLowerCase()));
-    if (sortBy === 'A–Z') list.sort((a, b) => a.title?.localeCompare(b.title));
-    else if (sortBy === 'Z–A') list.sort((a, b) => b.title?.localeCompare(a.title));
-    else if (sortBy === 'Oldest') list.reverse();
-    return list;
-  }, [docs, activeFilter, search, sortBy]);
+    return docs;
+  }, [docs, activeFilter]);
 
-  const lockedCount = docs.filter(d => d.is_locked).length;
+  const lockedCount = useMemo(() => docs.filter(d => d.is_locked).length, [docs]);
 
-  const renderItem = ({ item }: { item: any }) => {
+  // ---------- List footer (loading more indicator) ----------
+  const renderFooter = () => {
+    if (loadingMore) {
+      return (
+        <View style={styles.footerLoader}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={[styles.footerText, { color: colors.textSecondary }]}>Loading more documents...</Text>
+        </View>
+      );
+    }
+    if (!hasNextPage && docs.length > 0 && !loading) {
+      return (
+        <View style={styles.footerLoader}>
+          <Text style={[styles.footerText, { color: colors.textTertiary }]}>
+            {totalDocs} document{totalDocs !== 1 ? 's' : ''} total
+          </Text>
+        </View>
+      );
+    }
+    return null;
+  };
+
+  // ---------- Render document item ----------
+  const renderItem = ({ item }: { item: DocumentListItem }) => {
     const meta = getMeta(item.document_type);
     const isSelected = selectedDocs.has(item.id);
-    
+
     if (isGrid) {
       return (
         <TouchableOpacity
@@ -324,7 +476,7 @@ export default function HistoryScreen() {
         </TouchableOpacity>
       );
     }
-    
+
     return (
       <TouchableOpacity
         testID={`history-doc-${item.id}`}
@@ -398,8 +550,8 @@ export default function HistoryScreen() {
         <View>
           <Text style={[styles.title, { color: colors.textPrimary }]}>{t('history')}</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            {filtered.length} {t('documents')}
-            {lockedCount > 0 && ` • ${lockedCount} ${t('locked')}`}
+            {totalDocs} {t('documents')}
+            {lockedCount > 0 && ` · ${lockedCount} ${t('locked')}`}
           </Text>
         </View>
         {selectionMode ? (
@@ -483,7 +635,7 @@ export default function HistoryScreen() {
       </View>
 
       {/* Document List */}
-      {loading ? (
+      {loading && !refreshing ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -496,12 +648,15 @@ export default function HistoryScreen() {
           numColumns={isGrid ? 2 : 1}
           key={isGrid ? 'grid' : 'list'}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+          onEndReached={onEndReached}
+          onEndReachedThreshold={0.3}
+          ListFooterComponent={renderFooter}
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Ionicons name="documents-outline" size={56} color={colors.textTertiary} />
               <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>No documents found</Text>
               <Text style={[styles.emptySubtitle, { color: colors.textTertiary }]}>
-                {activeFilter === 'locked' ? 'No locked documents' : 'Start scanning to add documents'}
+                {search.trim() ? 'Try a different search term' : activeFilter === 'locked' ? 'No locked documents' : 'Start scanning to add documents'}
               </Text>
             </View>
           }
@@ -637,7 +792,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800' },
   subtitle: { fontSize: 13, marginTop: 2 },
   iconBtn: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  
+
   selectionActions: { flexDirection: 'row', gap: 8 },
   selectionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 },
   selectionBtnText: { color: '#FFF', fontSize: 14, fontWeight: '600' },
@@ -645,21 +800,21 @@ const styles = StyleSheet.create({
 
   searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, gap: 10, marginTop: 4 },
   searchInput: { flex: 1, fontSize: 15 },
-  
+
   filtersRow: { marginTop: 12, maxHeight: 44 },
   filtersContent: { paddingHorizontal: 20, gap: 8 },
   filterChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
   filterText: { fontSize: 13, fontWeight: '600' },
-  
+
   toolbar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, marginTop: 12, marginBottom: 8 },
   toolBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
   toolText: { fontSize: 13, fontWeight: '500' },
-  
+
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  
+
   gridContainer: { paddingHorizontal: 14, paddingBottom: 100 },
   listContainer: { paddingHorizontal: 20, paddingBottom: 100 },
-  
+
   gridCard: { flex: 1, margin: 6, borderRadius: 16, padding: 12, position: 'relative' },
   gridThumbImg: { width: '100%', aspectRatio: 0.75, borderRadius: 10, marginBottom: 10 },
   gridThumb: { width: '100%', aspectRatio: 0.75, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
@@ -667,10 +822,10 @@ const styles = StyleSheet.create({
   gridTitle: { fontSize: 14, fontWeight: '600', marginBottom: 4 },
   gridDate: { fontSize: 11, marginBottom: 8 },
   gridFooter: { flexDirection: 'row' },
-  
+
   checkbox: { position: 'absolute', top: 8, right: 8, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
   lockBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 8, zIndex: 10 },
-  
+
   listCard: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 16, marginBottom: 10 },
   thumbContainer: { position: 'relative' },
   listThumbImg: { width: 60, height: 75, borderRadius: 10 },
@@ -689,17 +844,17 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 11, fontWeight: '600' },
   sizeText: { fontSize: 11 },
   menuBtn: { padding: 8 },
-  
+
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 },
   emptyTitle: { fontSize: 17, fontWeight: '600', marginTop: 16 },
   emptySubtitle: { fontSize: 13, marginTop: 4, textAlign: 'center' },
-  
+
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   sortModal: { width: '80%', borderRadius: 20, padding: 20 },
   sortTitle: { fontSize: 17, fontWeight: '700', marginBottom: 16 },
   sortOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 12, borderRadius: 12 },
   sortOptionText: { fontSize: 15 },
-  
+
   passwordModal: { width: '85%', borderRadius: 24, padding: 24 },
   passwordHeader: { alignItems: 'center', marginBottom: 24 },
   passwordIconWrap: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
@@ -711,4 +866,8 @@ const styles = StyleSheet.create({
   passwordCancelText: { fontSize: 15, fontWeight: '600' },
   passwordConfirmBtn: { flex: 1.5, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   passwordConfirmText: { color: '#FFF', fontSize: 15, fontWeight: '700' },
+
+  // Footer styles for infinite scroll
+  footerLoader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, gap: 8 },
+  footerText: { fontSize: 13 },
 });
