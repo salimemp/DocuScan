@@ -288,15 +288,16 @@ async def send_verification_email(email: str, token: str, email_type: str = "con
         else:
             return False
 
-        resend.Emails.send({
-            "from": "DocScan Pro <onboarding@resend.dev>",
+        result = resend.Emails.send({
+            "from": "DocScan Pro <noreply@notify.docscanpro.app>",
             "to": [email],
             "subject": subject,
             "html": html
         })
+        print(f"✅ Email sent to {email}: {result}")
         return True
     except Exception as e:
-        print(f"Email send error: {e}")
+        print(f"❌ Email send error: {e}")
         return False
 
 # ── Database Dependency ────────────────────────────────────────────────────
