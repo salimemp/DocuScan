@@ -12,6 +12,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useLanguage } from '../../hooks/useLanguage';
 import { CookieConsentBanner } from '../../components/CookieConsentBanner';
 import { PoweredByElixio } from '../../components/PoweredByElixio';
+import { CloudProviderIcon } from '../../components/CloudProviderIcon';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 
