@@ -837,7 +837,7 @@ export default function DashboardScreen() {
                   onPress={() => handleCloudSyncToggle(provider.id)}
                 >
                   <View style={[styles.cloudProviderIcon, { backgroundColor: provider.color + '18' }]}>
-                    <Ionicons name={provider.icon as any} size={24} color={provider.color} />
+                    <CloudProviderIcon provider={provider.id} size={28} />
                   </View>
                   <Text style={[styles.cloudProviderName, { color: colors.textPrimary }]}>{provider.name}</Text>
                   <View style={[styles.connectBadge, { backgroundColor: colors.surfaceHighlight }]}>
