@@ -213,7 +213,31 @@ export default function BusinessCardScanner() {
   if (!permission) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        {/* Header with back button */}
+        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <TouchableOpacity 
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)/dashboard');
+              }
+            }} 
+            style={styles.backBtn}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+            Business Card Scanner
+          </Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={styles.permissionContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.permissionText, { color: colors.textSecondary, marginTop: 16 }]}>
+            Checking camera permissions...
+          </Text>
+        </View>
       </SafeAreaView>
     );
   }
@@ -221,19 +245,80 @@ export default function BusinessCardScanner() {
   if (!permission.granted) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        {/* Header with back button */}
+        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <TouchableOpacity 
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)/dashboard');
+              }
+            }} 
+            style={styles.backBtn}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+            Business Card Scanner
+          </Text>
+          <View style={{ width: 40 }} />
+        </View>
         <View style={styles.permissionContainer}>
-          <Ionicons name="camera-outline" size={64} color={colors.textSecondary} />
+          <View style={[styles.permissionIconContainer, { backgroundColor: colors.primary + '15' }]}>
+            <Ionicons name="camera-outline" size={48} color={colors.primary} />
+          </View>
           <Text style={[styles.permissionTitle, { color: colors.textPrimary }]}>
-            Camera Access Needed
+            Camera Access Required
           </Text>
           <Text style={[styles.permissionText, { color: colors.textSecondary }]}>
-            We need camera access to scan business cards
+            To scan business cards, we need access to your camera. Your privacy is important to us.
           </Text>
           <TouchableOpacity
             style={[styles.permissionBtn, { backgroundColor: colors.primary }]}
-            onPress={requestPermission}
+            onPress={async () => {
+              try {
+                const result = await requestPermission();
+                if (!result.granted) {
+                  Alert.alert(
+                    'Permission Required',
+                    'Camera permission is required to scan business cards. Please enable it in your device settings.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Open Settings', onPress: () => Linking.openSettings() }
+                    ]
+                  );
+                }
+              } catch (error) {
+                Alert.alert('Error', 'Failed to request camera permission. Please try again or enable it manually in settings.');
+              }
+            }}
           >
-            <Text style={styles.permissionBtnText}>Grant Permission</Text>
+            <Ionicons name="camera" size={20} color="#FFF" style={{ marginRight: 8 }} />
+            <Text style={styles.permissionBtnText}>Grant Camera Access</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.permissionSecondaryBtn, { borderColor: colors.border }]}
+            onPress={() => Linking.openSettings()}
+          >
+            <Ionicons name="settings-outline" size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
+            <Text style={[styles.permissionSecondaryBtnText, { color: colors.textSecondary }]}>
+              Open Settings
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.permissionBackBtn}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)/dashboard');
+              }
+            }}
+          >
+            <Text style={[styles.permissionBackBtnText, { color: colors.primary }]}>
+              Go Back to Dashboard
+            </Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
