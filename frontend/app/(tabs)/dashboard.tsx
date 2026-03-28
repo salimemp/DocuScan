@@ -15,6 +15,7 @@ import { CookieConsentBanner } from '../../components/CookieConsentBanner';
 import { PoweredByElixio } from '../../components/PoweredByElixio';
 import { CloudProviderIcon } from '../../components/CloudProviderIcon';
 import { VoiceCommandsHelp } from '../../components/VoiceCommandsHelp';
+import { getErrorMessage } from '../../utils/errorHelpers';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 
@@ -155,9 +156,9 @@ export default function DashboardScreen() {
         const docs = data.documents || data;
         setRecentDocs(Array.isArray(docs) ? docs.slice(0, 5) : []);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       // Ignore abort errors
-      if (e.name === 'AbortError') return;
+      if (e instanceof Error && e.name === 'AbortError') return;
     }
     
     if (isMountedRef.current) {
@@ -202,8 +203,8 @@ export default function DashboardScreen() {
       setShowShareDoc(false);
       setShareEmail('');
       setShareName('');
-    } catch (e: any) {
-      Alert.alert('Error', e.message);
+    } catch (e: unknown) {
+      Alert.alert('Error', getErrorMessage(e));
     } finally {
       setSending(false);
     }

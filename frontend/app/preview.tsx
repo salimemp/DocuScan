@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '../hooks/useTheme';
 import { useLanguage } from '../hooks/useLanguage';
 import { getScanPages, clearScanData } from '../utils/scanStore';
+import { getErrorMessage } from '../utils/errorHelpers';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -181,12 +182,12 @@ export default function PreviewScreen() {
       if (isMountedRef.current) {
         setResult(data);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       // Ignore abort errors
-      if (e.name === 'AbortError') return;
+      if (e instanceof Error && e.name === 'AbortError') return;
       
       if (isMountedRef.current) {
-        setError(e.message ?? 'Failed to analyze document');
+        setError(getErrorMessage(e) ?? 'Failed to analyze document');
       }
     } finally {
       if (isMountedRef.current) {
@@ -219,8 +220,8 @@ export default function PreviewScreen() {
       }
       clearScanData();
       router.replace('/dashboard');
-    } catch (e: any) {
-      Alert.alert('Save Failed', e.message);
+    } catch (e: unknown) {
+      Alert.alert('Save Failed', getErrorMessage(e));
     } finally {
       setIsSaving(false);
     }

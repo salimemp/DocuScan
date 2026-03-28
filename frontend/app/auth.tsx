@@ -16,6 +16,7 @@ import { useLanguage } from '../hooks/useLanguage';
 import { useAuth } from '../contexts/AuthContext';
 import { PasswordStrengthMeter, validatePassword } from '../components/PasswordStrengthMeter';
 import TurnstileWidget from '../components/TurnstileWidget';
+import { getErrorMessage } from '../utils/errorHelpers';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 // Cloudflare Turnstile site key - use test key in dev, real key in production
@@ -95,8 +96,8 @@ export default function AuthScreen() {
       
       setSuccess('Login successful!');
       setTimeout(() => router.replace('/(tabs)/dashboard'), 500);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(getErrorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -133,8 +134,8 @@ export default function AuthScreen() {
       
       setSuccess('Account created! Please check your email to verify.');
       setTimeout(() => router.replace('/(tabs)/dashboard'), 2000);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(getErrorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -161,8 +162,8 @@ export default function AuthScreen() {
       }
       
       setSuccess('Magic link sent! Check your email.');
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(getErrorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -189,8 +190,8 @@ export default function AuthScreen() {
       }
       
       setSuccess('Reset link sent! Check your email.');
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(getErrorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -227,8 +228,8 @@ export default function AuthScreen() {
           }
         }
       }
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(getErrorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -263,14 +264,14 @@ export default function AuthScreen() {
           Alert.alert('No Saved Login', 'Please log in with email/password first');
         }
       }
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(getErrorMessage(e));
     }
   };
 
-  const saveAuth = async (data: any) => {
-    await AsyncStorage.setItem(AUTH_TOKEN_KEY, data.access_token);
-    await AsyncStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
+  const saveAuth = async (data: { access_token?: string; refresh_token?: string; token?: string; user: { id: string; email: string; name: string } }) => {
+    await AsyncStorage.setItem(AUTH_TOKEN_KEY, data.access_token || data.token || '');
+    await AsyncStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token || '');
     await AsyncStorage.setItem(USER_KEY, JSON.stringify(data.user));
   };
 

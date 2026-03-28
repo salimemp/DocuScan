@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getErrorMessage } from '../utils/errorHelpers';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 const AUTH_TOKEN_KEY = '@DocScanPro:authToken';
@@ -162,8 +163,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await AsyncStorage.setItem(USER_KEY, JSON.stringify(data.user));
 
       return { success: true };
-    } catch (e: any) {
-      return { success: false, error: e.message || 'Network error' };
+    } catch (e: unknown) {
+      return { success: false, error: getErrorMessage(e) || 'Network error' };
     }
   };
 
@@ -191,8 +192,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await AsyncStorage.setItem(USER_KEY, JSON.stringify(data.user));
 
       return { success: true };
-    } catch (e: any) {
-      return { success: false, error: e.message || 'Network error' };
+    } catch (e: unknown) {
+      return { success: false, error: getErrorMessage(e) || 'Network error' };
     }
   };
 

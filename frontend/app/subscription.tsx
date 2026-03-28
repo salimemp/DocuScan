@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '../hooks/useTheme';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuth } from '../contexts/AuthContext';
+import { getErrorMessage } from '../utils/errorHelpers';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
@@ -181,16 +182,16 @@ export default function SubscriptionScreen() {
         // Handle errors
         throw new Error(data.detail || 'Failed to create subscription');
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       // Show informative error message
-      if (e.message.includes('Stripe')) {
+      if (getErrorMessage(e).includes('Stripe')) {
         Alert.alert(
           'Stripe Configuration Required',
           'The payment system requires Stripe to be configured. Please contact support or try again later.',
           [{ text: 'OK' }]
         );
       } else {
-        Alert.alert('Subscription Error', e.message || 'Failed to start subscription. Please try again.');
+        Alert.alert('Subscription Error', getErrorMessage(e) || 'Failed to start subscription. Please try again.');
       }
     } finally {
       if (isMountedRef.current) {
