@@ -2189,6 +2189,48 @@ app.include_router(subscription_router, prefix="/api")
 app.include_router(security_router, prefix="/api")
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+# ── Database Indexes ────────────────────────────────────────────────────────
+@app.on_event("startup")
+async def create_database_indexes():
+    """Create indexes for optimized query performance."""
+    try:
+        # Documents collection indexes
+        await db.documents.create_index("id", unique=True)
+        await db.documents.create_index([("created_at", -1)])  # Descending for recent first
+        await db.documents.create_index("document_type")
+        await db.documents.create_index("tags")
+        await db.documents.create_index([("title", "text")])  # Text search
+        await db.documents.create_index("is_locked")
+        
+        # Compound indexes for common query patterns
+        await db.documents.create_index([("document_type", 1), ("created_at", -1)])
+        await db.documents.create_index([("tags", 1), ("created_at", -1)])
+        
+        # Users collection indexes
+        await db.users.create_index("user_id", unique=True)
+        await db.users.create_index("email", unique=True)
+        await db.users.create_index([("created_at", -1)])
+        
+        # Contacts collection indexes (for business cards)
+        await db.contacts.create_index("id", unique=True)
+        await db.contacts.create_index([("created_at", -1)])
+        await db.contacts.create_index([("contact_info.name", "text"), ("contact_info.company", "text")])
+        
+        # Sessions collection indexes
+        await db.sessions.create_index("session_id", unique=True)
+        await db.sessions.create_index("user_id")
+        await db.sessions.create_index([("expires_at", 1)], expireAfterSeconds=0)  # TTL index
+        
+        # Subscriptions collection indexes
+        await db.subscriptions.create_index("user_id")
+        await db.subscriptions.create_index("stripe_subscription_id", sparse=True)
+        await db.subscriptions.create_index("status")
+        
+        logger.info("✅ Database indexes created successfully")
+    except Exception as e:
+        logger.error(f"Failed to create indexes: {e}")
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+
