@@ -1141,4 +1141,9 @@ const styles = StyleSheet.create({
   langCheck: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   rtlBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginRight: 8 },
   rtlBadgeText: { fontSize: 10, fontWeight: '700' },
+
+  // Help Center
+  helpTopicDesc: { fontSize: 12, marginTop: 2 },
+  helpContactBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16, borderRadius: 12, marginTop: 20, marginBottom: 8 },
+  helpContactBtnText: { color: '#FFF', fontSize: 15, fontWeight: '700' },
 });
