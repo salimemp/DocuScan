@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments, SplashScreen } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View, ActivityIndicator, Text } from 'react-native';
+import { View, ActivityIndicator, Text, Linking, Platform } from 'react-native';
 import { I18nextProvider } from 'react-i18next';
 import i18n from '../i18n/i18n';
 import { QueryProvider } from '../utils/queryClient';
@@ -63,6 +63,46 @@ function RootLayoutNav() {
     }
   }, [isLoading, hasCompletedOnboarding, segments, router, hasNavigated]);
 
+  // Handle deep links from widgets
+  useEffect(() => {
+    const handleDeepLink = (event: { url: string }) => {
+      const url = event.url;
+      if (!url) return;
+      
+      try {
+        // Parse deep link: docscanpro://scan, docscanpro://dashboard, etc.
+        const path = url.replace('docscanpro://', '').replace('exp://', '');
+        
+        if (path.startsWith('scan')) {
+          router.push('/scan');
+        } else if (path.startsWith('dashboard')) {
+          router.push('/(tabs)/dashboard');
+        } else if (path.startsWith('history')) {
+          router.push('/(tabs)/history');
+        } else if (path.startsWith('document/')) {
+          const docId = path.replace('document/', '');
+          if (docId) {
+            router.push({ pathname: '/document/[id]', params: { id: docId } });
+          }
+        }
+      } catch (e) {
+        console.log('Deep link error:', e);
+      }
+    };
+
+    // Handle deep link when app is already open
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+    
+    // Handle deep link when app launches
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink({ url });
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [router]);
+
   // Show loading
   if (isLoading) {
     return (
@@ -121,6 +161,14 @@ function RootLayoutNav() {
       <Stack.Screen
         name="secure-enclave"
         options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="widgets"
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="business-card"
+        options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
       />
     </Stack>
   );

@@ -15,6 +15,9 @@ import { useLanguage } from '../hooks/useLanguage';
 import { MathSolverModal } from '../components/MathSolverModal';
 import haptics from '../utils/haptics';
 import { voiceService } from '../services/VoiceCommandsService';
+import { useVoiceCommands } from '../hooks/useVoiceCommands';
+import { VoiceCommandsHelp } from '../components/VoiceCommandsHelp';
+import { incrementWidgetScanCount } from '../utils/widgetData';
 
 // Batch scan intervals in seconds
 const BATCH_INTERVALS = [2, 3, 5, 10];
@@ -40,8 +43,9 @@ export default function ScanScreen() {
   const batchTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
-  // Voice commands state
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  // Voice commands (global hook)
+  const { voiceEnabled, speak, announceAction, announceSuccess, announceError } = useVoiceCommands();
+  const [showVoiceHelp, setShowVoiceHelp] = useState(false);
 
   const refreshPages = () => setPages(getScanPages());
 
@@ -76,13 +80,17 @@ export default function ScanScreen() {
       const pageData = await processImage(uri);
       addScanPage(pageData);
       refreshPages();
+      // Update widget scan count
+      incrementWidgetScanCount();
       if (!silent) {
         await haptics.success();
+        await announceAction(`Page ${getScanPageCount()} captured`);
       }
     } catch {
       await haptics.error();
       if (!silent) {
         Alert.alert('Error', 'Failed to process image. Please try again.');
+        await announceError('Failed to process image');
       }
     } finally {
       setIsProcessing(false);
@@ -117,9 +125,7 @@ export default function ScanScreen() {
     setBatchCountdown(batchInterval);
     
     haptics.medium();
-    if (voiceEnabled) {
-      voiceService.announceBatchMode(batchInterval);
-    }
+    speak(`Batch scanning mode. Auto-capturing every ${batchInterval} seconds.`);
     
     // Countdown timer
     countdownRef.current = setInterval(() => {
@@ -138,7 +144,7 @@ export default function ScanScreen() {
     
     // Take first picture immediately
     takePicture(true);
-  }, [batchInterval, voiceEnabled]);
+  }, [batchInterval, speak]);
 
   const stopBatchMode = useCallback(() => {
     setBatchMode(false);
@@ -152,10 +158,10 @@ export default function ScanScreen() {
     }
     
     haptics.batchComplete();
-    if (voiceEnabled && batchCount > 0) {
-      voiceService.speak(`Batch complete. ${batchCount} pages captured.`);
+    if (batchCount > 0) {
+      announceSuccess(`Batch complete. ${batchCount} pages captured.`);
     }
-  }, [batchCount, voiceEnabled]);
+  }, [batchCount, announceSuccess]);
 
   const toggleBatchMode = () => {
     if (batchMode) {
@@ -558,10 +564,7 @@ export default function ScanScreen() {
 
             <TouchableOpacity
               style={[styles.voiceToggle, { backgroundColor: colors.surfaceHighlight }]}
-              onPress={() => {
-                haptics.selection();
-                setVoiceEnabled(!voiceEnabled);
-              }}
+              onPress={() => setShowVoiceHelp(true)}
             >
               <Ionicons 
                 name={voiceEnabled ? 'mic' : 'mic-off'} 
@@ -569,17 +572,9 @@ export default function ScanScreen() {
                 color={voiceEnabled ? colors.primary : colors.textTertiary} 
               />
               <Text style={[styles.voiceToggleText, { color: colors.textPrimary }]}>
-                Voice Announcements
+                Voice: {voiceEnabled ? 'On' : 'Off'}
               </Text>
-              <View style={[
-                styles.voiceToggleSwitch,
-                { backgroundColor: voiceEnabled ? colors.primary : colors.border }
-              ]}>
-                <View style={[
-                  styles.voiceToggleKnob,
-                  voiceEnabled && { marginLeft: 16 }
-                ]} />
-              </View>
+              <Ionicons name="help-circle-outline" size={20} color={colors.textTertiary} />
             </TouchableOpacity>
 
             <View style={styles.batchModalActions}>
@@ -610,6 +605,12 @@ export default function ScanScreen() {
       <MathSolverModal 
         visible={showMathSolver} 
         onClose={() => setShowMathSolver(false)} 
+      />
+
+      {/* Voice Commands Help Modal */}
+      <VoiceCommandsHelp
+        visible={showVoiceHelp}
+        onClose={() => setShowVoiceHelp(false)}
       />
     </View>
   );

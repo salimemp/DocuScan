@@ -171,9 +171,9 @@ backend:
 
   - task: "POST /api/scan - Gemini AI document scan"
     implemented: true
-    working: false
+    working: true
     file: "/app/backend/server.py"
-    stuck_count: 1
+    stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
@@ -183,6 +183,9 @@ backend:
       - working: false
         agent: "testing"
         comment: "AI scan endpoint failing due to Gemini API quota exceeded (HTTP 429). Error: 'You exceeded your current quota, please check your plan and billing details'. This is an external service limitation, not a code issue. The endpoint implementation is correct but requires valid API quota."
+      - working: true
+        agent: "testing"
+        comment: "COMPREHENSIVE REVIEW TESTING COMPLETED: POST /api/scan endpoint fully functional. Tested with multiple document types (invoice, receipt, contract, letter, form) - all 5 types working successfully. AI extraction working correctly with Gemini 3 Flash Preview model. Returns proper response structure with raw_text, confidence (0.99), document_type, structured_fields, and comprehensive metadata. Previous quota issues resolved. Endpoint is production-ready."
 
   - task: "POST /api/documents/{id}/export - Export document"
     implemented: true
@@ -261,6 +264,18 @@ backend:
       - working: true
         agent: "testing"
         comment: "COMPREHENSIVE PAGINATION API TESTING COMPLETED: All 10 tests passed (100% success rate). ✅ WORKING: Default pagination (page=1, page_size=20), Custom pagination (page=1&page_size=2 returns 2 docs with has_next=true), Page navigation (page=2&page_size=2 with has_prev=true, page=3&page_size=2 returns 1 doc with has_next=false), Server-side search (?search=test returns 2 matching documents), Sorting (title A-Z/Z-A, created_at oldest-first), Document structure (all required lightweight fields: id, title, document_type, detected_language, created_at, is_locked, tags, image_thumbnail, pages_count, confidence), Legacy endpoint (/api/documents/all returns full document data as array). Pagination response structure verified: documents, total, page, page_size, total_pages, has_next, has_prev. Total documents: 5. All pagination logic, search functionality, and sorting working correctly."
+
+  - task: "Core API Endpoints Review Testing"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "CORE API ENDPOINTS COMPREHENSIVE REVIEW TESTING COMPLETED: All 8 requested endpoints tested successfully (100% success rate). ✅ WORKING: POST /api/scan (AI document scanning with Gemini 3 Flash Preview, tested 5 document types: invoice, receipt, contract, letter, form), POST /api/documents (document creation with proper ID generation), GET /api/documents?page=1&page_size=20 (paginated list with proper structure: documents, total, page, page_size, total_pages, has_next, has_prev), GET /api/stats (statistics returning total_scans: 9, locked_documents: 0, storage_used: 1.3 MB, last_scan), POST /api/business-cards/scan (AI business card extraction working with contact info), GET /api/contacts (contacts list with proper structure containing contacts array), Batch document retrieval (multiple paginated calls with different page sizes), Multiple document type scanning (all 5 types successful). All core API endpoints are production-ready and fully functional."
 
 frontend:
   - task: "Dashboard screen"
@@ -399,3 +414,5 @@ agent_communication:
     message: "PAGINATION INTEGRATION COMPLETED: 1) Updated history.tsx to use the paginated /api/documents endpoint with server-side search, filter, and sort params. 2) Implemented infinite scroll via FlatList onEndReached + loading-more indicator. 3) Added debounced search (400ms) to avoid excessive API calls. 4) Added footer showing total document count. 5) Fixed dashboard.tsx to correctly handle paginated response (data.documents instead of raw array). 6) Added proper TypeScript types (DocumentListItem, PaginatedResponse). Both screens verified working via screenshots."
   - agent: "testing"
     message: "REGISTRATION & TURNSTILE INTEGRATION TESTING COMPLETED: Comprehensive testing of all requested endpoints at https://secure-docs-42.preview.emergentagent.com/api completed successfully. Results: 6/6 tests passed (100% success rate). ✅ WORKING: POST /api/auth/register WITHOUT turnstile token (optional field working correctly), POST /api/auth/register WITH turnstile token (turnstile integration working), POST /api/verify-turnstile endpoint (returns success: true), Password validation (weak passwords correctly rejected with 400 error), Paginated documents API (GET /api/documents?page=1&page_size=5 returns proper pagination structure), Business card scanner API (POST /api/business-cards/scan working with AI extraction). All registration and turnstile features are production-ready and functioning correctly. Rate limiting is also working as expected (429 errors when limits exceeded). No critical issues detected."
+  - agent: "testing"
+    message: "CORE API ENDPOINTS REVIEW TESTING COMPLETED: Comprehensive testing of all requested core endpoints at https://secure-docs-42.preview.emergentagent.com/api completed successfully. Results: 8/8 tests passed (100% success rate). ✅ WORKING: POST /api/scan (AI document scanning with Gemini 3 Flash Preview working perfectly, tested with 5 document types: invoice, receipt, contract, letter, form), POST /api/documents (document creation working), GET /api/documents?page=1&page_size=20 (paginated list working with proper pagination structure), GET /api/stats (statistics endpoint returning total_scans, locked_documents, storage_used, last_scan), POST /api/business-cards/scan (business card AI extraction working with proper contact info), GET /api/contacts (contacts list returning proper structure with contacts array), Batch document retrieval (multiple paginated calls working), Multiple document type scanning (all 5 types successful). All core API endpoints are fully functional and production-ready. Previous scan endpoint quota issues have been resolved - AI functionality is working correctly."
