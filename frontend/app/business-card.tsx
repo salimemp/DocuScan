@@ -894,4 +894,34 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
+  permissionIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  permissionSecondaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 12,
+  },
+  permissionSecondaryBtnText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  permissionBackBtn: {
+    marginTop: 24,
+    padding: 12,
+  },
+  permissionBackBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
 });
