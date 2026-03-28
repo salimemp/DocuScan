@@ -311,14 +311,6 @@ export default function DashboardScreen() {
     { icon: 'time', label: 'Last Scan', value: stats.last_scan, color: '#10B981' },
   ];
 
-  const cloudProviders = [
-    { id: 'google_drive', name: 'Google Drive', icon: 'logo-google', color: '#4285F4' },
-    { id: 'dropbox', name: 'Dropbox', icon: 'cloud-outline', color: '#0061FF' },
-    { id: 'onedrive', name: 'OneDrive', icon: 'logo-microsoft', color: '#0078D4' },
-    { id: 'box', name: 'Box', icon: 'cube-outline', color: '#0061D5' },
-    { id: 'icloud', name: 'iCloud', icon: 'logo-apple', color: '#3693F3' },
-  ];
-
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
