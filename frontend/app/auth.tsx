@@ -15,8 +15,12 @@ import { useTheme } from '../hooks/useTheme';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuth } from '../contexts/AuthContext';
 import { PasswordStrengthMeter, validatePassword } from '../components/PasswordStrengthMeter';
+import TurnstileWidget from '../components/TurnstileWidget';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
+// Cloudflare Turnstile site key - use test key in dev, real key in production
+// Test key always passes: 1x00000000000000000000AA
+const TURNSTILE_SITE_KEY = process.env.EXPO_PUBLIC_TURNSTILE_SITE_KEY || '1x00000000000000000000AA';
 const AUTH_TOKEN_KEY = '@DocScanPro:authToken';
 const REFRESH_TOKEN_KEY = '@DocScanPro:refreshToken';
 const USER_KEY = '@DocScanPro:user';
@@ -44,6 +48,10 @@ export default function AuthScreen() {
   const [isPasswordValid, setIsPasswordValid] = useState(false);
   const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
   const [isPasswordBreached, setIsPasswordBreached] = useState(false);
+  
+  // Turnstile state
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileVerified, setTurnstileVerified] = useState(false);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -117,7 +125,7 @@ export default function AuthScreen() {
     setError(null);
     
     try {
-      const result = await register(email, password, name);
+      const result = await register(email, password, name, turnstileToken || undefined);
       
       if (!result.success) {
         throw new Error(result.error || 'Registration failed');
@@ -354,6 +362,35 @@ export default function AuthScreen() {
         onBreachCheck={handleBreachCheck}
         showRequirements={true}
       />
+      
+      {/* Cloudflare Turnstile - Bot Protection */}
+      <View style={styles.turnstileContainer}>
+        <View style={styles.turnstileHeader}>
+          <Ionicons name="shield-checkmark-outline" size={16} color={colors.textSecondary} />
+          <Text style={[styles.turnstileLabel, { color: colors.textSecondary }]}>Bot Protection</Text>
+          {turnstileVerified && (
+            <View style={[styles.verifiedBadge, { backgroundColor: '#10B981' + '20' }]}>
+              <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+              <Text style={styles.verifiedText}>Verified</Text>
+            </View>
+          )}
+        </View>
+        <TurnstileWidget
+          siteKey={TURNSTILE_SITE_KEY}
+          onVerify={(token: string) => {
+            setTurnstileToken(token);
+            setTurnstileVerified(true);
+          }}
+          onError={() => {
+            setTurnstileToken(null);
+            setTurnstileVerified(false);
+          }}
+          onExpire={() => {
+            setTurnstileToken(null);
+            setTurnstileVerified(false);
+          }}
+        />
+      </View>
       
       <TouchableOpacity
         style={[
@@ -677,4 +714,10 @@ const styles = StyleSheet.create({
   
   skipBtn: { alignItems: 'center', marginTop: 20, paddingVertical: 12 },
   skipText: { fontSize: 14 },
+  
+  turnstileContainer: { marginTop: 16, marginBottom: 8 },
+  turnstileHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  turnstileLabel: { fontSize: 13, fontWeight: '500' },
+  verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, marginLeft: 'auto' },
+  verifiedText: { fontSize: 11, fontWeight: '600', color: '#10B981' },
 });

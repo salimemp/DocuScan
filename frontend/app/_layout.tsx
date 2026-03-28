@@ -49,7 +49,7 @@ function RootLayoutNav() {
     
     const currentSegment = segments[0];
     const isOnOnboarding = currentSegment === 'onboarding';
-    const isOnIndex = currentSegment === undefined || currentSegment === 'index';
+    const isOnIndex = currentSegment === undefined || currentSegment === ('index' as typeof currentSegment);
     
     // If user hasn't completed onboarding and is not already there, redirect
     if (!hasCompletedOnboarding && !isOnOnboarding) {

@@ -38,10 +38,13 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile || yarn install
 
+      - name: TypeScript type check
+        run: npx tsc --noEmit
+
       - name: Check syntax (build test)
         run: |
           echo "Checking if app can be bundled..."
-          npx expo export --platform web --output-dir ./dist-test || true
+          npx expo export --platform web --output-dir ./dist-test
           rm -rf ./dist-test
           echo "✅ Frontend check complete"
 

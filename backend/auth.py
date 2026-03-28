@@ -103,6 +103,7 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
     name: str = Field(min_length=2)
+    turnstile_token: Optional[str] = None
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -351,6 +352,15 @@ async def require_auth(
 async def register(data: UserRegister, request: Request):
     """Register new user with email/password"""
     db = get_db()
+    
+    # Verify Turnstile token if provided (bot protection)
+    if data.turnstile_token:
+        from rate_limit import verify_turnstile_token
+        forwarded_for = request.headers.get('X-Forwarded-For')
+        ip = forwarded_for.split(',')[0].strip() if forwarded_for else (request.client.host if request.client else None)
+        is_valid, result = await verify_turnstile_token(data.turnstile_token, ip)
+        if not is_valid:
+            raise HTTPException(400, "Bot verification failed. Please try again.")
     
     # Validate password strength
     is_valid, errors = validate_password_strength(data.password)

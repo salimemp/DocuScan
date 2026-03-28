@@ -14,14 +14,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../hooks/useTheme';
 import * as ImagePicker from 'expo-image-picker';
 
+interface MathSolution {
+  solution: string;
+  input_type: string;
+  original_equation?: string;
+}
+
 export default function MathSolverScreen() {
   const { colors, shadows } = useTheme();
   const [equation, setEquation] = useState('');
-  const [solution, setSolution] = useState(null);
+  const [solution, setSolution] = useState<MathSolution | null>(null);
   const [loading, setLoading] = useState(false);
-  const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  const solveMathProblem = async (imageBase64, textEquation) => {
+  const solveMathProblem = async (imageBase64?: string, textEquation?: string) => {
     if (!imageBase64 && (!textEquation || !textEquation.trim())) {
       Alert.alert('Error', 'Please provide either an equation or select an image');
       return;
@@ -75,7 +81,7 @@ export default function MathSolverScreen() {
 
     if (!result.canceled && result.assets[0].base64) {
       setSelectedImage(`data:image/jpeg;base64,${result.assets[0].base64}`);
-      solveMathProblem(`data:image/jpeg;base64,${result.assets[0].base64}`);
+      solveMathProblem(`data:image/jpeg;base64,${result.assets[0].base64}`, undefined);
     }
   };
 
@@ -95,7 +101,7 @@ export default function MathSolverScreen() {
 
     if (!result.canceled && result.assets[0].base64) {
       setSelectedImage(`data:image/jpeg;base64,${result.assets[0].base64}`);
-      solveMathProblem(`data:image/jpeg;base64,${result.assets[0].base64}`);
+      solveMathProblem(`data:image/jpeg;base64,${result.assets[0].base64}`, undefined);
     }
   };
 
@@ -108,7 +114,7 @@ export default function MathSolverScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Math Solver</Text>
+        <Text style={[styles.title, { color: colors.textPrimary }]}>Math Solver</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           Solve math problems from text or images using AI
         </Text>
@@ -116,7 +122,7 @@ export default function MathSolverScreen() {
 
       {/* Text Input Section */}
       <View style={[styles.section, { backgroundColor: colors.surface, ...shadows.sm }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
           <Ionicons name="create-outline" size={20} color={colors.primary} /> Type Equation
         </Text>
         <TextInput
@@ -125,7 +131,7 @@ export default function MathSolverScreen() {
             {
               backgroundColor: colors.background,
               borderColor: colors.border,
-              color: colors.text,
+              color: colors.textPrimary,
             },
           ]}
           placeholder="Enter math equation (e.g., 2x + 5 = 15)"
@@ -150,7 +156,7 @@ export default function MathSolverScreen() {
 
       {/* Image Input Section */}
       <View style={[styles.section, { backgroundColor: colors.surface, ...shadows.sm }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
           <Ionicons name="camera-outline" size={20} color={colors.primary} /> Photo Math
         </Text>
         <Text style={[styles.sectionDescription, { color: colors.textSecondary }]}>
@@ -194,7 +200,7 @@ export default function MathSolverScreen() {
       {solution && (
         <View style={[styles.section, { backgroundColor: colors.surface, ...shadows.sm }]}>
           <View style={styles.solutionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
               <Ionicons name="checkmark-circle" size={20} color={colors.success} /> Solution
             </Text>
             <TouchableOpacity onPress={clearAll} style={styles.clearButton}>
@@ -203,7 +209,7 @@ export default function MathSolverScreen() {
           </View>
           
           <View style={[styles.solutionCard, { backgroundColor: colors.background }]}>
-            <Text style={[styles.solutionText, { color: colors.text }]}>
+            <Text style={[styles.solutionText, { color: colors.textPrimary }]}>
               {solution.solution}
             </Text>
           </View>
@@ -223,7 +229,7 @@ export default function MathSolverScreen() {
 
       {/* Quick Examples */}
       <View style={[styles.section, { backgroundColor: colors.surface, ...shadows.sm }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
           <Ionicons name="bulb-outline" size={20} color={colors.primary} /> Quick Examples
         </Text>
         <View style={styles.examplesContainer}>

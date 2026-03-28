@@ -34,7 +34,7 @@ export const DocumentCard = memo(function DocumentCard({
       <View style={[styles.thumbnail, { backgroundColor: meta.color + '15' }]}>
         {hasImage ? (
           <LazyImage
-            source={{ uri: document.pages[0].image }}
+            source={{ uri: document.pages?.[0]?.image }}
             style={styles.thumbnailImage}
             containerStyle={styles.thumbnailContainer}
             resizeMode="cover"
