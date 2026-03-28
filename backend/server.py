@@ -1323,9 +1323,79 @@ async def create_document(doc: DocumentCreate):
     await db.documents.insert_one(doc_dict)
     return DocumentResponse(**{k: v for k, v in doc_dict.items() if k != 'password_hash'})
 
-@api_router.get("/documents", response_model=List[DocumentResponse])
-async def list_documents():
-    docs = await db.documents.find({}, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(500)
+@api_router.get("/documents", response_model=PaginatedDocumentsResponse)
+async def list_documents(
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(20, ge=1, le=100, description="Items per page"),
+    search: Optional[str] = Query(None, description="Search in title and tags"),
+    document_type: Optional[str] = Query(None, description="Filter by document type"),
+    sort_by: str = Query("created_at", description="Sort field"),
+    sort_order: str = Query("desc", description="Sort order: asc or desc")
+):
+    """
+    List documents with pagination, filtering, and optimized field projection.
+    Returns only essential fields for list view to improve performance.
+    """
+    # Build query filter
+    query_filter = {}
+    
+    if search:
+        query_filter["$or"] = [
+            {"title": {"$regex": search, "$options": "i"}},
+            {"tags": {"$regex": search, "$options": "i"}}
+        ]
+    
+    if document_type:
+        query_filter["document_type"] = document_type
+    
+    # Field projection - only return fields needed for list view
+    projection = {
+        "_id": 0,
+        "id": 1,
+        "title": 1,
+        "document_type": 1,
+        "document_subtype": 1,
+        "detected_language": 1,
+        "created_at": 1,
+        "size_kb": 1,
+        "is_locked": 1,
+        "tags": 1,
+        "image_thumbnail": 1,
+        "pages_count": 1,
+        "confidence": 1
+    }
+    
+    # Sort configuration
+    sort_direction = -1 if sort_order == "desc" else 1
+    
+    # Get total count for pagination
+    total = await db.documents.count_documents(query_filter)
+    
+    # Calculate pagination
+    skip = (page - 1) * page_size
+    total_pages = (total + page_size - 1) // page_size if total > 0 else 1
+    
+    # Execute optimized query with projection and pagination
+    docs = await db.documents.find(
+        query_filter, 
+        projection
+    ).sort(sort_by, sort_direction).skip(skip).limit(page_size).to_list(page_size)
+    
+    return PaginatedDocumentsResponse(
+        documents=[DocumentListItem(**d) for d in docs],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+        has_next=page < total_pages,
+        has_prev=page > 1
+    )
+
+# Legacy endpoint for backward compatibility (returns all fields)
+@api_router.get("/documents/all", response_model=List[DocumentResponse])
+async def list_all_documents(limit: int = Query(100, ge=1, le=500)):
+    """Legacy endpoint - returns full document data. Use /documents for optimized list."""
+    docs = await db.documents.find({}, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(limit)
     return [DocumentResponse(**d) for d in docs]
 
 @api_router.get("/documents/{doc_id}", response_model=DocumentResponse)
