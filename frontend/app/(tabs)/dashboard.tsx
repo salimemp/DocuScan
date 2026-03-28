@@ -2,11 +2,12 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   StatusBar, Image, RefreshControl, ActivityIndicator,
-  Modal, Pressable, TextInput, Alert,
+  Modal, Pressable, TextInput, Alert, Linking, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
+import * as StoreReview from 'expo-store-review';
 import { useTheme } from '../../hooks/useTheme';
 import { useLanguage } from '../../hooks/useLanguage';
 import { CookieConsentBanner } from '../../components/CookieConsentBanner';
