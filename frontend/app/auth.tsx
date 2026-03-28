@@ -191,7 +191,7 @@ export default function AuthScreen() {
   const handleGoogleAuth = async () => {
     try {
       const redirectUrl = Platform.OS === 'web'
-        ? `${BACKEND_URL}/`
+        ? (typeof window !== 'undefined' ? window.location.origin + '/' : '/')
         : Linking.createURL('/');
       
       const authUrl = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
