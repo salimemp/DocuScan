@@ -178,7 +178,7 @@ def verify_password(password: str, stored_hash: str) -> bool:
     try:
         salt, hashed = stored_hash.split(':')
         return hashlib.sha256(f"{salt}{password}".encode()).hexdigest() == hashed
-    except:
+    except Exception:
         return False
 
 def create_jwt_token(user_id: str, email: str, token_type: str = "access") -> str:
