@@ -812,6 +812,175 @@ export default function DashboardScreen() {
         </View>
       </Modal>
 
+      {/* Cloud Sync Modal */}
+      <Modal visible={showCloudSync} transparent animationType="slide" onRequestClose={() => setShowCloudSync(false)}>
+        <View style={[styles.modalFull, { backgroundColor: colors.background }]}>
+          <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <TouchableOpacity onPress={() => setShowCloudSync(false)} style={styles.modalHeaderBtn}>
+                <Ionicons name="close" size={24} color={colors.textPrimary} />
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Cloud Sync</Text>
+              <View style={{ width: 44 }} />
+            </View>
+            
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20 }}>
+              <View style={[styles.cloudHeader, { backgroundColor: colors.primary + '15' }]}>
+                <View style={[styles.cloudHeaderIcon, { backgroundColor: colors.primary }]}>
+                  <Ionicons name="sync" size={32} color="#FFF" />
+                </View>
+                <Text style={[styles.cloudHeaderTitle, { color: colors.textPrimary }]}>Auto-Sync Documents</Text>
+                <Text style={[styles.cloudHeaderSubtitle, { color: colors.textSecondary }]}>
+                  Keep your documents synced across all devices
+                </Text>
+              </View>
+
+              <Text style={[styles.cloudSectionTitle, { color: colors.textSecondary }]}>SELECT PROVIDER</Text>
+              
+              {cloudProviders.map((provider) => (
+                <TouchableOpacity
+                  key={provider.id}
+                  style={[styles.cloudProvider, { backgroundColor: colors.surface, ...shadows.sm }]}
+                  onPress={() => handleCloudSyncToggle(provider.id)}
+                >
+                  <View style={[styles.cloudProviderIcon, { backgroundColor: provider.color + '18' }]}>
+                    <Ionicons name={provider.icon as any} size={24} color={provider.color} />
+                  </View>
+                  <Text style={[styles.cloudProviderName, { color: colors.textPrimary }]}>{provider.name}</Text>
+                  <View style={[styles.connectBadge, { backgroundColor: colors.surfaceHighlight }]}>
+                    <Text style={[styles.connectBadgeText, { color: colors.textSecondary }]}>Enable</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+
+              <View style={[styles.cloudInfo, { backgroundColor: colors.surfaceHighlight }]}>
+                <Ionicons name="shield-checkmark-outline" size={20} color={colors.textSecondary} />
+                <Text style={[styles.cloudInfoText, { color: colors.textSecondary }]}>
+                  All synced documents are encrypted end-to-end
+                </Text>
+              </View>
+            </ScrollView>
+          </SafeAreaView>
+        </View>
+      </Modal>
+
+      {/* Default Format Modal */}
+      <Modal visible={showDefaultFormat} transparent animationType="slide" onRequestClose={() => setShowDefaultFormat(false)}>
+        <View style={[styles.modalFull, { backgroundColor: colors.background }]}>
+          <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <TouchableOpacity onPress={() => setShowDefaultFormat(false)} style={styles.modalHeaderBtn}>
+                <Ionicons name="close" size={24} color={colors.textPrimary} />
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Default Format</Text>
+              <View style={{ width: 44 }} />
+            </View>
+            
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20 }}>
+              <View style={[styles.cloudHeader, { backgroundColor: '#059669' + '15' }]}>
+                <View style={[styles.cloudHeaderIcon, { backgroundColor: '#059669' }]}>
+                  <Ionicons name="document-text" size={32} color="#FFF" />
+                </View>
+                <Text style={[styles.cloudHeaderTitle, { color: colors.textPrimary }]}>Export Format</Text>
+                <Text style={[styles.cloudHeaderSubtitle, { color: colors.textSecondary }]}>
+                  Choose your preferred document format
+                </Text>
+              </View>
+
+              <Text style={[styles.cloudSectionTitle, { color: colors.textSecondary }]}>AVAILABLE FORMATS</Text>
+              
+              {formatOptions.map((format) => (
+                <TouchableOpacity
+                  key={format.id}
+                  style={[
+                    styles.cloudProvider, 
+                    { backgroundColor: colors.surface, ...shadows.sm },
+                    selectedFormat === format.id && { borderColor: colors.primary, borderWidth: 2 }
+                  ]}
+                  onPress={() => {
+                    setSelectedFormat(format.id);
+                    setShowDefaultFormat(false);
+                  }}
+                >
+                  <View style={[styles.cloudProviderIcon, { backgroundColor: colors.primary + '18' }]}>
+                    <Ionicons name={format.icon as any} size={24} color={colors.primary} />
+                  </View>
+                  <Text style={[styles.cloudProviderName, { color: colors.textPrimary }]}>{format.label}</Text>
+                  {selectedFormat === format.id && (
+                    <View style={[styles.langCheck, { backgroundColor: colors.primary }]}>
+                      <Ionicons name="checkmark" size={18} color="#FFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </SafeAreaView>
+        </View>
+      </Modal>
+
+      {/* Help Center Modal */}
+      <Modal visible={showHelpCenter} transparent animationType="slide" onRequestClose={() => setShowHelpCenter(false)}>
+        <View style={[styles.modalFull, { backgroundColor: colors.background }]}>
+          <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <TouchableOpacity onPress={() => setShowHelpCenter(false)} style={styles.modalHeaderBtn}>
+                <Ionicons name="close" size={24} color={colors.textPrimary} />
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Help Center</Text>
+              <View style={{ width: 44 }} />
+            </View>
+            
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20 }}>
+              <View style={[styles.cloudHeader, { backgroundColor: '#F59E0B' + '15' }]}>
+                <View style={[styles.cloudHeaderIcon, { backgroundColor: '#F59E0B' }]}>
+                  <Ionicons name="help-buoy" size={32} color="#FFF" />
+                </View>
+                <Text style={[styles.cloudHeaderTitle, { color: colors.textPrimary }]}>How can we help?</Text>
+                <Text style={[styles.cloudHeaderSubtitle, { color: colors.textSecondary }]}>
+                  Browse topics or contact our support team
+                </Text>
+              </View>
+
+              <Text style={[styles.cloudSectionTitle, { color: colors.textSecondary }]}>POPULAR TOPICS</Text>
+              
+              {helpTopics.map((topic) => (
+                <TouchableOpacity
+                  key={topic.id}
+                  style={[styles.cloudProvider, { backgroundColor: colors.surface, ...shadows.sm }]}
+                  onPress={() => {
+                    Alert.alert(topic.title, `Detailed help for "${topic.title}" will be available in the full version.\n\nFor immediate assistance, please contact support@docscanpro.app`);
+                  }}
+                >
+                  <View style={[styles.cloudProviderIcon, { backgroundColor: '#F59E0B' + '18' }]}>
+                    <Ionicons name={topic.icon as any} size={24} color="#F59E0B" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.cloudProviderName, { color: colors.textPrimary }]}>{topic.title}</Text>
+                    <Text style={[styles.helpTopicDesc, { color: colors.textSecondary }]}>{topic.description}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                </TouchableOpacity>
+              ))}
+
+              <TouchableOpacity
+                style={[styles.helpContactBtn, { backgroundColor: colors.primary }]}
+                onPress={handleContactSupport}
+              >
+                <Ionicons name="mail-outline" size={20} color="#FFF" />
+                <Text style={styles.helpContactBtnText}>Contact Support</Text>
+              </TouchableOpacity>
+
+              <View style={[styles.cloudInfo, { backgroundColor: colors.surfaceHighlight }]}>
+                <Ionicons name="time-outline" size={20} color={colors.textSecondary} />
+                <Text style={[styles.cloudInfoText, { color: colors.textSecondary }]}>
+                  Our support team typically responds within 24 hours
+                </Text>
+              </View>
+            </ScrollView>
+          </SafeAreaView>
+        </View>
+      </Modal>
+
       {/* Powered By Elixio Digital */}
       <PoweredByElixio style={{ bottom: 90 }} />
 
