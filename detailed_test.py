@@ -7,7 +7,7 @@ import requests
 import json
 import base64
 
-BASE_URL = "https://secure-docs-42.preview.emergentagent.com/api"
+BASE_URL = "https://widget-native-build.preview.emergentagent.com/api"
 HEADERS = {"Content-Type": "application/json"}
 
 def create_simple_image():

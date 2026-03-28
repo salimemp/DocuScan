@@ -11,7 +11,7 @@ import sys
 from typing import Dict, Any, Optional
 
 # Backend URL from environment
-BACKEND_URL = "https://secure-docs-42.preview.emergentagent.com/api"
+BACKEND_URL = "https://widget-native-build.preview.emergentagent.com/api"
 
 class ExportFormatTester:
     def __init__(self):

@@ -15,7 +15,7 @@ export default defineConfig({
     timeout: 10000,
   },
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'https://secure-docs-42.preview.emergentagent.com',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'https://widget-native-build.preview.emergentagent.com',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

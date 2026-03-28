@@ -7,7 +7,7 @@ import { navigateTo, skipOnboarding } from './helpers';
 
 test.describe('Auth Flow', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto(process.env.PLAYWRIGHT_BASE_URL || 'https://secure-docs-42.preview.emergentagent.com');
+    await page.goto(process.env.PLAYWRIGHT_BASE_URL || 'https://widget-native-build.preview.emergentagent.com');
     await page.waitForTimeout(3000);
     await skipOnboarding(page);
     await navigateTo(page, '/auth');
