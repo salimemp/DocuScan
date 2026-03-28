@@ -160,7 +160,7 @@ jobs:
       - name: Run E2E API tests
         run: npx playwright test tests/e2e/api.spec.ts --project=desktop-chrome
         env:
-          PLAYWRIGHT_BASE_URL: ${{ vars.STAGING_URL || 'https://secure-docs-42.preview.emergentagent.com' }}
+          PLAYWRIGHT_BASE_URL: ${{ vars.STAGING_URL || 'https://widget-native-build.preview.emergentagent.com' }}
 
       - name: Upload test results
         uses: actions/upload-artifact@v4

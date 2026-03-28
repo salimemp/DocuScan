@@ -1,50 +1,71 @@
-# Welcome to your Expo app 👋
+# DocScan Pro — Frontend
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo (React Native) application with TypeScript strict mode.
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Quick Start
 
 ```bash
-npm run reset-project
+yarn install
+yarn start           # Start Metro + Expo
+yarn web             # Web only
+yarn ios             # iOS simulator
+yarn android         # Android emulator
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Scripts
 
-## Learn more
+| Script | Description |
+|--------|-------------|
+| `yarn start` | Start Expo dev server |
+| `yarn typecheck` | Run `tsc --noEmit` (zero errors expected) |
+| `yarn lint` | ESLint check |
+| `yarn test:e2e` | Run all Playwright E2E tests |
+| `yarn test:e2e:api` | API integration tests only (fastest) |
+| `yarn test:e2e:ui` | Dashboard + History + Widgets UI tests |
+| `yarn test:e2e:auth` | Authentication flow tests |
+| `yarn test:e2e:navigation` | Navigation flow tests |
+| `yarn test:e2e:report` | Open Playwright HTML report |
 
-To learn more about developing your project with Expo, look at the following resources:
+## Architecture
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+- **Routing**: File-based via Expo Router (`app/` directory)
+- **State**: React Query (server state) + Zustand (client state) + AsyncStorage (persistence)
+- **Auth**: `AuthContext.tsx` — JWT tokens, login/register/magic link/social/biometrics
+- **Voice**: `useVoiceCommands` hook — global toggle + TTS feedback (persisted via AsyncStorage)
+- **Themes**: `useTheme` hook — auto dark/light from system preference
+- **i18n**: i18next with 13 locale files
+- **Error Handling**: `getErrorMessage()` utility — all catch blocks use `unknown` type
 
-## Join the community
+## Key Components
 
-Join our community of developers creating universal apps.
+| Component | Purpose |
+|-----------|--------|
+| `PasswordStrengthMeter` | Real-time password validation + HIBP breach check |
+| `TurnstileWidget` | Cloudflare bot protection (WebView native, script web) |
+| `VoiceCommandsHelp` | Categorized voice command reference modal |
+| `ReadAloudControls` | TTS playback with speed adjustment |
+| `MathSolverModal` | AI math solver interface |
+| `SignatureCanvas` | E-signature drawing pad |
+| `SpeechInput` | Voice-enabled search input |
+| `CloudProviderIcon` | SVG icons for cloud storage providers |
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Testing
+
+Playwright E2E tests live in `tests/e2e/`. Configuration in `playwright.config.ts`.
+
+**Test projects**: iPhone 14, Pixel 7, Desktop Chrome.
+
+```bash
+# Fast API tests (no browser)
+yarn test:e2e:api
+
+# Full suite
+PLAYWRIGHT_BASE_URL=https://your-app.com yarn test:e2e
+```
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `EXPO_PUBLIC_BACKEND_URL` | Yes | Backend API base URL |
+| `EXPO_PUBLIC_TURNSTILE_SITE_KEY` | No | Cloudflare Turnstile site key (defaults to test key) |

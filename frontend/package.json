@@ -14,7 +14,12 @@
     "test:e2e:api": "npx playwright test tests/e2e/api.spec.ts",
     "test:e2e:navigation": "npx playwright test tests/e2e/navigation.spec.ts",
     "test:e2e:ui": "npx playwright test tests/e2e/dashboard.spec.ts tests/e2e/history.spec.ts tests/e2e/widgets.spec.ts",
-    "test:e2e:auth": "npx playwright test tests/e2e/auth.spec.ts",
+    "test:e2e:auth": "npx playwright test tests/e2e/auth.spec.ts tests/e2e/auth-full-flow.spec.ts",
+    "test:e2e:scan": "npx playwright test tests/e2e/scan-flow.spec.ts",
+    "test:e2e:crud": "npx playwright test tests/e2e/document-crud.spec.ts",
+    "test:e2e:security": "npx playwright test tests/e2e/security-features.spec.ts",
+    "test:e2e:turnstile": "npx playwright test tests/e2e/turnstile-real.spec.ts",
+    "test:e2e:errors": "npx playwright test tests/e2e/error-handling.spec.ts",
     "test:e2e:report": "npx playwright show-report"
   },
   "dependencies": {

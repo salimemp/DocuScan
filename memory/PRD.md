@@ -1,66 +1,63 @@
 # DocScan Pro — Product Requirements Document
 
 ## Problem Statement
-Build a React Native + Expo application utilizing Expo's latest SDK. Create a simple document scanner mobile app with two main sections: Dashboard and History. Build only the frontend design (no actual functionality yet).
+Build an enterprise-grade document scanning and management mobile application using React Native (Expo) with a FastAPI backend. The app should provide AI-powered OCR, multi-format export, strong security, and a polished native-feeling UX.
 
 ## Architecture
-- **Framework**: React Native + Expo SDK 54
-- **Navigation**: Expo Router (file-based routing)
-- **Theming**: Auto dark/light via `useColorScheme`
-- **State**: Local `useState` + `useMemo`
+- **Frontend**: Expo SDK 54, React Native, TypeScript (strict), Expo Router
+- **Backend**: FastAPI, Python 3.11+, MongoDB
+- **AI**: Google Gemini (OCR, Math Solver, Business Card extraction, categorization)
+- **Email**: Resend (`noreply@notify.docscanpro.app`)
+- **Payments**: Stripe
+- **Testing**: Playwright E2E, Backend testing agent
+- **CI/CD**: GitHub Actions
 
 ## User Personas
-- Professionals who need to scan and organize documents on the go
-- Students digitizing notes, assignments, and ID cards
+- **Professionals** — Scan receipts, contracts, invoices on the go
+- **Students** — Digitize notes, assignments, ID cards
+- **Business Users** — Scan business cards, share documents, team collaboration
 
-## Core Requirements (Static)
-- Two main screens: Dashboard + History
-- Professional Blue accent (#2563EB)
-- Auto dark/light theme
-- Bottom tab navigation
-- Filter/sort in History
-- List/Grid toggle in History
+## Implemented Features (as of March 2026)
 
-## What's Been Implemented (Feb 2026 → Mar 2026)
+### Core Scanning
+- [x] Camera document scanning with multi-page
+- [x] Batch scanning (auto-capture at intervals)
+- [x] Business card scanner (AI OCR → contact extraction)
+- [x] Math solver (image/text → step-by-step solutions)
+- [x] 18+ export formats
 
-### Mar 5, 2026 — Initial Build
-- **Root layout** + **Index redirect** + **Tab layout** (Dashboard + History)
-- **Dashboard screen**: greeting, real-time stats (API-driven), blue Scan CTA, Quick Actions, Recent Scans
-- **History screen**: search, filter chips, sort modal, list/grid toggle, empty state
-- **DocumentCard component**, **Theme hook** (auto dark/light), **Mock data** (12 docs)
+### Auth & Security
+- [x] Email/password with strong password policy + HIBP breach check
+- [x] Magic link email login
+- [x] Social login (Google, Apple)
+- [x] Biometrics (Face ID / Fingerprint)
+- [x] 2FA (TOTP, email codes, hardware keys)
+- [x] Passkeys (WebAuthn)
+- [x] Cloudflare Turnstile bot protection (registration)
+- [x] API rate limiting (per-endpoint)
+- [x] AES-256-GCM document encryption
+- [x] Secure Enclave with security levels
+- [x] Document password protection
 
-### Mar 5, 2026 — Camera + Gemini AI OCR
-- **Backend scan endpoint** (`POST /api/scan`): Gemini 2.0 Flash image analysis, multilingual OCR, structured JSON output for 18 document types
-- **Backend document CRUD** (`/api/documents`, `/api/stats`): MongoDB persistence, soft delete
-- **Scan screen** (`app/scan.tsx`): Full camera UI with scan frame, flash toggle, flip camera, gallery import
-- **Preview screen** (`app/preview.tsx`): AI analysis display, confidence bar, formatted output renderer (line-by-line parser), structured fields, entity extraction (dates/amounts/names), tags, Save/Discard actions
-- **Floating FAB** visible on all tabs (Dashboard + History)
-- **Dashboard**: now loads live stats + recent docs from API, wired scan buttons
-- **History**: loads real documents from MongoDB, pull-to-refresh, delete, thumbnail display
-- **scanStore utility**: singleton for passing large base64 image between scan→preview without URL params
-- **Packages**: expo-camera@17, expo-image-picker@17, expo-image-manipulator@14 (SDK 54 compatible)
-- **app.json**: Camera + photo library permissions for iOS/Android
+### UI/UX
+- [x] Paginated document list (server-side search, filter, sort, infinite scroll)
+- [x] Voice commands (50+ commands, global toggle, help modal)
+- [x] Read aloud with speed controls
+- [x] Home screen widgets (3 sizes, deep linking, config screen)
+- [x] 13 languages with RTL
+- [x] Dark/light theme
+- [x] Haptic feedback
+- [x] Custom branding (logo, favicon, splash)
 
-## Prioritized Backlog
+### Infrastructure
+- [x] CI/CD pipeline (GitHub Actions: lint, typecheck, build, E2E, deploy)
+- [x] Playwright E2E testing (35+ tests across 6 suites)
+- [x] TypeScript strict mode — zero errors
+- [x] MongoDB indexes on hot fields
+- [x] SEO metadata for web build
+- [x] Email delivery via Resend (`notify.docscanpro.app`)
 
-### P0 (Requires user action — Gemini API Key)
-- User must add their own `GEMINI_API_KEY=<key>` to `/app/backend/.env` to use real scanning
-  - Currently uses `EMERGENT_LLM_KEY` as fallback (works with Emergent credits)
-
-### P1 (Important Features — Next)
-- Document detail screen (full-screen preview, rename, share, delete)
-- Multi-page scan stitching (scan multiple pages → single document)
-- PDF export from scanned documents
-- Document sharing (native share sheet)
-
-### P2 (Nice to Have)
-- Folder/category management
-- Cloud sync
-- Offline mode with queue
-- Push notifications for backup reminders
-
-## Next Tasks List
-1. User to add `GEMINI_API_KEY=<your-google-key>` to `/app/backend/.env` to enable real scanning
-2. Build document detail/view screen
-3. Add PDF export
-4. Implement document sharing
+## Known Limitations
+- Native iOS WidgetKit / Android AppWidget requires config plugins or ejecting
+- Speech recognition (input) is web-only via Web Speech API
+- Turnstile renders via WebView on native (iframe on web)

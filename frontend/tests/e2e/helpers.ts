@@ -4,7 +4,7 @@
  */
 import { Page, expect } from '@playwright/test';
 
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'https://secure-docs-42.preview.emergentagent.com';
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'https://widget-native-build.preview.emergentagent.com';
 
 /**
  * Skip onboarding flow if visible
