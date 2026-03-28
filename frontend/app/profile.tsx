@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useTheme } from '../hooks/useTheme';
 import { useLanguage } from '../hooks/useLanguage';
+import { getErrorMessage } from '../utils/errorHelpers';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 const AUTH_TOKEN_KEY = '@DocScanPro:authToken';
@@ -247,8 +248,8 @@ export default function ProfileScreen() {
         'Passkey/WebAuthn registration would be triggered here. This requires native WebAuthn support which varies by platform.',
         [{ text: 'OK' }]
       );
-    } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to setup passkey');
+    } catch (e: unknown) {
+      Alert.alert('Error', getErrorMessage(e) || 'Failed to setup passkey');
     }
   };
 

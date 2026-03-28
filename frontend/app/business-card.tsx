@@ -11,6 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Contacts from 'expo-contacts';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../hooks/useTheme';
+import { getErrorMessage } from '../utils/errorHelpers';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 
@@ -141,8 +142,8 @@ export default function BusinessCardScanner() {
         setCardId(data.card_id);
         setMode('result');
       }
-    } catch (e: any) {
-      Alert.alert('Scan Failed', e.message || 'Could not extract contact information');
+    } catch (e: unknown) {
+      Alert.alert('Scan Failed', getErrorMessage(e) || 'Could not extract contact information');
       if (isMountedRef.current) {
         setMode('camera');
       }
@@ -193,7 +194,7 @@ export default function BusinessCardScanner() {
       Alert.alert('Success', 'Contact saved to your device!', [
         { text: 'OK', onPress: () => router.back() }
       ]);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Failed to save contact:', e);
       Alert.alert('Error', 'Failed to save contact');
     }

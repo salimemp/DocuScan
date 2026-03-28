@@ -13,6 +13,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { SignatureCanvas } from '../../components/SignatureCanvas';
 import { ReadAloudControls, ReadAloudButton } from '../../components/ReadAloudControls';
+import { getErrorMessage } from '../../utils/errorHelpers';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 
@@ -107,8 +108,8 @@ export default function DocumentDetailScreen() {
       const data = await res.json();
       setDoc(data);
       setNewTitle(data.title || '');
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(getErrorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -147,8 +148,8 @@ export default function DocumentDetailScreen() {
       const updated = await res.json();
       setDoc(updated);
       setShowRename(false);
-    } catch (e: any) {
-      Alert.alert('Error', e.message);
+    } catch (e: unknown) {
+      Alert.alert('Error', getErrorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -200,8 +201,8 @@ export default function DocumentDetailScreen() {
         Alert.alert('Success', `Document exported as ${filename}`);
       }
       setShowExport(false);
-    } catch (e: any) {
-      Alert.alert('Export Failed', e.message);
+    } catch (e: unknown) {
+      Alert.alert('Export Failed', getErrorMessage(e));
     } finally {
       setExporting(false);
     }
@@ -214,8 +215,8 @@ export default function DocumentDetailScreen() {
         message: `${doc?.title || 'Document'}\n\n${doc?.summary || ''}\n\n${doc?.formatted_output || doc?.raw_text || ''}`,
       };
       await Share.share(shareContent);
-    } catch (e: any) {
-      Alert.alert('Share Failed', e.message);
+    } catch (e: unknown) {
+      Alert.alert('Share Failed', getErrorMessage(e));
     }
   };
 
@@ -240,8 +241,8 @@ export default function DocumentDetailScreen() {
       await fetchDocument();
       setNewComment('');
       Alert.alert('Success', 'Comment added!');
-    } catch (e: any) {
-      Alert.alert('Error', e.message);
+    } catch (e: unknown) {
+      Alert.alert('Error', getErrorMessage(e));
     } finally {
       setAddingComment(false);
     }
@@ -280,8 +281,8 @@ export default function DocumentDetailScreen() {
       if (!res.ok) throw new Error('Failed to save signature');
       await fetchSignatures();
       Alert.alert('Success', 'Signature saved!');
-    } catch (e: any) {
-      Alert.alert('Error', e.message);
+    } catch (e: unknown) {
+      Alert.alert('Error', getErrorMessage(e));
     }
   };
 
@@ -302,8 +303,8 @@ export default function DocumentDetailScreen() {
       await fetchDocument();
       setShowSignatures(false);
       Alert.alert('Success', 'Signature added to document!');
-    } catch (e: any) {
-      Alert.alert('Error', e.message);
+    } catch (e: unknown) {
+      Alert.alert('Error', getErrorMessage(e));
     }
   };
 
@@ -332,8 +333,8 @@ export default function DocumentDetailScreen() {
       setSignerEmail('');
       setRequestMessage('');
       Alert.alert('Success', `Signature request sent to ${signerEmail}`);
-    } catch (e: any) {
-      Alert.alert('Error', e.message);
+    } catch (e: unknown) {
+      Alert.alert('Error', getErrorMessage(e));
     } finally {
       setSendingRequest(false);
     }
@@ -363,8 +364,8 @@ export default function DocumentDetailScreen() {
       setSignerEmail('');
       setRequestMessage('');
       Alert.alert('Success', `Comment request sent to ${signerEmail}`);
-    } catch (e: any) {
-      Alert.alert('Error', e.message);
+    } catch (e: unknown) {
+      Alert.alert('Error', getErrorMessage(e));
     } finally {
       setSendingRequest(false);
     }

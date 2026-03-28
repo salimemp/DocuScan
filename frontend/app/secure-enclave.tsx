@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '../hooks/useTheme';
 import { useLanguage } from '../hooks/useLanguage';
+import { getErrorMessage } from '../utils/errorHelpers';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 
@@ -148,8 +149,8 @@ export default function SecureEnclaveScreen() {
       Alert.alert('Success', `${docsToEncrypt.length} document(s) encrypted successfully`);
       resetModals();
       fetchData();
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Encryption failed');
+    } catch (error: unknown) {
+      Alert.alert('Error', getErrorMessage(error, 'Encryption failed'));
     } finally {
       setActionLoading(false);
     }
@@ -178,8 +179,8 @@ export default function SecureEnclaveScreen() {
       resetModals();
       // Navigate to document view with decrypted data
       router.push({ pathname: '/document/[id]', params: { id: targetDocId } });
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Incorrect password');
+    } catch (error: unknown) {
+      Alert.alert('Error', getErrorMessage(error, 'Incorrect password'));
     } finally {
       setActionLoading(false);
     }
@@ -210,8 +211,8 @@ export default function SecureEnclaveScreen() {
               Alert.alert('Success', 'Encryption removed');
               resetModals();
               fetchData();
-            } catch (error: any) {
-              Alert.alert('Error', error.message);
+            } catch (error: unknown) {
+              Alert.alert('Error', getErrorMessage(error));
             } finally {
               setActionLoading(false);
             }
@@ -231,8 +232,8 @@ export default function SecureEnclaveScreen() {
       
       Alert.alert('Success', 'Document moved to secure enclave');
       fetchData();
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
+    } catch (error: unknown) {
+      Alert.alert('Error', getErrorMessage(error));
     }
   };
 
@@ -255,8 +256,8 @@ export default function SecureEnclaveScreen() {
         `Category: ${data.category}\nConfidence: ${Math.round(data.confidence * 100)}%\n\n${data.recommendation}`
       );
       fetchData();
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
+    } catch (error: unknown) {
+      Alert.alert('Error', getErrorMessage(error));
     }
   };
 
@@ -272,9 +273,9 @@ export default function SecureEnclaveScreen() {
     setSelectedDocs(new Set());
   };
 
-  const renderDocItem = ({ item }: { item: any }) => {
+  const renderDocItem = ({ item }: { item: { id: string; title: string; security_level: string; document_type: string; created_at: string; is_locked: boolean; enclave_level?: string; is_encrypted?: boolean; is_in_enclave?: boolean; image_thumbnail?: string } }) => {
     const meta = getMeta(item.document_type);
-    const levelConfig = LEVEL_CONFIG[item.enclave_level as EnclaveLevel] || LEVEL_CONFIG[0];
+    const levelConfig = LEVEL_CONFIG[(item.enclave_level as unknown as EnclaveLevel)] || LEVEL_CONFIG[0];
     const isSelected = selectedDocs.has(item.id);
     
     return (

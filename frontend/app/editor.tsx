@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../hooks/useTheme';
 import { useLanguage } from '../hooks/useLanguage';
+import { getErrorMessage } from '../utils/errorHelpers';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -92,8 +93,8 @@ export default function EditorScreen() {
       } else {
         setPages([{ id: 0, thumbnail: null, content: initialContent }]);
       }
-    } catch (e: any) {
-      Alert.alert('Error', e.message);
+    } catch (e: unknown) {
+      Alert.alert('Error', getErrorMessage(e));
       router.back();
     } finally {
       setLoading(false);
@@ -145,8 +146,8 @@ export default function EditorScreen() {
       });
       if (!res.ok) throw new Error('Failed to save');
       router.back();
-    } catch (e: any) {
-      Alert.alert('Save Failed', e.message);
+    } catch (e: unknown) {
+      Alert.alert('Save Failed', getErrorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -268,8 +269,8 @@ export default function EditorScreen() {
       if (!res.ok) throw new Error('AI request failed');
       const data = await res.json();
       setAiResponse(data.response);
-    } catch (e: any) {
-      setAiResponse(`Error: ${e.message}`);
+    } catch (e: unknown) {
+      setAiResponse(`Error: ${getErrorMessage(e)}`);
     } finally {
       setAiLoading(false);
     }

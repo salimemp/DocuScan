@@ -3,6 +3,7 @@
  * Provides voice input capabilities with real-time transcription
  */
 import { Platform, NativeEventEmitter, NativeModules } from 'react-native';
+import { getErrorMessage } from '../utils/errorHelpers';
 
 // Types
 export interface SpeechRecognitionResult {
@@ -160,10 +161,10 @@ class SpeechRecognitionService {
       await this.Voice.start(locale);
       this.isListening = true;
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.onErrorCallback?.({
         code: 'START_ERROR',
-        message: error.message || 'Failed to start speech recognition',
+        message: getErrorMessage(error) || 'Failed to start speech recognition',
       });
       return false;
     }

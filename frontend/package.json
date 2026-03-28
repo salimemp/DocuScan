@@ -8,7 +8,14 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "npx playwright test",
+    "test:e2e:api": "npx playwright test tests/e2e/api.spec.ts",
+    "test:e2e:navigation": "npx playwright test tests/e2e/navigation.spec.ts",
+    "test:e2e:ui": "npx playwright test tests/e2e/dashboard.spec.ts tests/e2e/history.spec.ts tests/e2e/widgets.spec.ts",
+    "test:e2e:auth": "npx playwright test tests/e2e/auth.spec.ts",
+    "test:e2e:report": "npx playwright show-report"
   },
   "dependencies": {
     "@babel/runtime": "^7.20.6",
@@ -64,6 +71,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@playwright/test": "^1.58.2",
     "@types/react": "~19.1.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",

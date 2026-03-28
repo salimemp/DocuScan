@@ -10,6 +10,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useTheme } from '../hooks/useTheme';
 import { useLanguage } from '../hooks/useLanguage';
+import { getErrorMessage } from '../utils/errorHelpers';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 
@@ -114,8 +115,8 @@ export const MathSolverModal: React.FC<MathSolverModalProps> = ({ visible, onClo
 
       const data = await res.json();
       setSolution(data.solution);
-    } catch (e: any) {
-      setError(e.message || 'Something went wrong');
+    } catch (e: unknown) {
+      setError(getErrorMessage(e) || 'Something went wrong');
     } finally {
       setLoading(false);
     }
