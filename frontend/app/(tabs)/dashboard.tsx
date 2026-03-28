@@ -530,10 +530,10 @@ export default function DashboardScreen() {
                   <Text style={[styles.settingsItemValue, { color: colors.textTertiary }]}>{getCurrentLanguageInfo().nativeName}</Text>
                 </TouchableOpacity>
                 <View style={[styles.settingsDivider, { backgroundColor: colors.border }]} />
-                <TouchableOpacity style={styles.settingsItem}>
+                <TouchableOpacity style={styles.settingsItem} onPress={() => setShowCloudSync(true)}>
                   <Ionicons name="cloud-outline" size={22} color={colors.primary} />
                   <Text style={[styles.settingsItemText, { color: colors.textPrimary }]}>Cloud Sync</Text>
-                  <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                  <Text style={[styles.settingsItemValue, { color: colors.textTertiary }]}>{cloudSyncEnabled ? 'On' : 'Off'}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -546,29 +546,31 @@ export default function DashboardScreen() {
                   <Text style={[styles.settingsItemValue, { color: colors.textTertiary }]}>Gemini 3</Text>
                 </TouchableOpacity>
                 <View style={[styles.settingsDivider, { backgroundColor: colors.border }]} />
-                <TouchableOpacity style={styles.settingsItem}>
+                <TouchableOpacity style={styles.settingsItem} onPress={() => setShowDefaultFormat(true)}>
                   <Ionicons name="document-text-outline" size={22} color={colors.primary} />
                   <Text style={[styles.settingsItemText, { color: colors.textPrimary }]}>Default Format</Text>
-                  <Text style={[styles.settingsItemValue, { color: colors.textTertiary }]}>Auto-detect</Text>
+                  <Text style={[styles.settingsItemValue, { color: colors.textTertiary }]}>
+                    {formatOptions.find(f => f.id === selectedFormat)?.label || 'Auto-detect'}
+                  </Text>
                 </TouchableOpacity>
               </View>
 
               {/* Support */}
               <Text style={[styles.settingsSection, { color: colors.textSecondary }]}>SUPPORT</Text>
               <View style={[styles.settingsCard, { backgroundColor: colors.surface, ...shadows.sm }]}>
-                <TouchableOpacity style={styles.settingsItem}>
+                <TouchableOpacity style={styles.settingsItem} onPress={() => setShowHelpCenter(true)}>
                   <Ionicons name="help-circle-outline" size={22} color={colors.primary} />
                   <Text style={[styles.settingsItemText, { color: colors.textPrimary }]}>Help Center</Text>
                   <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                 </TouchableOpacity>
                 <View style={[styles.settingsDivider, { backgroundColor: colors.border }]} />
-                <TouchableOpacity style={styles.settingsItem}>
+                <TouchableOpacity style={styles.settingsItem} onPress={handleContactSupport}>
                   <Ionicons name="chatbubble-outline" size={22} color={colors.primary} />
                   <Text style={[styles.settingsItemText, { color: colors.textPrimary }]}>Contact Support</Text>
                   <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                 </TouchableOpacity>
                 <View style={[styles.settingsDivider, { backgroundColor: colors.border }]} />
-                <TouchableOpacity style={styles.settingsItem}>
+                <TouchableOpacity style={styles.settingsItem} onPress={handleRateApp}>
                   <Ionicons name="star-outline" size={22} color={colors.primary} />
                   <Text style={[styles.settingsItemText, { color: colors.textPrimary }]}>Rate App</Text>
                   <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
