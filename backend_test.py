@@ -1,382 +1,508 @@
 #!/usr/bin/env python3
 """
-DocScan Pro Backend API Testing Suite
-Tests authentication and subscription endpoints as requested in the review.
+Comprehensive Backend API Testing for DocScan Pro
+Testing paginated documents API functionality
 """
 
-import asyncio
-import aiohttp
+import requests
 import json
-import sys
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, List, Any
 
-# Test configuration
-BASE_URL = "https://math-solver-app-8.preview.emergentagent.com/api"
-TEST_USER_EMAIL = "newtest@test.com"
-TEST_USER_PASSWORD = "testpass123"
-TEST_USER_NAME = "New Test User"
-MAGIC_LINK_EMAIL = "test@example.com"
+# API Configuration
+BASE_URL = "https://secure-docs-42.preview.emergentagent.com/api"
 
-class DocScanAPITester:
-    def __init__(self, base_url: str):
-        self.base_url = base_url
-        self.session: Optional[aiohttp.ClientSession] = None
-        self.auth_token: Optional[str] = None
-        self.refresh_token: Optional[str] = None
-        self.user_data: Optional[Dict[str, Any]] = None
+class APITester:
+    def __init__(self):
+        self.base_url = BASE_URL
+        self.session = requests.Session()
+        self.test_results = []
         
-    async def __aenter__(self):
-        self.session = aiohttp.ClientSession()
-        return self
-        
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self.session:
-            await self.session.close()
-    
-    def log_test(self, test_name: str, status: str, details: str = ""):
-        """Log test results with timestamp"""
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        status_symbol = "✅" if status == "PASS" else "❌" if status == "FAIL" else "⚠️"
-        print(f"[{timestamp}] {status_symbol} {test_name}: {status}")
+    def log_test(self, test_name: str, success: bool, details: str = ""):
+        """Log test results"""
+        status = "✅ PASS" if success else "❌ FAIL"
+        self.test_results.append({
+            "test": test_name,
+            "status": status,
+            "success": success,
+            "details": details
+        })
+        print(f"{status}: {test_name}")
         if details:
-            print(f"    {details}")
+            print(f"   Details: {details}")
     
-    async def make_request(self, method: str, endpoint: str, data: Dict = None, headers: Dict = None) -> Dict:
-        """Make HTTP request and return response"""
-        url = f"{self.base_url}{endpoint}"
-        request_headers = {"Content-Type": "application/json"}
-        
-        if headers:
-            request_headers.update(headers)
-            
-        if self.auth_token and "Authorization" not in request_headers:
-            request_headers["Authorization"] = f"Bearer {self.auth_token}"
-        
+    def make_request(self, endpoint: str, method: str = "GET", **kwargs) -> tuple:
+        """Make HTTP request and return (success, response, error)"""
         try:
-            async with self.session.request(
-                method, 
-                url, 
-                json=data if data else None,
-                headers=request_headers
-            ) as response:
-                response_text = await response.text()
-                
+            url = f"{self.base_url}{endpoint}"
+            response = self.session.request(method, url, timeout=30, **kwargs)
+            
+            if response.status_code == 200:
                 try:
-                    response_data = json.loads(response_text) if response_text else {}
+                    data = response.json()
+                    return True, data, None
                 except json.JSONDecodeError:
-                    response_data = {"raw_response": response_text}
-                
-                return {
-                    "status": response.status,
-                    "data": response_data,
-                    "headers": dict(response.headers)
-                }
-        except Exception as e:
-            return {
-                "status": 0,
-                "data": {"error": str(e)},
-                "headers": {}
-            }
-    
-    async def test_auth_register(self) -> bool:
-        """Test user registration endpoint"""
-        test_name = "POST /api/auth/register"
-        
-        payload = {
-            "email": TEST_USER_EMAIL,
-            "password": TEST_USER_PASSWORD,
-            "name": TEST_USER_NAME
-        }
-        
-        response = await self.make_request("POST", "/auth/register", payload)
-        
-        if response["status"] == 200:
-            data = response["data"]
-            if all(key in data for key in ["access_token", "refresh_token", "user"]):
-                self.auth_token = data["access_token"]
-                self.refresh_token = data["refresh_token"]
-                self.user_data = data["user"]
-                
-                # Validate user object structure
-                user = data["user"]
-                required_fields = ["user_id", "email", "name", "email_verified", "created_at"]
-                missing_fields = [field for field in required_fields if field not in user]
-                
-                if missing_fields:
-                    self.log_test(test_name, "FAIL", f"Missing user fields: {missing_fields}")
-                    return False
-                
-                self.log_test(test_name, "PASS", f"User registered: {user['email']}, Token received")
-                return True
+                    return False, None, f"Invalid JSON response: {response.text[:200]}"
             else:
-                self.log_test(test_name, "FAIL", f"Missing required fields in response: {list(data.keys())}")
-                return False
-        elif response["status"] == 400 and "already registered" in str(response["data"]):
-            self.log_test(test_name, "PASS", "User already exists (expected for repeated tests)")
-            return True
-        else:
-            self.log_test(test_name, "FAIL", f"Status {response['status']}: {response['data']}")
-            return False
-    
-    async def test_auth_login(self) -> bool:
-        """Test user login endpoint"""
-        test_name = "POST /api/auth/login"
-        
-        payload = {
-            "email": TEST_USER_EMAIL,
-            "password": TEST_USER_PASSWORD
-        }
-        
-        response = await self.make_request("POST", "/auth/login", payload)
-        
-        if response["status"] == 200:
-            data = response["data"]
-            if all(key in data for key in ["access_token", "refresh_token", "user"]):
-                self.auth_token = data["access_token"]
-                self.refresh_token = data["refresh_token"]
-                self.user_data = data["user"]
+                return False, None, f"HTTP {response.status_code}: {response.text[:200]}"
                 
-                # Validate token structure
-                if not data["access_token"] or not data["refresh_token"]:
-                    self.log_test(test_name, "FAIL", "Empty tokens received")
-                    return False
-                
-                self.log_test(test_name, "PASS", f"Login successful: {data['user']['email']}")
-                return True
-            else:
-                self.log_test(test_name, "FAIL", f"Missing required fields: {list(data.keys())}")
-                return False
-        else:
-            self.log_test(test_name, "FAIL", f"Status {response['status']}: {response['data']}")
-            return False
+        except requests.exceptions.RequestException as e:
+            return False, None, f"Request failed: {str(e)}"
     
-    async def test_auth_me(self) -> bool:
-        """Test get current user endpoint"""
-        test_name = "GET /api/auth/me"
+    def verify_pagination_structure(self, data: Dict[str, Any]) -> tuple:
+        """Verify pagination response structure"""
+        required_fields = ["documents", "total", "page", "page_size", "total_pages", "has_next", "has_prev"]
+        missing_fields = [field for field in required_fields if field not in data]
         
-        if not self.auth_token:
-            self.log_test(test_name, "FAIL", "No auth token available")
-            return False
+        if missing_fields:
+            return False, f"Missing pagination fields: {missing_fields}"
         
-        response = await self.make_request("GET", "/auth/me")
+        # Verify data types
+        if not isinstance(data["documents"], list):
+            return False, "documents field must be a list"
+        if not isinstance(data["total"], int):
+            return False, "total field must be an integer"
+        if not isinstance(data["page"], int):
+            return False, "page field must be an integer"
+        if not isinstance(data["page_size"], int):
+            return False, "page_size field must be an integer"
+        if not isinstance(data["total_pages"], int):
+            return False, "total_pages field must be an integer"
+        if not isinstance(data["has_next"], bool):
+            return False, "has_next field must be a boolean"
+        if not isinstance(data["has_prev"], bool):
+            return False, "has_prev field must be a boolean"
         
-        if response["status"] == 200:
-            data = response["data"]
-            required_fields = ["user_id", "email", "name", "email_verified", "created_at"]
-            missing_fields = [field for field in required_fields if field not in data]
-            
-            if missing_fields:
-                self.log_test(test_name, "FAIL", f"Missing fields: {missing_fields}")
-                return False
-            
-            if data["email"] != TEST_USER_EMAIL:
-                self.log_test(test_name, "FAIL", f"Email mismatch: expected {TEST_USER_EMAIL}, got {data['email']}")
-                return False
-            
-            self.log_test(test_name, "PASS", f"User info retrieved: {data['email']}")
-            return True
-        elif response["status"] == 401:
-            self.log_test(test_name, "FAIL", "Authentication failed - invalid token")
-            return False
-        else:
-            self.log_test(test_name, "FAIL", f"Status {response['status']}: {response['data']}")
-            return False
+        return True, "Pagination structure valid"
     
-    async def test_magic_link_request(self) -> bool:
-        """Test magic link request endpoint"""
-        test_name = "POST /api/auth/magic-link/request"
+    def verify_document_fields(self, document: Dict[str, Any]) -> tuple:
+        """Verify document has required lightweight fields"""
+        required_fields = [
+            "id", "title", "document_type", "detected_language", 
+            "created_at", "is_locked", "tags", "image_thumbnail", 
+            "pages_count", "confidence"
+        ]
         
-        payload = {
-            "email": MAGIC_LINK_EMAIL
-        }
+        missing_fields = [field for field in required_fields if field not in document]
+        if missing_fields:
+            return False, f"Missing document fields: {missing_fields}"
         
-        response = await self.make_request("POST", "/auth/magic-link/request", payload)
+        # Verify specific field types
+        if not isinstance(document["tags"], list):
+            return False, "tags field must be a list"
+        if not isinstance(document["is_locked"], bool):
+            return False, "is_locked field must be a boolean"
+        if not isinstance(document["pages_count"], int):
+            return False, "pages_count field must be an integer"
+        if not isinstance(document["confidence"], (int, float)):
+            return False, "confidence field must be a number"
         
-        if response["status"] == 200:
-            data = response["data"]
-            if "message" in data and "magic link" in data["message"].lower():
-                self.log_test(test_name, "PASS", "Magic link request accepted")
-                return True
-            else:
-                self.log_test(test_name, "FAIL", f"Unexpected response: {data}")
-                return False
-        else:
-            self.log_test(test_name, "FAIL", f"Status {response['status']}: {response['data']}")
-            return False
-    
-    async def test_subscription_tiers(self) -> bool:
-        """Test subscription tiers endpoint"""
-        test_name = "GET /api/subscriptions/tiers"
-        
-        response = await self.make_request("GET", "/subscriptions/tiers")
-        
-        if response["status"] == 200:
-            data = response["data"]
-            if "tiers" in data and isinstance(data["tiers"], list):
-                tiers = data["tiers"]
-                
-                # Check for expected tiers
-                tier_names = [tier.get("name", "").lower() for tier in tiers]
-                expected_tiers = ["plus", "pro", "business"]
-                
-                found_tiers = []
-                for expected in expected_tiers:
-                    if any(expected in name for name in tier_names):
-                        found_tiers.append(expected)
-                
-                if len(found_tiers) >= 3:
-                    # Validate tier structure
-                    for tier in tiers:
-                        required_fields = ["id", "name", "monthly_price", "annual_price", "features"]
-                        missing_fields = [field for field in required_fields if field not in tier]
-                        if missing_fields:
-                            self.log_test(test_name, "FAIL", f"Tier missing fields: {missing_fields}")
-                            return False
-                    
-                    self.log_test(test_name, "PASS", f"Found {len(tiers)} tiers: {[t['name'] for t in tiers]}")
-                    return True
-                else:
-                    self.log_test(test_name, "FAIL", f"Expected 3 tiers (plus, pro, business), found: {tier_names}")
-                    return False
-            else:
-                self.log_test(test_name, "FAIL", f"Invalid response structure: {list(data.keys())}")
-                return False
-        else:
-            self.log_test(test_name, "FAIL", f"Status {response['status']}: {response['data']}")
-            return False
-    
-    async def test_subscription_current_with_auth(self) -> bool:
-        """Test current subscription endpoint with authentication"""
-        test_name = "GET /api/subscriptions/current (with auth)"
-        
-        if not self.auth_token:
-            self.log_test(test_name, "FAIL", "No auth token available")
-            return False
-        
-        response = await self.make_request("GET", "/subscriptions/current")
-        
-        if response["status"] == 200:
-            data = response["data"]
-            
-            # For new users, should return free tier limits
-            if "subscription" in data and "tier_limits" in data:
-                if data["subscription"] is None:
-                    # Free tier user
-                    limits = data["tier_limits"]
-                    if "scans_per_day" in limits and "storage_gb" in limits:
-                        self.log_test(test_name, "PASS", f"Free tier limits: {limits}")
-                        return True
-                    else:
-                        self.log_test(test_name, "FAIL", f"Missing tier limits: {limits}")
-                        return False
-                else:
-                    # Paid subscription
-                    sub = data["subscription"]
-                    required_fields = ["subscription_id", "tier", "status", "amount"]
-                    missing_fields = [field for field in required_fields if field not in sub]
-                    if missing_fields:
-                        self.log_test(test_name, "FAIL", f"Missing subscription fields: {missing_fields}")
-                        return False
-                    
-                    self.log_test(test_name, "PASS", f"Active subscription: {sub['tier']}")
-                    return True
-            else:
-                self.log_test(test_name, "FAIL", f"Invalid response structure: {list(data.keys())}")
-                return False
-        else:
-            self.log_test(test_name, "FAIL", f"Status {response['status']}: {response['data']}")
-            return False
-    
-    async def test_subscription_current_without_auth(self) -> bool:
-        """Test current subscription endpoint without authentication"""
-        test_name = "GET /api/subscriptions/current (without auth)"
-        
-        # Temporarily remove auth token
-        temp_token = self.auth_token
-        self.auth_token = None
-        
-        response = await self.make_request("GET", "/subscriptions/current")
-        
-        # Restore auth token
-        self.auth_token = temp_token
-        
-        if response["status"] == 401:
-            self.log_test(test_name, "PASS", "Correctly requires authentication")
-            return True
-        elif response["status"] == 200:
-            # Some APIs might return free tier for unauthenticated users
-            data = response["data"]
-            if "tier_limits" in data:
-                self.log_test(test_name, "PASS", "Returns free tier limits for unauthenticated users")
-                return True
-            else:
-                self.log_test(test_name, "FAIL", "Unexpected response for unauthenticated request")
-                return False
-        else:
-            self.log_test(test_name, "FAIL", f"Status {response['status']}: {response['data']}")
-            return False
-    
-    async def run_all_tests(self) -> Dict[str, bool]:
-        """Run all API tests and return results"""
-        print("🚀 Starting DocScan Pro API Tests")
-        print(f"📍 Testing endpoint: {self.base_url}")
-        print("=" * 60)
-        
-        results = {}
-        
-        # Authentication Tests (Priority)
-        print("\n🔐 AUTHENTICATION TESTS")
-        results["auth_register"] = await self.test_auth_register()
-        results["auth_login"] = await self.test_auth_login()
-        results["auth_me"] = await self.test_auth_me()
-        results["magic_link_request"] = await self.test_magic_link_request()
-        
-        # Subscription Tests (Priority)
-        print("\n💳 SUBSCRIPTION TESTS")
-        results["subscription_tiers"] = await self.test_subscription_tiers()
-        results["subscription_current_with_auth"] = await self.test_subscription_current_with_auth()
-        results["subscription_current_without_auth"] = await self.test_subscription_current_without_auth()
-        
-        return results
+        return True, "Document fields valid"
 
-async def main():
-    """Main test runner"""
-    print("DocScan Pro Backend API Test Suite")
-    print("Testing critical authentication and subscription endpoints")
-    print()
-    
-    async with DocScanAPITester(BASE_URL) as tester:
-        results = await tester.run_all_tests()
+    def test_default_pagination(self):
+        """Test 1: GET /api/documents (default page=1, page_size=20)"""
+        success, data, error = self.make_request("/documents")
+        
+        if not success:
+            self.log_test("Default pagination", False, error)
+            return
+        
+        # Verify pagination structure
+        struct_valid, struct_msg = self.verify_pagination_structure(data)
+        if not struct_valid:
+            self.log_test("Default pagination", False, struct_msg)
+            return
+        
+        # Verify default values
+        if data["page"] != 1:
+            self.log_test("Default pagination", False, f"Expected page=1, got {data['page']}")
+            return
+        
+        if data["page_size"] != 20:
+            self.log_test("Default pagination", False, f"Expected page_size=20, got {data['page_size']}")
+            return
+        
+        # Verify documents have correct fields
+        if data["documents"]:
+            doc_valid, doc_msg = self.verify_document_fields(data["documents"][0])
+            if not doc_valid:
+                self.log_test("Default pagination", False, doc_msg)
+                return
+        
+        self.log_test("Default pagination", True, 
+                     f"Total: {data['total']}, Page: {data['page']}, Size: {data['page_size']}, "
+                     f"Total Pages: {data['total_pages']}, Has Next: {data['has_next']}, Has Prev: {data['has_prev']}")
+        
+        # Store total for other tests
+        self.total_documents = data["total"]
+        return data
+
+    def test_pagination_page_1_size_2(self):
+        """Test 2: GET /api/documents?page=1&page_size=2"""
+        success, data, error = self.make_request("/documents?page=1&page_size=2")
+        
+        if not success:
+            self.log_test("Pagination page=1, size=2", False, error)
+            return
+        
+        struct_valid, struct_msg = self.verify_pagination_structure(data)
+        if not struct_valid:
+            self.log_test("Pagination page=1, size=2", False, struct_msg)
+            return
+        
+        # Verify pagination values
+        if data["page"] != 1 or data["page_size"] != 2:
+            self.log_test("Pagination page=1, size=2", False, 
+                         f"Expected page=1, page_size=2, got page={data['page']}, page_size={data['page_size']}")
+            return
+        
+        # Should return exactly 2 documents (or less if total < 2)
+        expected_docs = min(2, data["total"])
+        if len(data["documents"]) != expected_docs:
+            self.log_test("Pagination page=1, size=2", False, 
+                         f"Expected {expected_docs} documents, got {len(data['documents'])}")
+            return
+        
+        # Should have has_next=true if there are more than 2 total docs
+        expected_has_next = data["total"] > 2
+        if data["has_next"] != expected_has_next:
+            self.log_test("Pagination page=1, size=2", False, 
+                         f"Expected has_next={expected_has_next}, got {data['has_next']}")
+            return
+        
+        # Should have has_prev=false for page 1
+        if data["has_prev"] != False:
+            self.log_test("Pagination page=1, size=2", False, 
+                         f"Expected has_prev=False, got {data['has_prev']}")
+            return
+        
+        self.log_test("Pagination page=1, size=2", True, 
+                     f"Returned {len(data['documents'])} docs, has_next={data['has_next']}, has_prev={data['has_prev']}")
+
+    def test_pagination_page_2_size_2(self):
+        """Test 3: GET /api/documents?page=2&page_size=2"""
+        success, data, error = self.make_request("/documents?page=2&page_size=2")
+        
+        if not success:
+            self.log_test("Pagination page=2, size=2", False, error)
+            return
+        
+        struct_valid, struct_msg = self.verify_pagination_structure(data)
+        if not struct_valid:
+            self.log_test("Pagination page=2, size=2", False, struct_msg)
+            return
+        
+        # Verify pagination values
+        if data["page"] != 2 or data["page_size"] != 2:
+            self.log_test("Pagination page=2, size=2", False, 
+                         f"Expected page=2, page_size=2, got page={data['page']}, page_size={data['page_size']}")
+            return
+        
+        # Should have has_prev=true for page 2
+        if data["has_prev"] != True:
+            self.log_test("Pagination page=2, size=2", False, 
+                         f"Expected has_prev=True, got {data['has_prev']}")
+            return
+        
+        # Calculate expected documents for page 2
+        total = data["total"]
+        expected_docs = min(2, max(0, total - 2))  # Skip first 2, take next 2
+        if len(data["documents"]) != expected_docs:
+            self.log_test("Pagination page=2, size=2", False, 
+                         f"Expected {expected_docs} documents, got {len(data['documents'])}")
+            return
+        
+        self.log_test("Pagination page=2, size=2", True, 
+                     f"Returned {len(data['documents'])} docs, has_next={data['has_next']}, has_prev={data['has_prev']}")
+
+    def test_pagination_page_3_size_2(self):
+        """Test 4: GET /api/documents?page=3&page_size=2"""
+        success, data, error = self.make_request("/documents?page=3&page_size=2")
+        
+        if not success:
+            self.log_test("Pagination page=3, size=2", False, error)
+            return
+        
+        struct_valid, struct_msg = self.verify_pagination_structure(data)
+        if not struct_valid:
+            self.log_test("Pagination page=3, size=2", False, struct_msg)
+            return
+        
+        # Verify pagination values
+        if data["page"] != 3 or data["page_size"] != 2:
+            self.log_test("Pagination page=3, size=2", False, 
+                         f"Expected page=3, page_size=2, got page={data['page']}, page_size={data['page_size']}")
+            return
+        
+        # For 5 total docs with page_size=2: page 3 should have 1 doc and has_next=false
+        total = data["total"]
+        if total == 5:
+            expected_docs = 1
+            expected_has_next = False
+        else:
+            # Calculate for other totals
+            expected_docs = max(0, total - 4)  # Skip first 4, take remaining
+            expected_has_next = total > 6
+        
+        if len(data["documents"]) != expected_docs:
+            self.log_test("Pagination page=3, size=2", False, 
+                         f"Expected {expected_docs} documents, got {len(data['documents'])}")
+            return
+        
+        if data["has_next"] != expected_has_next:
+            self.log_test("Pagination page=3, size=2", False, 
+                         f"Expected has_next={expected_has_next}, got {data['has_next']}")
+            return
+        
+        self.log_test("Pagination page=3, size=2", True, 
+                     f"Returned {len(data['documents'])} docs, has_next={data['has_next']}, has_prev={data['has_prev']}")
+
+    def test_search_functionality(self):
+        """Test 5: GET /api/documents?search=test"""
+        success, data, error = self.make_request("/documents?search=test")
+        
+        if not success:
+            self.log_test("Search functionality", False, error)
+            return
+        
+        struct_valid, struct_msg = self.verify_pagination_structure(data)
+        if not struct_valid:
+            self.log_test("Search functionality", False, struct_msg)
+            return
+        
+        # Verify search results contain "test" in title or tags
+        search_term = "test"
+        for doc in data["documents"]:
+            title_match = search_term.lower() in doc.get("title", "").lower()
+            tags_match = any(search_term.lower() in tag.lower() for tag in doc.get("tags", []))
+            
+            if not (title_match or tags_match):
+                self.log_test("Search functionality", False, 
+                             f"Document '{doc.get('title', 'No title')}' doesn't contain search term '{search_term}'")
+                return
+        
+        self.log_test("Search functionality", True, 
+                     f"Found {len(data['documents'])} documents matching 'test'")
+
+    def test_sort_title_asc(self):
+        """Test 6: GET /api/documents?sort_by=title&sort_order=asc"""
+        success, data, error = self.make_request("/documents?sort_by=title&sort_order=asc")
+        
+        if not success:
+            self.log_test("Sort title A-Z", False, error)
+            return
+        
+        struct_valid, struct_msg = self.verify_pagination_structure(data)
+        if not struct_valid:
+            self.log_test("Sort title A-Z", False, struct_msg)
+            return
+        
+        # Verify documents are sorted by title in ascending order
+        titles = [doc.get("title", "") for doc in data["documents"]]
+        sorted_titles = sorted(titles, key=str.lower)
+        
+        if titles != sorted_titles:
+            self.log_test("Sort title A-Z", False, 
+                         f"Documents not sorted A-Z. Got: {titles[:3]}...")
+            return
+        
+        self.log_test("Sort title A-Z", True, 
+                     f"Documents correctly sorted A-Z. First 3: {titles[:3]}")
+
+    def test_sort_title_desc(self):
+        """Test 7: GET /api/documents?sort_by=title&sort_order=desc"""
+        success, data, error = self.make_request("/documents?sort_by=title&sort_order=desc")
+        
+        if not success:
+            self.log_test("Sort title Z-A", False, error)
+            return
+        
+        struct_valid, struct_msg = self.verify_pagination_structure(data)
+        if not struct_valid:
+            self.log_test("Sort title Z-A", False, struct_msg)
+            return
+        
+        # Verify documents are sorted by title in descending order
+        titles = [doc.get("title", "") for doc in data["documents"]]
+        sorted_titles = sorted(titles, key=str.lower, reverse=True)
+        
+        if titles != sorted_titles:
+            self.log_test("Sort title Z-A", False, 
+                         f"Documents not sorted Z-A. Got: {titles[:3]}...")
+            return
+        
+        self.log_test("Sort title Z-A", True, 
+                     f"Documents correctly sorted Z-A. First 3: {titles[:3]}")
+
+    def test_sort_created_at_asc(self):
+        """Test 8: GET /api/documents?sort_by=created_at&sort_order=asc"""
+        success, data, error = self.make_request("/documents?sort_by=created_at&sort_order=asc")
+        
+        if not success:
+            self.log_test("Sort created_at oldest-first", False, error)
+            return
+        
+        struct_valid, struct_msg = self.verify_pagination_structure(data)
+        if not struct_valid:
+            self.log_test("Sort created_at oldest-first", False, struct_msg)
+            return
+        
+        # Verify documents are sorted by created_at in ascending order (oldest first)
+        created_dates = []
+        for doc in data["documents"]:
+            created_at = doc.get("created_at")
+            if created_at:
+                # Parse ISO datetime string
+                try:
+                    if isinstance(created_at, str):
+                        # Handle different datetime formats
+                        if created_at.endswith('Z'):
+                            created_at = created_at[:-1] + '+00:00'
+                        dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    else:
+                        dt = created_at
+                    created_dates.append(dt)
+                except ValueError as e:
+                    self.log_test("Sort created_at oldest-first", False, 
+                                 f"Invalid datetime format: {created_at}")
+                    return
+        
+        # Check if dates are in ascending order
+        for i in range(1, len(created_dates)):
+            if created_dates[i] < created_dates[i-1]:
+                self.log_test("Sort created_at oldest-first", False, 
+                             f"Documents not sorted oldest-first")
+                return
+        
+        self.log_test("Sort created_at oldest-first", True, 
+                     f"Documents correctly sorted oldest-first. Count: {len(created_dates)}")
+
+    def test_document_fields_structure(self):
+        """Test 9: Verify each document has the required lightweight fields"""
+        success, data, error = self.make_request("/documents")
+        
+        if not success:
+            self.log_test("Document fields structure", False, error)
+            return
+        
+        if not data.get("documents"):
+            self.log_test("Document fields structure", False, "No documents found to verify")
+            return
+        
+        # Test all documents have required fields
+        required_fields = [
+            "id", "title", "document_type", "detected_language", 
+            "created_at", "is_locked", "tags", "image_thumbnail", 
+            "pages_count", "confidence"
+        ]
+        
+        for i, doc in enumerate(data["documents"]):
+            doc_valid, doc_msg = self.verify_document_fields(doc)
+            if not doc_valid:
+                self.log_test("Document fields structure", False, 
+                             f"Document {i+1}: {doc_msg}")
+                return
+        
+        # Show sample document structure
+        sample_doc = data["documents"][0]
+        sample_fields = {k: type(v).__name__ for k, v in sample_doc.items()}
+        
+        self.log_test("Document fields structure", True, 
+                     f"All {len(data['documents'])} documents have required fields. Sample: {sample_fields}")
+
+    def test_legacy_endpoint(self):
+        """Test 10: Verify legacy endpoint GET /api/documents/all returns full document data"""
+        success, data, error = self.make_request("/documents/all")
+        
+        if not success:
+            self.log_test("Legacy endpoint /documents/all", False, error)
+            return
+        
+        # Should return a plain array, not paginated response
+        if not isinstance(data, list):
+            self.log_test("Legacy endpoint /documents/all", False, 
+                         f"Expected array, got {type(data).__name__}")
+            return
+        
+        if not data:
+            self.log_test("Legacy endpoint /documents/all", True, "No documents found (empty array)")
+            return
+        
+        # Verify documents have full data (more fields than lightweight version)
+        sample_doc = data[0]
+        
+        # Legacy endpoint should have more fields than the lightweight version
+        lightweight_fields = {
+            "id", "title", "document_type", "detected_language", 
+            "created_at", "is_locked", "tags", "image_thumbnail", 
+            "pages_count", "confidence"
+        }
+        
+        doc_fields = set(sample_doc.keys())
+        
+        # Should have all lightweight fields plus additional ones
+        missing_fields = lightweight_fields - doc_fields
+        if missing_fields:
+            self.log_test("Legacy endpoint /documents/all", False, 
+                         f"Missing expected fields: {missing_fields}")
+            return
+        
+        # Should have additional fields like formatted_output, raw_text, etc.
+        additional_fields = doc_fields - lightweight_fields
+        
+        self.log_test("Legacy endpoint /documents/all", True, 
+                     f"Returned {len(data)} full documents. Additional fields: {list(additional_fields)[:5]}")
+
+    def run_all_tests(self):
+        """Run all pagination API tests"""
+        print("=" * 80)
+        print("DOCSAN PRO - PAGINATED DOCUMENTS API TESTING")
+        print("=" * 80)
+        print(f"Testing API at: {self.base_url}")
+        print()
+        
+        # Run tests in order
+        self.test_default_pagination()
+        self.test_pagination_page_1_size_2()
+        self.test_pagination_page_2_size_2()
+        self.test_pagination_page_3_size_2()
+        self.test_search_functionality()
+        self.test_sort_title_asc()
+        self.test_sort_title_desc()
+        self.test_sort_created_at_asc()
+        self.test_document_fields_structure()
+        self.test_legacy_endpoint()
         
         # Summary
-        print("\n" + "=" * 60)
-        print("📊 TEST SUMMARY")
-        print("=" * 60)
+        print("\n" + "=" * 80)
+        print("TEST SUMMARY")
+        print("=" * 80)
         
-        passed = sum(1 for result in results.values() if result)
-        total = len(results)
+        passed = sum(1 for result in self.test_results if result["success"])
+        total = len(self.test_results)
         
-        for test_name, result in results.items():
-            status = "✅ PASS" if result else "❌ FAIL"
-            print(f"{status} {test_name}")
+        print(f"Total Tests: {total}")
+        print(f"Passed: {passed}")
+        print(f"Failed: {total - passed}")
+        print(f"Success Rate: {(passed/total)*100:.1f}%")
         
-        print(f"\n🎯 Results: {passed}/{total} tests passed ({passed/total*100:.1f}%)")
+        print("\nDetailed Results:")
+        for result in self.test_results:
+            print(f"{result['status']}: {result['test']}")
+            if result['details']:
+                print(f"   {result['details']}")
         
-        if passed == total:
-            print("🎉 All tests passed! API is working correctly.")
-            return 0
-        else:
-            print("⚠️  Some tests failed. Check the details above.")
-            return 1
+        # Return summary for test_result.md
+        return {
+            "total_tests": total,
+            "passed": passed,
+            "failed": total - passed,
+            "success_rate": (passed/total)*100,
+            "results": self.test_results
+        }
 
 if __name__ == "__main__":
-    try:
-        exit_code = asyncio.run(main())
-        sys.exit(exit_code)
-    except KeyboardInterrupt:
-        print("\n⏹️  Tests interrupted by user")
-        sys.exit(1)
-    except Exception as e:
-        print(f"\n💥 Test suite crashed: {e}")
-        sys.exit(1)
+    tester = APITester()
+    summary = tester.run_all_tests()
+    
+    print(f"\n🎯 FINAL RESULT: {summary['passed']}/{summary['total_tests']} tests passed ({summary['success_rate']:.1f}%)")
