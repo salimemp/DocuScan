@@ -23,7 +23,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 
 # Configuration
-BASE_URL = "https://widget-native-build.preview.emergentagent.com/api"
+BASE_URL = "https://document-scanner-pro-7.preview.emergentagent.com/api"
 HEADERS = {"Content-Type": "application/json"}
 
 # Test credentials from /app/memory/test_credentials.md

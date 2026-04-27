@@ -4,7 +4,7 @@
  */
 import { test, expect } from '@playwright/test';
 
-const API_BASE = (process.env.PLAYWRIGHT_BASE_URL || 'https://widget-native-build.preview.emergentagent.com') + '/api';
+const API_BASE = (process.env.PLAYWRIGHT_BASE_URL || 'https://document-scanner-pro-7.preview.emergentagent.com') + '/api';
 
 test.describe('Turnstile Verification (Production Keys)', () => {
   test('should verify a valid Turnstile token via API', async ({ request }) => {
@@ -59,7 +59,7 @@ test.describe('Turnstile Verification (Production Keys)', () => {
   });
 
   test('should show Turnstile widget on registration form', async ({ page }) => {
-    await page.goto(process.env.PLAYWRIGHT_BASE_URL || 'https://widget-native-build.preview.emergentagent.com');
+    await page.goto(process.env.PLAYWRIGHT_BASE_URL || 'https://document-scanner-pro-7.preview.emergentagent.com');
     await page.waitForTimeout(3000);
     
     // Skip onboarding
@@ -70,7 +70,7 @@ test.describe('Turnstile Verification (Production Keys)', () => {
     }
     
     // Navigate to auth
-    await page.goto((process.env.PLAYWRIGHT_BASE_URL || 'https://widget-native-build.preview.emergentagent.com') + '/auth');
+    await page.goto((process.env.PLAYWRIGHT_BASE_URL || 'https://document-scanner-pro-7.preview.emergentagent.com') + '/auth');
     await page.waitForTimeout(3000);
     
     // Switch to registration
@@ -92,7 +92,7 @@ test.describe('Turnstile Verification (Production Keys)', () => {
 
   test('Turnstile widget should render with real site key', async ({ page }) => {
     // Navigate directly to auth page
-    await page.goto((process.env.PLAYWRIGHT_BASE_URL || 'https://widget-native-build.preview.emergentagent.com') + '/auth');
+    await page.goto((process.env.PLAYWRIGHT_BASE_URL || 'https://document-scanner-pro-7.preview.emergentagent.com') + '/auth');
     await page.waitForTimeout(5000);
     
     // If redirected to onboarding, skip it and go back to auth
@@ -100,7 +100,7 @@ test.describe('Turnstile Verification (Production Keys)', () => {
     if (await skipBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await skipBtn.click({ force: true });
       await page.waitForTimeout(2000);
-      await page.goto((process.env.PLAYWRIGHT_BASE_URL || 'https://widget-native-build.preview.emergentagent.com') + '/auth');
+      await page.goto((process.env.PLAYWRIGHT_BASE_URL || 'https://document-scanner-pro-7.preview.emergentagent.com') + '/auth');
       await page.waitForTimeout(4000);
     }
     

@@ -15,7 +15,7 @@ export default defineConfig({
     timeout: 10000,
   },
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'https://widget-native-build.preview.emergentagent.com',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'https://document-scanner-pro-7.preview.emergentagent.com',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
