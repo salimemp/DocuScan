@@ -20,6 +20,7 @@
     "test:e2e:security": "npx playwright test tests/e2e/security-features.spec.ts",
     "test:e2e:turnstile": "npx playwright test tests/e2e/turnstile-real.spec.ts",
     "test:e2e:errors": "npx playwright test tests/e2e/error-handling.spec.ts",
+    "test:e2e:camera": "npx playwright test tests/e2e/camera-mock.spec.ts",
     "test:e2e:report": "npx playwright show-report"
   },
   "dependencies": {

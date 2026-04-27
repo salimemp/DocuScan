@@ -625,13 +625,22 @@ export default function HistoryScreen() {
           <Ionicons name="swap-vertical-outline" size={16} color={colors.textSecondary} />
           <Text style={[styles.toolText, { color: colors.textSecondary }]}>{sortBy}</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          testID="view-toggle-btn"
-          style={[styles.toolBtn, { backgroundColor: colors.surface, ...shadows.sm }]}
-          onPress={() => setIsGrid(g => !g)}
-        >
-          <Ionicons name={isGrid ? 'list-outline' : 'grid-outline'} size={16} color={colors.textSecondary} />
-        </TouchableOpacity>
+        <View style={styles.toolbarRight}>
+          {/* Document Count Badge */}
+          <View testID="doc-count-badge" style={[styles.docCountBadge, { backgroundColor: colors.primary + '15' }]}>
+            <Ionicons name="documents" size={14} color={colors.primary} />
+            <Text style={[styles.docCountText, { color: colors.primary }]}>
+              {totalDocs} {totalDocs === 1 ? 'doc' : 'docs'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            testID="view-toggle-btn"
+            style={[styles.toolBtn, { backgroundColor: colors.surface, ...shadows.sm }]}
+            onPress={() => setIsGrid(g => !g)}
+          >
+            <Ionicons name={isGrid ? 'list-outline' : 'grid-outline'} size={16} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Document List */}
@@ -806,9 +815,12 @@ const styles = StyleSheet.create({
   filterChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
   filterText: { fontSize: 13, fontWeight: '600' },
 
-  toolbar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, marginTop: 12, marginBottom: 8 },
+  toolbar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginTop: 12, marginBottom: 8 },
+  toolbarRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   toolBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
   toolText: { fontSize: 13, fontWeight: '500' },
+  docCountBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
+  docCountText: { fontSize: 13, fontWeight: '700' },
 
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
