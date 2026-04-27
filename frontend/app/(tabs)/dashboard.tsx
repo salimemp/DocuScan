@@ -385,6 +385,31 @@ export default function DashboardScreen() {
           </View>
         </TouchableOpacity>
 
+        {/* Blog CTA */}
+        <TouchableOpacity
+          testID="blog-cta"
+          activeOpacity={0.85}
+          onPress={() => router.push('/blog')}
+          style={[styles.feedbackCard, { backgroundColor: colors.surface, ...shadows.sm }]}
+          accessibilityRole="link"
+          accessibilityLabel="Read DocScan Pro blog articles"
+        >
+          <View style={[styles.feedbackIconWrap, { backgroundColor: '#0EA5E9' + '15' }]}>
+            <Ionicons name="reader" size={20} color="#0EA5E9" />
+          </View>
+          <View style={styles.feedbackTextWrap}>
+            <Text style={[styles.feedbackTitle, { color: colors.textPrimary }]}>
+              Tips, Guides &amp; Tutorials
+            </Text>
+            <Text style={[styles.feedbackSubtitle, { color: colors.textSecondary }]}>
+              Master document scanning, OCR &amp; AI tools
+            </Text>
+          </View>
+          <View style={[styles.feedbackArrow, { backgroundColor: '#0EA5E9' + '15' }]}>
+            <Ionicons name="arrow-forward" size={14} color="#0EA5E9" />
+          </View>
+        </TouchableOpacity>
+
         {/* Stats Row */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsRow} style={styles.statScroll}>
           {statItems.map((stat, i) => (
