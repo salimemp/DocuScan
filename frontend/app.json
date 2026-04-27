@@ -72,6 +72,33 @@
         }
       ],
       "expo-web-browser",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableJetifier": true,
+            "enableProguardInReleaseBuilds": false,
+            "extraMavenRepos": [],
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "minSdkVersion": 24,
+            "buildToolsVersion": "35.0.0",
+            "kotlinVersion": "2.0.21",
+            "packagingOptions": {
+              "pickFirst": [
+                "**/libc++_shared.so",
+                "**/libfbjni.so",
+                "**/libjsc.so"
+              ]
+            },
+            "extraProguardRules": "-keep class androidx.versionedparcelable.** { *; }"
+          },
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ],
+      "./plugins/force-androidx",
       "./plugins/widget-plugin"
     ],
     "experiments": {
@@ -82,6 +109,26 @@
         "title": "DocScan Pro - AI Document Scanner, Math Solver & Business Card Scanner",
         "description": "Transform your phone into a powerful document scanner. AI-powered OCR, math equation solver, business card scanning with contact extraction, secure encrypted vault, cloud backup, and 18+ export formats. Free to download!",
         "keywords": [
+          "document scanner",
+          "ocr app",
+          "pdf scanner",
+          "math solver",
+          "equation solver",
+          "business card scanner",
+          "contact scanner",
+          "document management",
+          "secure vault",
+          "encrypted documents",
+          "cloud backup",
+          "scan to pdf",
+          "mobile scanner",
+          "ai scanner",
+          "text recognition",
+          "photo to text",
+          "receipt scanner",
+          "scan documents",
+          "paperless office",
+          "document organizer",
           "document scanner",
           "ocr app",
           "pdf scanner",
@@ -112,7 +159,12 @@
         "subcategory": "BUSINESS",
         "contentRating": "4+",
         "releaseNotes": "Version 2.0 - Major update with AI Math Solver, Business Card Scanner, Enhanced Security with Secure Vault, Rate Limiting, and improved performance."
+      },
+      "router": {},
+      "eas": {
+        "projectId": "0827619a-1eb3-4176-a670-b129f973a395"
       }
-    }
+    },
+    "owner": "salimemp"
   }
 }

@@ -4,7 +4,7 @@
  */
 import { test, expect } from '@playwright/test';
 
-const API_BASE = (process.env.PLAYWRIGHT_BASE_URL || 'https://widget-native-build.preview.emergentagent.com') + '/api';
+const API_BASE = (process.env.PLAYWRIGHT_BASE_URL || 'https://document-scanner-pro-7.preview.emergentagent.com') + '/api';
 
 test.describe('Security Features', () => {
   test('should get secure enclave stats', async ({ request }) => {
@@ -60,7 +60,7 @@ test.describe('Security Features', () => {
 
 test.describe('Secure Enclave Page', () => {
   test('should navigate to secure enclave page', async ({ page }) => {
-    await page.goto(process.env.PLAYWRIGHT_BASE_URL || 'https://widget-native-build.preview.emergentagent.com');
+    await page.goto(process.env.PLAYWRIGHT_BASE_URL || 'https://document-scanner-pro-7.preview.emergentagent.com');
     await page.waitForTimeout(3000);
     
     // Skip onboarding
@@ -70,7 +70,7 @@ test.describe('Secure Enclave Page', () => {
       await page.waitForTimeout(3000);
     }
     
-    await page.goto((process.env.PLAYWRIGHT_BASE_URL || 'https://widget-native-build.preview.emergentagent.com') + '/secure-enclave');
+    await page.goto((process.env.PLAYWRIGHT_BASE_URL || 'https://document-scanner-pro-7.preview.emergentagent.com') + '/secure-enclave');
     await page.waitForTimeout(3000);
     
     const pageContent = await page.textContent('body');

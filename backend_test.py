@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime
 
 # Production API URL
-BASE_URL = "https://widget-native-build.preview.emergentagent.com/api"
+BASE_URL = "https://document-scanner-pro-7.preview.emergentagent.com/api"
 
 def test_feedback_system():
     """Test the complete feedback system"""

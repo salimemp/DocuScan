@@ -14,3 +14,16 @@
 - Turnstile verification is OPTIONAL during registration - if no turnstile_token is provided, registration proceeds without bot verification
 - When turnstile_token IS provided, it is validated against the Cloudflare API using the secret key
 - Production keys are now active (replaced test keys 1x00000000000000000000AA)
+
+## EAS / Expo Build
+- Account: salimemp (salimemp@mail.com)
+- Project: @salimemp/docscan-pro
+- Project ID: 0827619a-1eb3-4176-a670-b129f973a395
+- Project URL: https://expo.dev/accounts/salimemp/projects/docscan-pro
+- EXPO_TOKEN stored in /app/frontend/.env
+
+## Build Profiles
+- `development` — Dev client, internal distribution
+- `preview` — Internal testing APK / iOS device build
+- `ios-simulator` — iOS Simulator .app build (no signing)
+- `production` — App Store / Play Store ready

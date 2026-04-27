@@ -14,7 +14,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://widget-native-build.preview.emergentagent.com"
+        "EXPO_PUBLIC_BACKEND_URL": "https://document-scanner-pro-7.preview.emergentagent.com"
       }
     },
     "preview": {
@@ -26,7 +26,16 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://widget-native-build.preview.emergentagent.com"
+        "EXPO_PUBLIC_BACKEND_URL": "https://document-scanner-pro-7.preview.emergentagent.com"
+      }
+    },
+    "ios-simulator": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      },
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "https://document-scanner-pro-7.preview.emergentagent.com"
       }
     },
     "production": {
@@ -38,19 +47,13 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://widget-native-build.preview.emergentagent.com"
+        "EXPO_PUBLIC_BACKEND_URL": "https://document-scanner-pro-7.preview.emergentagent.com"
       }
     }
   },
   "submit": {
     "production": {
-      "ios": {
-        "appleId": "",
-        "ascAppId": "",
-        "appleTeamId": ""
-      },
       "android": {
-        "serviceAccountKeyPath": "",
         "track": "internal"
       }
     }
