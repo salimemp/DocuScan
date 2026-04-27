@@ -14,6 +14,17 @@ import { getErrorMessage } from '../utils/errorHelpers';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 
+interface BetaStatus {
+  is_beta: boolean;
+  version: string;
+  max_users: number;
+  current_users: number;
+  spots_remaining: number;
+  is_open: boolean;
+  message: string;
+  features: string[];
+}
+
 interface SubscriptionTier {
   id: string;
   name: string;
@@ -37,11 +48,13 @@ export default function SubscriptionScreen() {
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState(false);
   const [currentSub, setCurrentSub] = useState<any>(null);
+  const [betaStatus, setBetaStatus] = useState<BetaStatus | null>(null);
   const isMountedRef = useRef(true);
 
   useEffect(() => {
     isMountedRef.current = true;
     fetchTiers();
+    fetchBetaStatus();
     if (isAuthenticated && accessToken) {
       fetchCurrentSubscription();
     }
@@ -50,6 +63,18 @@ export default function SubscriptionScreen() {
       isMountedRef.current = false;
     };
   }, [isAuthenticated, accessToken]);
+
+  const fetchBetaStatus = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/beta/status`);
+      if (res.ok) {
+        const data = await res.json();
+        if (isMountedRef.current) setBetaStatus(data);
+      }
+    } catch {
+      // Non-critical
+    }
+  };
 
   const fetchTiers = async () => {
     try {
@@ -326,17 +351,61 @@ export default function SubscriptionScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Hero Section */}
-        <View style={styles.heroSection}>
-          <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>
-            Unlock Full Potential
-          </Text>
-          <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-            Choose the plan that works best for you
-          </Text>
-        </View>
+        {/* Beta Hero Section */}
+        {betaStatus?.is_beta ? (
+          <View style={styles.heroSection}>
+            <View style={[styles.betaHeroBanner, { backgroundColor: '#F59E0B' + '12' }]}>
+              <View style={[styles.betaHeroIcon, { backgroundColor: '#F59E0B' + '20' }]}>
+                <Ionicons name="flask" size={32} color="#F59E0B" />
+              </View>
+              <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>
+                Beta Launch
+              </Text>
+              <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
+                All Pro features free for our first {betaStatus.max_users} users
+              </Text>
+              
+              {/* Beta Progress */}
+              <View style={styles.betaProgressWrap}>
+                <View style={[styles.betaProgressBg, { backgroundColor: colors.surfaceHighlight }]}>
+                  <View style={[styles.betaProgressFill, {
+                    width: `${(betaStatus.current_users / betaStatus.max_users) * 100}%`,
+                    backgroundColor: betaStatus.spots_remaining < 20 ? '#DC2626' : '#F59E0B'
+                  }]} />
+                </View>
+                <Text style={[styles.betaProgressText, { color: colors.textTertiary }]}>
+                  {betaStatus.spots_remaining} spots remaining out of {betaStatus.max_users}
+                </Text>
+              </View>
 
-        {/* Billing Toggle */}
+              {/* Features included in beta */}
+              <View style={styles.betaFeaturesGrid}>
+                {betaStatus.features.slice(0, 6).map((feature, idx) => (
+                  <View key={idx} style={styles.betaFeatureItem}>
+                    <Ionicons name="checkmark-circle" size={16} color="#059669" />
+                    <Text style={[styles.betaFeatureText, { color: colors.textPrimary }]}>{feature}</Text>
+                  </View>
+                ))}
+              </View>
+              
+              <Text style={[styles.betaVersionText, { color: colors.textTertiary }]}>
+                v{betaStatus.version}
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.heroSection}>
+            <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>
+              Unlock Full Potential
+            </Text>
+            <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
+              Choose the plan that works best for you
+            </Text>
+          </View>
+        )}
+
+        {/* Billing Toggle - Hidden during beta */}
+        {!betaStatus?.is_beta && (
         <View style={[styles.billingToggle, { backgroundColor: colors.surfaceHighlight }]}>
           <TouchableOpacity
             style={[
@@ -368,6 +437,7 @@ export default function SubscriptionScreen() {
             </View>
           </TouchableOpacity>
         </View>
+        )}
 
         {/* Tier Cards */}
         <View style={styles.tiersContainer}>
@@ -547,5 +617,58 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 16,
     marginTop: 24,
+  },
+
+  // Beta styles
+  betaHeroBanner: {
+    width: '100%',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+  },
+  betaHeroIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  betaProgressWrap: {
+    width: '100%',
+    marginTop: 16,
+    marginBottom: 20,
+  },
+  betaProgressBg: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  betaProgressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  betaProgressText: {
+    fontSize: 11,
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  betaFeaturesGrid: {
+    width: '100%',
+    gap: 8,
+  },
+  betaFeatureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  betaFeatureText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  betaVersionText: {
+    fontSize: 11,
+    marginTop: 16,
+    fontStyle: 'italic',
   },
 });

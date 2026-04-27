@@ -17,6 +17,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { PasswordStrengthMeter, validatePassword } from '../components/PasswordStrengthMeter';
 import TurnstileWidget from '../components/TurnstileWidget';
 import { getErrorMessage } from '../utils/errorHelpers';
+import { BetaBadge } from '../components/BetaBanner';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 // Cloudflare Turnstile site key - use test key in dev, real key in production
@@ -497,6 +498,16 @@ export default function AuthScreen() {
              mode === 'magic' ? 'Magic Link' : 'Reset Password'}
           </Text>
 
+          {/* Beta Callout for Registration */}
+          {mode === 'register' && (
+            <View style={[styles.betaCallout, { backgroundColor: '#F59E0B' + '12' }]}>
+              <Ionicons name="flask" size={16} color="#F59E0B" />
+              <Text style={[styles.betaCalloutText, { color: '#92400E' }]}>
+                Free for our first 100 beta users — all Pro features included!
+              </Text>
+            </View>
+          )}
+
           {/* Error/Success Messages */}
           {error && (
             <View style={[styles.alertBox, { backgroundColor: '#FEE2E2' }]}>
@@ -721,4 +732,20 @@ const styles = StyleSheet.create({
   turnstileLabel: { fontSize: 13, fontWeight: '500' },
   verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, marginLeft: 'auto' },
   verifiedText: { fontSize: 11, fontWeight: '600', color: '#10B981' },
+  
+  betaCallout: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  betaCalloutText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
 });

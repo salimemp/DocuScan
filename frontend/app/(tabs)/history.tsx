@@ -10,6 +10,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useLanguage } from '../../hooks/useLanguage';
 import { SpeechInput } from '../../components/SpeechInput';
+import { BetaBanner } from '../../components/BetaBanner';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 const PAGE_SIZE = 20;
