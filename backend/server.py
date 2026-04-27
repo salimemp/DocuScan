@@ -2187,6 +2187,127 @@ async def advanced_search(request: AdvancedSearchRequest):
 BETA_MAX_USERS = 100
 BETA_VERSION = "1.0.0-beta"
 
+# ── Feedback System ───────────────────────────────────────────────────────
+class FeedbackRequest(BaseModel):
+    rating: int = Field(..., ge=1, le=5, description="Rating from 1-5 stars")
+    category: str = Field(..., description="Feedback category")
+    message: str = Field(..., min_length=5, max_length=2000, description="Feedback message")
+    email: str = Field(default="", description="Optional email for follow-up")
+    user_name: str = Field(default="Anonymous", description="User display name")
+
+@api_router.post("/feedback")
+async def submit_feedback(feedback: FeedbackRequest, request: Request):
+    """Submit user feedback and send email notification"""
+    feedback_collection = db.feedback
+    
+    feedback_doc = {
+        "id": str(uuid.uuid4()),
+        "rating": feedback.rating,
+        "category": feedback.category,
+        "message": feedback.message,
+        "email": feedback.email,
+        "user_name": feedback.user_name,
+        "created_at": datetime.utcnow().isoformat(),
+        "ip": request.client.host if request.client else "unknown",
+        "status": "new"
+    }
+    
+    await feedback_collection.insert_one(feedback_doc)
+    
+    # Send email notification via Resend
+    try:
+        star_display = "★" * feedback.rating + "☆" * (5 - feedback.rating)
+        resend.Emails.send({
+            "from": "DocScan Pro <noreply@notify.docscanpro.app>",
+            "to": ["salimmakrana@gmail.com"],
+            "subject": f"[DocScan Beta] New Feedback: {star_display} ({feedback.category})",
+            "html": f"""
+            <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+                <div style="background: linear-gradient(135deg, #2563EB, #7C3AED); padding: 20px 24px; border-radius: 12px 12px 0 0; color: white;">
+                    <h2 style="margin: 0; font-size: 18px;">New Beta Feedback Received</h2>
+                    <p style="margin: 4px 0 0 0; opacity: 0.9; font-size: 13px;">{datetime.utcnow().strftime('%B %d, %Y at %H:%M UTC')}</p>
+                </div>
+                <div style="background: #f9fafb; padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+                    <div style="margin-bottom: 16px;">
+                        <span style="font-size: 28px; letter-spacing: 2px;">{star_display}</span>
+                        <span style="color: #6b7280; margin-left: 8px;">({feedback.rating}/5)</span>
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr style="border-bottom: 1px solid #e5e7eb;">
+                            <td style="padding: 10px 0; color: #6b7280; width: 100px; font-size: 13px;">Category</td>
+                            <td style="padding: 10px 0; font-weight: 600; font-size: 14px;">{feedback.category}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #e5e7eb;">
+                            <td style="padding: 10px 0; color: #6b7280; font-size: 13px;">From</td>
+                            <td style="padding: 10px 0; font-size: 14px;">{feedback.user_name} {f'({feedback.email})' if feedback.email else ''}</td>
+                        </tr>
+                    </table>
+                    <div style="margin-top: 16px; padding: 16px; background: white; border-radius: 8px; border: 1px solid #e5e7eb;">
+                        <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #374151;">{feedback.message}</p>
+                    </div>
+                </div>
+            </div>
+            """
+        })
+        logger.info(f"✅ Feedback notification email sent for feedback {feedback_doc['id']}")
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to send feedback notification email: {e}")
+    
+    return {
+        "success": True,
+        "id": feedback_doc["id"],
+        "message": "Thank you for your feedback! We truly appreciate it."
+    }
+
+@api_router.get("/feedback")
+async def get_all_feedback():
+    """Get all feedback (admin endpoint)"""
+    feedback_collection = db.feedback
+    feedbacks = []
+    cursor = feedback_collection.find({}).sort("created_at", -1).limit(100)
+    async for doc in cursor:
+        doc.pop("_id", None)
+        feedbacks.append(doc)
+    
+    return {
+        "feedbacks": feedbacks,
+        "total": len(feedbacks)
+    }
+
+@api_router.get("/feedback/stats")
+async def get_feedback_stats():
+    """Get feedback statistics"""
+    feedback_collection = db.feedback
+    total = await feedback_collection.count_documents({})
+    
+    # Calculate average rating
+    pipeline = [
+        {"$group": {"_id": None, "avg_rating": {"$avg": "$rating"}, "count": {"$sum": 1}}}
+    ]
+    result = await feedback_collection.aggregate(pipeline).to_list(1)
+    avg_rating = round(result[0]["avg_rating"], 1) if result else 0
+    
+    # Count by category
+    cat_pipeline = [
+        {"$group": {"_id": "$category", "count": {"$sum": 1}}}
+    ]
+    cat_result = await feedback_collection.aggregate(cat_pipeline).to_list(20)
+    by_category = {r["_id"]: r["count"] for r in cat_result}
+    
+    # Count by rating
+    rating_pipeline = [
+        {"$group": {"_id": "$rating", "count": {"$sum": 1}}}
+    ]
+    rating_result = await feedback_collection.aggregate(rating_pipeline).to_list(5)
+    by_rating = {str(r["_id"]): r["count"] for r in rating_result}
+    
+    return {
+        "total": total,
+        "average_rating": avg_rating,
+        "by_category": by_category,
+        "by_rating": by_rating
+    }
+
 @api_router.get("/beta/status")
 async def get_beta_status():
     """Get current beta program status"""

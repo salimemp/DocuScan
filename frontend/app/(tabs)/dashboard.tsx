@@ -362,6 +362,29 @@ export default function DashboardScreen() {
         {/* Beta Launch Banner */}
         <BetaBanner />
 
+        {/* Feedback CTA */}
+        <TouchableOpacity
+          testID="feedback-cta"
+          activeOpacity={0.85}
+          onPress={() => router.push('/feedback')}
+          style={[styles.feedbackCard, { backgroundColor: colors.surface, ...shadows.sm }]}
+        >
+          <View style={[styles.feedbackIconWrap, { backgroundColor: '#8B5CF6' + '15' }]}>
+            <Ionicons name="heart" size={20} color="#8B5CF6" />
+          </View>
+          <View style={styles.feedbackTextWrap}>
+            <Text style={[styles.feedbackTitle, { color: colors.textPrimary }]}>
+              Share Your Feedback
+            </Text>
+            <Text style={[styles.feedbackSubtitle, { color: colors.textSecondary }]}>
+              Help us build the best document scanner
+            </Text>
+          </View>
+          <View style={[styles.feedbackArrow, { backgroundColor: '#8B5CF6' + '15' }]}>
+            <Ionicons name="arrow-forward" size={14} color="#8B5CF6" />
+          </View>
+        </TouchableOpacity>
+
         {/* Stats Row */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsRow} style={styles.statScroll}>
           {statItems.map((stat, i) => (
@@ -1193,4 +1216,40 @@ const styles = StyleSheet.create({
   // Voice toggle switch
   toggleSwitch: { width: 36, height: 20, borderRadius: 10, justifyContent: 'center', paddingHorizontal: 2 },
   toggleKnob: { width: 16, height: 16, borderRadius: 8, backgroundColor: '#FFF' },
+
+  // Feedback CTA
+  feedbackCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginTop: 12,
+    padding: 16,
+    borderRadius: 14,
+  },
+  feedbackIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  feedbackTextWrap: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  feedbackTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  feedbackSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  feedbackArrow: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
