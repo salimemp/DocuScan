@@ -5,7 +5,22 @@ import type { PropsWithChildren } from 'react';
  * Root HTML template for DocScan Pro web build.
  * Injects comprehensive SEO schemas, Open Graph, Twitter Cards, and meta tags.
  * This file only runs in Node.js for static/SSR rendering.
+ *
+ * Search Engine Verification tokens are read from environment variables:
+ *   EXPO_PUBLIC_GOOGLE_SITE_VERIFICATION
+ *   EXPO_PUBLIC_BING_SITE_VERIFICATION
+ *   EXPO_PUBLIC_YANDEX_VERIFICATION
+ *   EXPO_PUBLIC_PINTEREST_VERIFICATION
+ *   EXPO_PUBLIC_FACEBOOK_DOMAIN_VERIFICATION
  */
+
+const SITE_URL = process.env.EXPO_PUBLIC_SITE_URL || 'https://docscanpro.app';
+const GOOGLE_TOKEN = process.env.EXPO_PUBLIC_GOOGLE_SITE_VERIFICATION || '';
+const BING_TOKEN = process.env.EXPO_PUBLIC_BING_SITE_VERIFICATION || '';
+const YANDEX_TOKEN = process.env.EXPO_PUBLIC_YANDEX_VERIFICATION || '';
+const PINTEREST_TOKEN = process.env.EXPO_PUBLIC_PINTEREST_VERIFICATION || '';
+const FB_TOKEN = process.env.EXPO_PUBLIC_FACEBOOK_DOMAIN_VERIFICATION || '';
+
 export default function Root({ children }: PropsWithChildren) {
   return (
     <html lang="en">
@@ -445,12 +460,12 @@ export default function Root({ children }: PropsWithChildren) {
           }}
         />
 
-        {/* Verification tags */}
-        <meta name="google-site-verification" content="ADD_GOOGLE_SEARCH_CONSOLE_TOKEN_HERE" />
-        <meta name="msvalidate.01" content="ADD_BING_WEBMASTER_TOKEN_HERE" />
-        <meta name="yandex-verification" content="ADD_YANDEX_TOKEN_HERE" />
-        <meta name="p:domain_verify" content="ADD_PINTEREST_TOKEN_HERE" />
-        <meta name="facebook-domain-verification" content="ADD_FB_DOMAIN_TOKEN_HERE" />
+        {/* Verification tags — populated from EXPO_PUBLIC_* env variables */}
+        {GOOGLE_TOKEN && <meta name="google-site-verification" content={GOOGLE_TOKEN} />}
+        {BING_TOKEN && <meta name="msvalidate.01" content={BING_TOKEN} />}
+        {YANDEX_TOKEN && <meta name="yandex-verification" content={YANDEX_TOKEN} />}
+        {PINTEREST_TOKEN && <meta name="p:domain_verify" content={PINTEREST_TOKEN} />}
+        {FB_TOKEN && <meta name="facebook-domain-verification" content={FB_TOKEN} />}
 
         {/* Required for proper ScrollView behavior on web */}
         <ScrollViewStyleReset />
