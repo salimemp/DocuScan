@@ -83,3 +83,12 @@ credentials.json
 
 # Note: .env files are intentionally NOT ignored — they are required for deployment.
 # Sensitive .env files should be managed via Emergent dashboard environment variables.
+-e 
+# Environment and credential files
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
