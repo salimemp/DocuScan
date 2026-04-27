@@ -190,10 +190,26 @@ export const PasswordStrengthMeter: React.FC<PasswordStrengthMeterProps> = ({
     onValidityChange?.(isValid, errors);
   }, [requirementsStatus, breachResult, onValidityChange]);
   
-  if (!password) return null;
+  if (!password) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.hintContainer}>
+          <Ionicons name="shield-outline" size={14} color={colors.textTertiary} />
+          <Text style={[styles.hintText, { color: colors.textTertiary }]}>
+            Password strength will appear as you type
+          </Text>
+        </View>
+      </View>
+    );
+  }
   
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, styles.meterContainer, { backgroundColor: colors.surfaceHighlight, borderRadius: 14, padding: 14 }]}>
+      {/* Section Label */}
+      <View style={styles.sectionHeader}>
+        <Ionicons name="shield-checkmark" size={16} color={strengthInfo.color} />
+        <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>Password Strength</Text>
+      </View>
       {/* Strength Bar */}
       <View style={styles.strengthBarContainer}>
         <View style={[styles.strengthBarBg, { backgroundColor: colors.surfaceHighlight }]}>
@@ -309,13 +325,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   strengthBarBg: {
-    height: 6,
-    borderRadius: 3,
+    height: 10,
+    borderRadius: 5,
     overflow: 'hidden',
   },
   strengthBarFill: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: 5,
   },
   strengthLabelRow: {
     flexDirection: 'row',
@@ -323,11 +339,12 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   strengthLabel: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
   },
   strengthScore: {
-    fontSize: 11,
+    fontSize: 13,
+    fontWeight: '500',
   },
   
   requirementsContainer: {
@@ -340,7 +357,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   requirementText: {
-    fontSize: 12,
+    fontSize: 13,
   },
   
   breachContainer: {
@@ -374,6 +391,32 @@ const styles = StyleSheet.create({
     color: '#991B1B',
     fontSize: 12,
     lineHeight: 16,
+  },
+  
+  // New styles for enhanced visibility
+  hintContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+  },
+  hintText: {
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+  meterContainer: {
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 10,
+  },
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
 
