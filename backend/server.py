@@ -2183,6 +2183,40 @@ async def advanced_search(request: AdvancedSearchRequest):
         "total_pages": (total + request.limit - 1) // request.limit
     }
 
+# ── Beta Program Configuration ────────────────────────────────────────────
+BETA_MAX_USERS = 100
+BETA_VERSION = "1.0.0-beta"
+
+@api_router.get("/beta/status")
+async def get_beta_status():
+    """Get current beta program status"""
+    users_collection = db.users
+    total_users = await users_collection.count_documents({})
+    spots_remaining = max(0, BETA_MAX_USERS - total_users)
+    
+    return {
+        "is_beta": True,
+        "version": BETA_VERSION,
+        "max_users": BETA_MAX_USERS,
+        "current_users": total_users,
+        "spots_remaining": spots_remaining,
+        "is_open": spots_remaining > 0,
+        "features": [
+            "Unlimited scans",
+            "All 18+ export formats",
+            "AI-powered OCR in any language",
+            "Math solver",
+            "E-signatures",
+            "Password protection",
+            "Cloud backup",
+            "Business card scanner",
+            "Batch scanning",
+            "Read aloud",
+            "13 languages"
+        ],
+        "message": f"Free for our first {BETA_MAX_USERS} users! {spots_remaining} spots remaining."
+    }
+
 app.include_router(api_router)
 app.include_router(auth_router, prefix="/api")
 app.include_router(subscription_router, prefix="/api")

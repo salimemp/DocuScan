@@ -16,6 +16,7 @@ import { PoweredByElixio } from '../../components/PoweredByElixio';
 import { CloudProviderIcon } from '../../components/CloudProviderIcon';
 import { VoiceCommandsHelp } from '../../components/VoiceCommandsHelp';
 import { getErrorMessage } from '../../utils/errorHelpers';
+import { BetaBanner, BetaBadge } from '../../components/BetaBanner';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 
@@ -339,7 +340,10 @@ export default function DashboardScreen() {
             />
             <View>
               <Text style={[styles.greeting, { color: colors.textSecondary }]}>{greeting} 👋</Text>
-              <Text style={[styles.appTitle, { color: colors.textPrimary }]}>DocScan Pro</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={[styles.appTitle, { color: colors.textPrimary }]}>DocScan Pro</Text>
+                <BetaBadge />
+              </View>
             </View>
           </View>
           <TouchableOpacity
@@ -354,6 +358,9 @@ export default function DashboardScreen() {
         </View>
 
         <Text style={[styles.dateText, { color: colors.textTertiary }]}>{today}</Text>
+
+        {/* Beta Launch Banner */}
+        <BetaBanner />
 
         {/* Stats Row */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsRow} style={styles.statScroll}>
