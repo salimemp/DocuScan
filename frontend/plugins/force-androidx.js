@@ -9,6 +9,36 @@ const { withAppBuildGradle } = require('@expo/config-plugins');
 
 const RESOLUTION_BLOCK = `
 // === Force AndroidX (injected by force-androidx plugin) ===
+android {
+    packagingOptions {
+        resources {
+            pickFirsts += [
+                "META-INF/androidx.*",
+                "META-INF/*.version",
+                "META-INF/*.kotlin_module",
+                "META-INF/*.properties",
+                "META-INF/proguard/**",
+                "META-INF/services/**",
+                "META-INF/INDEX.LIST",
+                "META-INF/io.netty.versions.properties",
+                "META-INF/DEPENDENCIES"
+            ]
+            excludes += [
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/license.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/notice.txt",
+                "META-INF/ASL2.0",
+                "META-INF/*.SF",
+                "META-INF/*.DSA",
+                "META-INF/*.RSA"
+            ]
+        }
+    }
+}
+
 configurations.all {
     resolutionStrategy {
         force "androidx.core:core:1.16.0"
