@@ -101,6 +101,26 @@
           "receipt scanner",
           "scan documents",
           "paperless office",
+          "document organizer",
+          "document scanner",
+          "ocr app",
+          "pdf scanner",
+          "math solver",
+          "equation solver",
+          "business card scanner",
+          "contact scanner",
+          "document management",
+          "secure vault",
+          "encrypted documents",
+          "cloud backup",
+          "scan to pdf",
+          "mobile scanner",
+          "ai scanner",
+          "text recognition",
+          "photo to text",
+          "receipt scanner",
+          "scan documents",
+          "paperless office",
           "document organizer"
         ],
         "author": "DocScan Pro Team",
@@ -112,7 +132,12 @@
         "subcategory": "BUSINESS",
         "contentRating": "4+",
         "releaseNotes": "Version 2.0 - Major update with AI Math Solver, Business Card Scanner, Enhanced Security with Secure Vault, Rate Limiting, and improved performance."
+      },
+      "router": {},
+      "eas": {
+        "projectId": "0827619a-1eb3-4176-a670-b129f973a395"
       }
-    }
+    },
+    "owner": "salimemp"
   }
 }
