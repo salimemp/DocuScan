@@ -40,6 +40,12 @@
       "env": {
         "EXPO_PUBLIC_BACKEND_URL": "https://widget-native-build.preview.emergentagent.com"
       }
+    },
+    "production-apk": {
+      "extends": "production",
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {
