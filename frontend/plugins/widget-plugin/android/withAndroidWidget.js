@@ -5,17 +5,51 @@
 const {
   withAndroidManifest,
   withDangerousMod,
+  withGradleProperties,
 } = require('@expo/config-plugins');
 const path = require('path');
 const fs = require('fs');
 
 function withAndroidWidget(config) {
+  // Step 0: Ensure AndroidX + Jetifier enabled (safety net for legacy support-lib deps)
+  config = withGradleProperties(config, (cfg) => {
+    const ensureProp = (key, value) => {
+      const existing = cfg.modResults.find(
+        (item) => item.type === 'property' && item.key === key
+      );
+      if (existing) {
+        existing.value = value;
+      } else {
+        cfg.modResults.push({ type: 'property', key, value });
+      }
+    };
+    ensureProp('android.useAndroidX', 'true');
+    ensureProp('android.enableJetifier', 'true');
+    return cfg;
+  });
+
   // Step 1: Add widget receivers to AndroidManifest.xml
   config = withAndroidManifest(config, (mod) => {
     const manifest = mod.modResults;
     const application = manifest.manifest.application?.[0];
     
     if (!application) return mod;
+
+    // --- FIX: Manifest merger conflict between AndroidX (androidx.core.app.CoreComponentFactory)
+    // and legacy android.support (from @react-native-voice/voice 3.x which still ships old support libs).
+    // Without this, Gradle fails: "Attribute application@appComponentFactory is also present at
+    // [com.android.support:support-compat:28.0.0]". We instruct the merger to keep the AndroidX value.
+    if (!manifest.manifest.$) manifest.manifest.$ = {};
+    if (!manifest.manifest.$['xmlns:tools']) {
+      manifest.manifest.$['xmlns:tools'] = 'http://schemas.android.com/tools';
+    }
+    const existingReplace = application.$?.['tools:replace'] || '';
+    const replaceAttrs = new Set(
+      existingReplace.split(',').map((s) => s.trim()).filter(Boolean)
+    );
+    replaceAttrs.add('android:appComponentFactory');
+    application.$['tools:replace'] = Array.from(replaceAttrs).join(',');
+    application.$['android:appComponentFactory'] = 'androidx.core.app.CoreComponentFactory';
 
     // Ensure receivers array exists
     if (!application.receiver) {
