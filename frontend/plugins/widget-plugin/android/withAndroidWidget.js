@@ -56,7 +56,7 @@ function withAndroidWidget(config) {
       application.receiver = [];
     }
 
-    const packageName = config.android?.package || 'com.docscanpro.app';
+    const packageName = config.android?.package || 'com.salimmakrana.docscanpro';
 
     // Add Quick Scan Widget receiver
     const widgetReceivers = [
@@ -120,7 +120,7 @@ function withAndroidWidget(config) {
     'android',
     async (mod) => {
       const projectRoot = mod.modRequest.projectRoot;
-      const packageName = config.android?.package || 'com.docscanpro.app';
+      const packageName = config.android?.package || 'com.salimmakrana.docscanpro';
       const packagePath = packageName.replace(/\./g, '/');
       
       // Paths

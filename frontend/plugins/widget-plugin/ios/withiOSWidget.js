@@ -17,8 +17,8 @@ function withiOSWidget(config) {
   // Step 1: Add App Group entitlement for shared data
   config = withEntitlementsPlist(config, (mod) => {
     const bundleId = mod.modResults['application-identifier'] ||
-      config.ios?.bundleIdentifier || 'com.docscanpro.app';
-    const appGroup = `group.${config.ios?.bundleIdentifier || 'com.docscanpro.app'}`;
+      config.ios?.bundleIdentifier || 'com.salimmakrana.docscanpro';
+    const appGroup = `group.${config.ios?.bundleIdentifier || 'com.salimmakrana.docscanpro'}`;
     
     mod.modResults['com.apple.security.application-groups'] = [
       appGroup,
@@ -36,7 +36,7 @@ function withiOSWidget(config) {
   // Step 3: Add widget extension to Xcode project
   config = withXcodeProject(config, async (mod) => {
     const project = mod.modResults;
-    const bundleId = config.ios?.bundleIdentifier || 'com.docscanpro.app';
+    const bundleId = config.ios?.bundleIdentifier || 'com.salimmakrana.docscanpro';
     const widgetBundleId = `${bundleId}${WIDGET_BUNDLE_ID_SUFFIX}`;
     const appGroup = `group.${bundleId}`;
     const targetName = WIDGET_EXTENSION_NAME;
