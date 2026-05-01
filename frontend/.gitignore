@@ -37,3 +37,6 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+
+# Google Play service account (DO NOT COMMIT)
+google-play-service-account.json
