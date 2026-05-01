@@ -170,6 +170,10 @@ function RootLayoutNav() {
         name="business-card"
         options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
       />
+      <Stack.Screen
+        name="feedback"
+        options={{ animation: 'slide_from_right' }}
+      />
     </Stack>
   );
 }
