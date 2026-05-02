@@ -2397,7 +2397,7 @@ async def create_deletion_request(req: DeletionRequest, request: Request):
                 </p>
             """
             resend.Emails.send({
-                "from": "DocScan Pro <noreply@docscanpro.app>",
+                "from": "DocScan Pro <noreply@notify.docscanpro.app>",
                 "to": ["support@docscanpro.app"],
                 "subject": f"[Deletion Request] {req.email} — {scope_label}",
                 "html": html_body,
