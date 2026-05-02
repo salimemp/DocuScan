@@ -2338,6 +2338,85 @@ async def get_beta_status():
         "message": f"Free for our first {BETA_MAX_USERS} users! {spots_remaining} spots remaining."
     }
 
+# ── Account/Data Deletion Request ──────────────────────────────────────────
+class DeletionRequest(BaseModel):
+    email: str = Field(..., min_length=3, max_length=320)
+    full_name: Optional[str] = Field(None, max_length=200)
+    reason: Optional[str] = Field(None, max_length=2000)
+    confirm: bool = Field(..., description="User must confirm they want their data deleted")
+    delete_scope: str = Field("all", description="all | account_only | scans_only")
+
+@api_router.post("/account/deletion-request")
+async def create_deletion_request(req: DeletionRequest, request: Request):
+    """Public endpoint to receive data-deletion requests from the public web form
+    (https://docscanpro.app/delete-account). Records the request and emails support
+    via Resend. Required by Google Play Data Safety for the 'Delete account URL'.
+    """
+    if not req.confirm:
+        raise HTTPException(400, "You must confirm the deletion request")
+
+    # Basic email shape check
+    if "@" not in req.email or "." not in req.email.split("@")[-1]:
+        raise HTTPException(400, "Invalid email address")
+
+    deletion_id = str(uuid.uuid4())
+    record = {
+        "id": deletion_id,
+        "email": req.email.strip().lower(),
+        "full_name": (req.full_name or "").strip(),
+        "reason": (req.reason or "").strip(),
+        "delete_scope": req.delete_scope,
+        "client_ip": request.client.host if request.client else None,
+        "user_agent": request.headers.get("user-agent", "")[:500],
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc),
+    }
+    await db.deletion_requests.insert_one(record)
+
+    # Email support@docscanpro.app via Resend (best-effort, don't fail user request)
+    try:
+        if resend.api_key:
+            scope_label = {
+                "all": "Full account + all scans/data",
+                "account_only": "Account only (keep scans for the affected user)",
+                "scans_only": "Scans/documents only (keep account active)",
+            }.get(req.delete_scope, req.delete_scope)
+            html_body = f"""
+                <h2>New Data-Deletion Request</h2>
+                <p><strong>Request ID:</strong> {deletion_id}</p>
+                <p><strong>Email:</strong> {req.email}</p>
+                <p><strong>Name:</strong> {req.full_name or '<em>not provided</em>'}</p>
+                <p><strong>Scope:</strong> {scope_label}</p>
+                <p><strong>Reason:</strong> {req.reason or '<em>not provided</em>'}</p>
+                <p><strong>Submitted:</strong> {record['created_at'].isoformat()}</p>
+                <hr/>
+                <p style='color:#64748B;font-size:12px'>
+                    Please action this request within 30 days per the DocScan Pro
+                    Privacy Policy. After verifying ownership of the email,
+                    delete the user record and associated documents from MongoDB.
+                </p>
+            """
+            resend.Emails.send({
+                "from": "DocScan Pro <noreply@docscanpro.app>",
+                "to": ["support@docscanpro.app"],
+                "subject": f"[Deletion Request] {req.email} — {scope_label}",
+                "html": html_body,
+                "reply_to": req.email,
+            })
+            logger.info(f"✅ Deletion request email sent for {deletion_id}")
+    except Exception as e:
+        logger.warning(f"⚠️  Could not email deletion request {deletion_id}: {e}")
+
+    return {
+        "success": True,
+        "request_id": deletion_id,
+        "message": (
+            "Your deletion request has been received. We will verify your "
+            "identity and complete the deletion within 30 days. A confirmation "
+            "email will be sent to your address once processing is complete."
+        ),
+    }
+
 app.include_router(api_router)
 app.include_router(auth_router, prefix="/api")
 app.include_router(subscription_router, prefix="/api")

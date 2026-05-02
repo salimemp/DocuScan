@@ -1,319 +1,184 @@
-#!/usr/bin/env python3
 """
-DocScan Pro Backend Feedback System Testing
-Testing feedback endpoints at production URL
+Backend test for POST /api/account/deletion-request endpoint.
+Tests data-deletion request submission, validation, and DB persistence.
 """
+import os
+import re
+import sys
+import time
+import asyncio
+import httpx
 
-import requests
-import json
-import uuid
-from datetime import datetime
+# Resolve backend URL from frontend env
+FRONTEND_ENV = "/app/frontend/.env"
+BACKEND_URL = None
+with open(FRONTEND_ENV) as f:
+    for line in f:
+        line = line.strip()
+        if line.startswith("EXPO_PUBLIC_BACKEND_URL="):
+            BACKEND_URL = line.split("=", 1)[1].strip().strip('"').strip("'")
+            break
 
-# Production API URL
-BASE_URL = "https://widget-native-build.preview.emergentagent.com/api"
+if not BACKEND_URL:
+    print("ERROR: EXPO_PUBLIC_BACKEND_URL not found in frontend/.env")
+    sys.exit(1)
 
-def test_feedback_system():
-    """Test the complete feedback system"""
-    print("🧪 Testing DocScan Pro Feedback System")
-    print("=" * 60)
-    
-    results = []
-    
-    # Test 1: POST /api/feedback - Valid submission
-    print("\n1️⃣ Testing POST /api/feedback - Valid submission")
+API_URL = f"{BACKEND_URL}/api"
+ENDPOINT = f"{API_URL}/account/deletion-request"
+
+print(f"Testing endpoint: {ENDPOINT}")
+print("=" * 80)
+
+results = []
+
+def record(name, passed, detail=""):
+    status = "PASS" if passed else "FAIL"
+    print(f"[{status}] {name}")
+    if detail:
+        print(f"   {detail}")
+    results.append((name, passed, detail))
+
+UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+
+
+def test_valid_full_request():
+    payload = {
+        "email": f"alice.johnson+{int(time.time())}@example.com",
+        "full_name": "Alice Johnson",
+        "reason": "I no longer use this app and want my data removed.",
+        "delete_scope": "all",
+        "confirm": True,
+    }
     try:
-        feedback_data = {
-            "rating": 5,
-            "category": "General",
-            "message": "Great app, love it!",
-            "email": "test@example.com",
-            "user_name": "Tester"
-        }
-        
-        response = requests.post(f"{BASE_URL}/feedback", json=feedback_data, timeout=10)
-        print(f"Status: {response.status_code}")
-        print(f"Response: {response.text}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("success") and data.get("id") and data.get("message"):
-                print("✅ Valid feedback submission working")
-                results.append("✅ POST /api/feedback - Valid submission")
-                feedback_id = data.get("id")
-            else:
-                print("❌ Response structure incorrect")
-                results.append("❌ POST /api/feedback - Invalid response structure")
-        else:
-            print(f"❌ Failed with status {response.status_code}")
-            results.append(f"❌ POST /api/feedback - Failed ({response.status_code})")
-            
+        r = httpx.post(ENDPOINT, json=payload, timeout=30.0)
+        if r.status_code != 200:
+            record("Valid full request returns 200", False,
+                   f"Got {r.status_code}: {r.text[:300]}")
+            return None
+        data = r.json()
+        ok = data.get("success") is True
+        rid = data.get("request_id", "")
+        is_uuid = bool(UUID_RE.match(rid)) if isinstance(rid, str) else False
+        passed = ok and is_uuid
+        record(
+            "Valid full request returns 200 with success=true and UUID request_id",
+            passed,
+            f"success={ok}, request_id={rid}, uuid_valid={is_uuid}, "
+            f"message={data.get('message','')[:80]}",
+        )
+        return rid if passed else None
     except Exception as e:
-        print(f"❌ Error: {e}")
-        results.append(f"❌ POST /api/feedback - Error: {e}")
-    
-    # Test 2: POST /api/feedback - Missing rating validation
-    print("\n2️⃣ Testing POST /api/feedback - Missing rating validation")
+        record("Valid full request returns 200", False, f"Exception: {e}")
+        return None
+
+
+def test_confirm_false():
+    payload = {
+        "email": "bob.smith@example.com",
+        "full_name": "Bob Smith",
+        "reason": "Not confirming",
+        "delete_scope": "all",
+        "confirm": False,
+    }
     try:
-        invalid_data = {
-            "category": "General",
-            "message": "Test message without rating",
-            "email": "test@example.com",
-            "user_name": "Tester"
-        }
-        
-        response = requests.post(f"{BASE_URL}/feedback", json=invalid_data, timeout=10)
-        print(f"Status: {response.status_code}")
-        print(f"Response: {response.text}")
-        
-        if response.status_code == 422:  # Validation error expected
-            print("✅ Missing rating validation working")
-            results.append("✅ POST /api/feedback - Missing rating validation")
-        else:
-            print(f"❌ Expected 422, got {response.status_code}")
-            results.append(f"❌ POST /api/feedback - Missing rating validation failed")
-            
+        r = httpx.post(ENDPOINT, json=payload, timeout=30.0)
+        passed = r.status_code == 400
+        record("confirm=false returns 400", passed,
+               f"Got {r.status_code}: {r.text[:300]}")
     except Exception as e:
-        print(f"❌ Error: {e}")
-        results.append(f"❌ POST /api/feedback - Missing rating validation error: {e}")
-    
-    # Test 3: POST /api/feedback - Empty message validation
-    print("\n3️⃣ Testing POST /api/feedback - Empty message validation")
+        record("confirm=false returns 400", False, f"Exception: {e}")
+
+
+def test_invalid_email():
+    payload = {
+        "email": "not-an-email",
+        "full_name": "Charlie Davis",
+        "reason": "Bad email test",
+        "delete_scope": "all",
+        "confirm": True,
+    }
     try:
-        invalid_data = {
-            "rating": 3,
-            "category": "General",
-            "message": "",
-            "email": "test@example.com",
-            "user_name": "Tester"
-        }
-        
-        response = requests.post(f"{BASE_URL}/feedback", json=invalid_data, timeout=10)
-        print(f"Status: {response.status_code}")
-        print(f"Response: {response.text}")
-        
-        if response.status_code == 422:  # Validation error expected
-            print("✅ Empty message validation working")
-            results.append("✅ POST /api/feedback - Empty message validation")
-        else:
-            print(f"❌ Expected 422, got {response.status_code}")
-            results.append(f"❌ POST /api/feedback - Empty message validation failed")
-            
+        r = httpx.post(ENDPOINT, json=payload, timeout=30.0)
+        passed = r.status_code == 400
+        record("Invalid email (no @) returns 400", passed,
+               f"Got {r.status_code}: {r.text[:300]}")
     except Exception as e:
-        print(f"❌ Error: {e}")
-        results.append(f"❌ POST /api/feedback - Empty message validation error: {e}")
-    
-    # Test 4: POST /api/feedback - Message too short validation
-    print("\n4️⃣ Testing POST /api/feedback - Message too short validation")
+        record("Invalid email returns 400", False, f"Exception: {e}")
+
+
+def test_missing_email():
+    payload = {
+        "full_name": "Dana Lee",
+        "reason": "Missing email test",
+        "delete_scope": "all",
+        "confirm": True,
+    }
     try:
-        invalid_data = {
-            "rating": 3,
-            "category": "General",
-            "message": "Hi",  # Less than 5 characters
-            "email": "test@example.com",
-            "user_name": "Tester"
-        }
-        
-        response = requests.post(f"{BASE_URL}/feedback", json=invalid_data, timeout=10)
-        print(f"Status: {response.status_code}")
-        print(f"Response: {response.text}")
-        
-        if response.status_code == 422:  # Validation error expected
-            print("✅ Message too short validation working")
-            results.append("✅ POST /api/feedback - Message too short validation")
-        else:
-            print(f"❌ Expected 422, got {response.status_code}")
-            results.append(f"❌ POST /api/feedback - Message too short validation failed")
-            
+        r = httpx.post(ENDPOINT, json=payload, timeout=30.0)
+        passed = r.status_code == 422
+        record("Missing email returns 422", passed,
+               f"Got {r.status_code}: {r.text[:300]}")
     except Exception as e:
-        print(f"❌ Error: {e}")
-        results.append(f"❌ POST /api/feedback - Message too short validation error: {e}")
-    
-    # Test 5: POST /api/feedback - Optional fields test
-    print("\n5️⃣ Testing POST /api/feedback - Optional fields test")
+        record("Missing email returns 422", False, f"Exception: {e}")
+
+
+async def verify_in_mongo(request_id):
+    if not request_id:
+        record("Mongo persistence (deletion_requests collection)", False,
+               "Skipped - no request_id from valid submission")
+        return
     try:
-        minimal_data = {
-            "rating": 4,
-            "category": "Bug Report",
-            "message": "Found a small issue with the app interface"
-            # No email or user_name (should use defaults)
-        }
-        
-        response = requests.post(f"{BASE_URL}/feedback", json=minimal_data, timeout=10)
-        print(f"Status: {response.status_code}")
-        print(f"Response: {response.text}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("success") and data.get("id"):
-                print("✅ Optional fields working (defaults applied)")
-                results.append("✅ POST /api/feedback - Optional fields working")
-            else:
-                print("❌ Response structure incorrect")
-                results.append("❌ POST /api/feedback - Optional fields failed")
-        else:
-            print(f"❌ Failed with status {response.status_code}")
-            results.append(f"❌ POST /api/feedback - Optional fields failed ({response.status_code})")
-            
+        from motor.motor_asyncio import AsyncIOMotorClient
+        from dotenv import load_dotenv
+        load_dotenv("/app/backend/.env")
+        mongo_url = os.environ["MONGO_URL"]
+        db_name = os.environ["DB_NAME"]
+        client = AsyncIOMotorClient(mongo_url)
+        db = client[db_name]
+        doc = await db.deletion_requests.find_one({"id": request_id})
+        if not doc:
+            record("Mongo persistence (deletion_requests collection)", False,
+                   f"Record with id={request_id} not found in deletion_requests")
+            client.close()
+            return
+        expected = ["id", "email", "full_name", "reason", "delete_scope",
+                    "status", "created_at"]
+        missing = [k for k in expected if k not in doc]
+        passed = (not missing
+                  and doc.get("status") == "pending"
+                  and doc.get("delete_scope") == "all")
+        detail = (f"Found record id={doc.get('id')}, email={doc.get('email')}, "
+                  f"status={doc.get('status')}, scope={doc.get('delete_scope')}, "
+                  f"missing_fields={missing}")
+        record("Mongo persistence (deletion_requests collection)", passed, detail)
+        client.close()
     except Exception as e:
-        print(f"❌ Error: {e}")
-        results.append(f"❌ POST /api/feedback - Optional fields error: {e}")
-    
-    # Test 6: GET /api/feedback - Get all feedback (admin)
-    print("\n6️⃣ Testing GET /api/feedback - Get all feedback")
-    try:
-        response = requests.get(f"{BASE_URL}/feedback", timeout=10)
-        print(f"Status: {response.status_code}")
-        print(f"Response: {response.text}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            if "feedbacks" in data and "total" in data:
-                feedbacks = data["feedbacks"]
-                total = data["total"]
-                print(f"✅ Feedback list working - Total: {total}, Retrieved: {len(feedbacks)}")
-                
-                # Check feedback structure
-                if feedbacks and len(feedbacks) > 0:
-                    sample_feedback = feedbacks[0]
-                    required_fields = ["id", "rating", "category", "message", "created_at", "status"]
-                    missing_fields = [field for field in required_fields if field not in sample_feedback]
-                    
-                    if not missing_fields:
-                        print("✅ Feedback structure correct")
-                        results.append("✅ GET /api/feedback - Working with correct structure")
-                    else:
-                        print(f"❌ Missing fields in feedback: {missing_fields}")
-                        results.append(f"❌ GET /api/feedback - Missing fields: {missing_fields}")
-                else:
-                    print("✅ Feedback list working (empty)")
-                    results.append("✅ GET /api/feedback - Working (empty list)")
-            else:
-                print("❌ Response structure incorrect")
-                results.append("❌ GET /api/feedback - Invalid response structure")
-        else:
-            print(f"❌ Failed with status {response.status_code}")
-            results.append(f"❌ GET /api/feedback - Failed ({response.status_code})")
-            
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        results.append(f"❌ GET /api/feedback - Error: {e}")
-    
-    # Test 7: GET /api/feedback/stats - Get feedback statistics
-    print("\n7️⃣ Testing GET /api/feedback/stats - Get feedback statistics")
-    try:
-        response = requests.get(f"{BASE_URL}/feedback/stats", timeout=10)
-        print(f"Status: {response.status_code}")
-        print(f"Response: {response.text}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            required_fields = ["total", "average_rating", "by_category", "by_rating"]
-            missing_fields = [field for field in required_fields if field not in data]
-            
-            if not missing_fields:
-                print(f"✅ Feedback stats working - Total: {data['total']}, Avg Rating: {data['average_rating']}")
-                print(f"   Categories: {data['by_category']}")
-                print(f"   Ratings: {data['by_rating']}")
-                results.append("✅ GET /api/feedback/stats - Working with correct structure")
-            else:
-                print(f"❌ Missing fields in stats: {missing_fields}")
-                results.append(f"❌ GET /api/feedback/stats - Missing fields: {missing_fields}")
-        else:
-            print(f"❌ Failed with status {response.status_code}")
-            results.append(f"❌ GET /api/feedback/stats - Failed ({response.status_code})")
-            
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        results.append(f"❌ GET /api/feedback/stats - Error: {e}")
-    
-    # Test 8: Regression check - GET /api/beta/status
-    print("\n8️⃣ Testing Regression - GET /api/beta/status")
-    try:
-        response = requests.get(f"{BASE_URL}/beta/status", timeout=10)
-        print(f"Status: {response.status_code}")
-        print(f"Response: {response.text}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            if "is_beta" in data and "version" in data:
-                print("✅ Beta status endpoint working")
-                results.append("✅ GET /api/beta/status - Regression check passed")
-            else:
-                print("❌ Beta status response structure incorrect")
-                results.append("❌ GET /api/beta/status - Invalid structure")
-        else:
-            print(f"❌ Failed with status {response.status_code}")
-            results.append(f"❌ GET /api/beta/status - Failed ({response.status_code})")
-            
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        results.append(f"❌ GET /api/beta/status - Error: {e}")
-    
-    # Test 9: Regression check - GET /api/stats
-    print("\n9️⃣ Testing Regression - GET /api/stats")
-    try:
-        response = requests.get(f"{BASE_URL}/stats", timeout=10)
-        print(f"Status: {response.status_code}")
-        print(f"Response: {response.text}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            if "total_scans" in data:
-                print("✅ Stats endpoint working")
-                results.append("✅ GET /api/stats - Regression check passed")
-            else:
-                print("❌ Stats response structure incorrect")
-                results.append("❌ GET /api/stats - Invalid structure")
-        else:
-            print(f"❌ Failed with status {response.status_code}")
-            results.append(f"❌ GET /api/stats - Failed ({response.status_code})")
-            
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        results.append(f"❌ GET /api/stats - Error: {e}")
-    
-    # Test 10: Regression check - GET /api/documents with pagination
-    print("\n🔟 Testing Regression - GET /api/documents with pagination")
-    try:
-        response = requests.get(f"{BASE_URL}/documents?page=1&page_size=5", timeout=10)
-        print(f"Status: {response.status_code}")
-        print(f"Response: {response.text}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            if "documents" in data and "total" in data:
-                print("✅ Documents pagination endpoint working")
-                results.append("✅ GET /api/documents?page=1&page_size=5 - Regression check passed")
-            else:
-                print("❌ Documents response structure incorrect")
-                results.append("❌ GET /api/documents - Invalid structure")
-        else:
-            print(f"❌ Failed with status {response.status_code}")
-            results.append(f"❌ GET /api/documents - Failed ({response.status_code})")
-            
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        results.append(f"❌ GET /api/documents - Error: {e}")
-    
-    # Summary
-    print("\n" + "=" * 60)
-    print("📊 FEEDBACK SYSTEM TEST SUMMARY")
-    print("=" * 60)
-    
-    passed = len([r for r in results if r.startswith("✅")])
+        record("Mongo persistence (deletion_requests collection)", False, f"Exception: {e}")
+
+
+def main():
+    print("\n--- Test 1: Valid full request ---")
+    rid = test_valid_full_request()
+    print("\n--- Test 2: confirm=false ---")
+    test_confirm_false()
+    print("\n--- Test 3: invalid email ---")
+    test_invalid_email()
+    print("\n--- Test 4: missing email ---")
+    test_missing_email()
+    print("\n--- Test 5: Mongo persistence ---")
+    asyncio.run(verify_in_mongo(rid))
+
+    print("\n" + "=" * 80)
     total = len(results)
-    
-    for result in results:
-        print(result)
-    
-    print(f"\n🎯 Results: {passed}/{total} tests passed ({(passed/total)*100:.1f}%)")
-    
-    if passed == total:
-        print("🎉 All feedback system tests PASSED!")
-        return True
-    else:
-        print("⚠️ Some tests FAILED - see details above")
-        return False
+    passed = sum(1 for _, p, _ in results if p)
+    print(f"RESULT: {passed}/{total} tests passed")
+    if passed != total:
+        print("\nFailed tests:")
+        for name, p, detail in results:
+            if not p:
+                print(f"  - {name}: {detail}")
+        sys.exit(1)
+
 
 if __name__ == "__main__":
-    test_feedback_system()
+    main()
