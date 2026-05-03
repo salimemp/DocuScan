@@ -26,10 +26,17 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# Database connection
+# Database connection — defer connection until first use to avoid module-import
+# crashes if MONGO_URL is malformed (e.g., has unresolved <cluster> placeholders).
 mongo_url = os.environ.get('MONGO_URL', '')
-client = AsyncIOMotorClient(mongo_url) if mongo_url else None
-db = client[os.environ.get('DB_NAME', 'docscanpro')] if client else None
+client = None
+db = None
+try:
+    if mongo_url and '<' not in mongo_url:
+        client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=5000)
+        db = client[os.environ.get('DB_NAME', 'docscanpro')]
+except Exception as e:
+    print(f"⚠️  document_security: could not init Mongo client: {e}", flush=True)
 
 security_router = APIRouter(prefix="/security", tags=["security"])
 
