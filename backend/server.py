@@ -21,9 +21,15 @@ from rate_limit import rate_limiter, verify_turnstile_token, RATE_LIMITS, get_ra
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+# Connect to MongoDB. Use sensible defaults so the container can boot even if
+# env vars are missing — health checks will still pass; only DB-dependent
+# routes will fail. This prevents container-restart loops on deploy platforms.
+mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
+db_name = os.environ.get('DB_NAME', 'docscanpro')
+if 'MONGO_URL' not in os.environ:
+    print('⚠️  WARNING: MONGO_URL not set — using localhost fallback. Database routes will fail.', flush=True)
+client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=5000)
+db = client[db_name]
 
 # App URL — used for email action links (deep links to documents/signing)
 APP_URL = os.environ.get('APP_URL', 'https://docscanpro.app').rstrip('/')
@@ -2444,9 +2450,11 @@ app.include_router(security_router, prefix="/api")
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 # ── Database Indexes ────────────────────────────────────────────────────────
-@app.on_event("startup")
-async def create_database_indexes():
-    """Create indexes for optimized query performance."""
+async def _create_database_indexes_task():
+    """Create indexes for optimized query performance.
+    Runs as a fire-and-forget background task so it doesn't block app startup
+    (important for cloud platforms with strict healthcheck timeouts).
+    """
     try:
         # Documents collection indexes
         await db.documents.create_index("id", unique=True)
@@ -2483,6 +2491,14 @@ async def create_database_indexes():
         logger.info("✅ Database indexes created successfully")
     except Exception as e:
         logger.error(f"Failed to create indexes: {e}")
+
+
+@app.on_event("startup")
+async def _kickoff_index_creation():
+    """Schedule index creation as a background task — doesn't block startup."""
+    import asyncio
+    asyncio.create_task(_create_database_indexes_task())
+    logger.info("⏳ Index creation scheduled in background; app is ready to serve traffic.")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
