@@ -1,0 +1,3 @@
+# Railway / generic Python hosting — process config
+# Railway auto-detects Python from requirements.txt; this Procfile tells it how to start the backend.
+web: uvicorn server:app --host 0.0.0.0 --port $PORT --workers 1

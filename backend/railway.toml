@@ -1,0 +1,17 @@
+# Railway configuration — tells Railway how to build & run the backend
+# See https://docs.railway.app/reference/config-as-code
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "pip install -r requirements.txt"
+
+[deploy]
+startCommand = "uvicorn server:app --host 0.0.0.0 --port $PORT --workers 1"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+# Optional: pin the Python version that Railway will use
+[build.nixpacksPlan]
+providers = ["python"]
