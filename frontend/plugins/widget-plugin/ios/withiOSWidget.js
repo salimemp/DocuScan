@@ -94,7 +94,7 @@ function withiOSWidget(config) {
   </dict>
 </dict>
 </plist>`;
-    fs.writeFileSync(path.join(widgetDir, 'Info.plist'), widgetInfoPlist);
+    fs.writeFileSync(path.join(widgetDir, `${targetName}-Info.plist`), widgetInfoPlist);
 
     // Add widget target to Xcode project
     try {

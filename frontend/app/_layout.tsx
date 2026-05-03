@@ -50,9 +50,11 @@ function RootLayoutNav() {
     const currentSegment = segments[0];
     const isOnOnboarding = currentSegment === 'onboarding';
     const isOnIndex = currentSegment === undefined || currentSegment === ('index' as typeof currentSegment);
+    // Public routes that shouldn't trigger onboarding redirect (good for SEO)
+    const isPublicRoute = currentSegment === 'blog' || currentSegment === 'feedback';
     
     // If user hasn't completed onboarding and is not already there, redirect
-    if (!hasCompletedOnboarding && !isOnOnboarding) {
+    if (!hasCompletedOnboarding && !isOnOnboarding && !isPublicRoute) {
       setHasNavigated(true);
       router.replace('/onboarding');
     } 

@@ -200,8 +200,12 @@ export default function AuthScreen() {
 
   const handleGoogleAuth = async () => {
     try {
+      // Platform-specific redirect URL (canonical Expo Router OAuth pattern):
+      // - Web: window.location.origin (browser context, works on any domain)
+      // - Mobile (iOS/Android): Linking.createURL generates deep link via app.json scheme
+      // NOTE: Platform.OS check is REQUIRED — `window` is undefined on React Native mobile.
       const redirectUrl = Platform.OS === 'web'
-        ? (typeof window !== 'undefined' ? window.location.origin + '/' : '/')
+        ? window.location.origin + '/'
         : Linking.createURL('/');
       
       const authUrl = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;

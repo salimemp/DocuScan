@@ -5,7 +5,7 @@
 import { test, expect } from '@playwright/test';
 import { skipOnboarding, navigateTo } from './helpers';
 
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'https://widget-native-build.preview.emergentagent.com';
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'https://document-scanner-pro-7.preview.emergentagent.com';
 const API_BASE = BASE_URL + '/api';
 
 test.describe('Business Card Scanner', () => {

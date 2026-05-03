@@ -11,7 +11,7 @@ import time
 from typing import Dict, Any
 
 # Configuration
-BASE_URL = "https://widget-native-build.preview.emergentagent.com/api"
+BASE_URL = "https://document-scanner-pro-7.preview.emergentagent.com/api"
 HEADERS = {"Content-Type": "application/json"}
 
 class TestResults:

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+
+  <url>
+    <loc>https://docscanpro.app/</loc>
+    <image:image>
+      <image:loc>https://docscanpro.app/og-image.png</image:loc>
+      <image:title>DocScan Pro Hero — AI Document Scanner</image:title>
+      <image:caption>Best AI document scanner for creators</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://docscanpro.app/screenshots/scan.png</image:loc>
+      <image:title>AI-Powered Document Scanning</image:title>
+      <image:caption>Scan any document in seconds with auto edge detection</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://docscanpro.app/screenshots/ocr.png</image:loc>
+      <image:title>Real-Time OCR in 100+ Languages</image:title>
+      <image:caption>Extract text from images with multilingual OCR</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://docscanpro.app/screenshots/math.png</image:loc>
+      <image:title>AI Math Equation Solver</image:title>
+      <image:caption>Solve handwritten and printed math equations instantly</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://docscanpro.app/screenshots/business-card.png</image:loc>
+      <image:title>Business Card Scanner</image:title>
+      <image:caption>Extract contacts from business cards automatically</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://docscanpro.app/screenshots/vault.png</image:loc>
+      <image:title>Encrypted Document Vault</image:title>
+      <image:caption>AES-256 encrypted secure document storage</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://docscanpro.app/screenshots/widgets.png</image:loc>
+      <image:title>Home Screen Widgets</image:title>
+      <image:caption>Quick scan widgets for iOS and Android home screens</image:caption>
+    </image:image>
+  </url>
+
+</urlset>

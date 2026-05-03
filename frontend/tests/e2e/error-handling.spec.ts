@@ -4,7 +4,7 @@
  */
 import { test, expect } from '@playwright/test';
 
-const API_BASE = (process.env.PLAYWRIGHT_BASE_URL || 'https://widget-native-build.preview.emergentagent.com') + '/api';
+const API_BASE = (process.env.PLAYWRIGHT_BASE_URL || 'https://document-scanner-pro-7.preview.emergentagent.com') + '/api';
 
 test.describe('Error Handling', () => {
   test('should return 404 for non-existent document', async ({ request }) => {
@@ -106,7 +106,7 @@ test.describe('Error Handling', () => {
 
 test.describe('Web App Error Recovery', () => {
   test('should recover from invalid route navigation', async ({ page }) => {
-    const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'https://widget-native-build.preview.emergentagent.com';
+    const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'https://document-scanner-pro-7.preview.emergentagent.com';
     await page.goto(`${BASE_URL}/nonexistent-page`);
     await page.waitForTimeout(3000);
     
@@ -116,7 +116,7 @@ test.describe('Web App Error Recovery', () => {
   });
 
   test('should load app after clearing cookies', async ({ page, context }) => {
-    const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'https://widget-native-build.preview.emergentagent.com';
+    const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'https://document-scanner-pro-7.preview.emergentagent.com';
     await context.clearCookies();
     await page.goto(BASE_URL);
     await page.waitForTimeout(3000);
