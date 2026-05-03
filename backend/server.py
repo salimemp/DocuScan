@@ -1081,6 +1081,23 @@ app.add_middleware(RateLimitMiddleware)
 async def root():
     return {"message": "DocScan Pro API v5 - Full Featured Document Management"}
 
+# ── Kubernetes/load-balancer health probes ─────────────────────────────────
+# Intentionally zero DB calls to keep response <1ms and avoid cascading
+# failures during transient DB hiccups. K8s liveness/readiness probes hit
+# these to decide if the pod is alive.
+@api_router.get("/health")
+async def health_check():
+    return {"status": "healthy", "service": "docscan-pro-api"}
+
+@api_router.get("/healthz")
+async def healthz():
+    return {"status": "ok"}
+
+@app.get("/health")
+async def root_health_check():
+    """Health check at root (no /api prefix) for load balancers that probe /."""
+    return {"status": "healthy"}
+
 @api_router.post("/scan")
 async def scan_document(request: ScanRequest):
     api_key = get_api_key()
