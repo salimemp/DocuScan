@@ -1,52 +1,62 @@
-# DocScan Pro Backend - Production Dockerfile
+# DocScan Pro Backend — Production Dockerfile
+# Multi-stage build optimized for Railway / Render / Fly.io.
+# Uses dynamic $PORT (required by Railway), proper health endpoint, and libjpeg for Pillow.
 
-# Build stage
-FROM python:3.11-slim as builder
+# ─── Stage 1: Builder ──────────────────────────────────────────
+FROM python:3.11-slim AS builder
 
-WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    gcc \
+    g++ \
     libffi-dev \
+    libssl-dev \
+    libjpeg-dev \
+    zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
+WORKDIR /install
+
 COPY requirements.txt .
+RUN pip install --upgrade pip \
+    && pip install --prefix=/install/deps -r requirements.txt
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --user -r requirements.txt
-
-# Production stage
+# ─── Stage 2: Runtime ──────────────────────────────────────────
 FROM python:3.11-slim
 
-WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PORT=8001
 
-# Install runtime dependencies
+# Runtime libs for opencv-headless + Pillow
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
+    libjpeg62-turbo \
+    zlib1g \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy Python packages from builder
-COPY --from=builder /root/.local /root/.local
+# Copy Python dependencies from builder
+COPY --from=builder /install/deps /usr/local
 
-# Make sure scripts in .local are usable
-ENV PATH=/root/.local/bin:$PATH
+# Non-root user for security
+RUN useradd --create-home --shell /bin/bash appuser
 
-# Copy application code
-COPY . .
-
-# Create non-root user
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+WORKDIR /app
+COPY --chown=appuser:appuser . .
 USER appuser
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8001/api/')" || exit 1
-
-# Expose port
 EXPOSE 8001
 
-# Run the application
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001"]
+# Health check uses the new /health endpoint
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl --fail http://localhost:${PORT}/health || exit 1
+
+# Use shell form so $PORT expansion works (Railway injects this dynamically)
+CMD uvicorn server:app --host 0.0.0.0 --port ${PORT} --workers 1
