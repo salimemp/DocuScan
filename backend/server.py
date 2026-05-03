@@ -1107,6 +1107,11 @@ async def root_health_check():
     """Health check at root (no /api prefix) for load balancers that probe /."""
     return {"status": "healthy"}
 
+# Also at root path "/" — many load balancers default to this
+@app.get("/")
+async def root_root():
+    return {"status": "ok", "service": "DocScan Pro API", "health": "/health"}
+
 @api_router.post("/scan")
 async def scan_document(request: ScanRequest):
     api_key = get_api_key()
