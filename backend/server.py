@@ -25,6 +25,9 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+# App URL — used for email action links (deep links to documents/signing)
+APP_URL = os.environ.get('APP_URL', 'https://docscanpro.app').rstrip('/')
+
 # Initialize Resend
 resend.api_key = os.environ.get('RESEND_API_KEY', '')
 
@@ -1539,7 +1542,7 @@ async def request_comment(doc_id: str, request: CommentRequest, background_tasks
             'requester_email': request.requester_email,
             'document_title': doc.get('title', 'Untitled'),
             'message': request.message,
-            'action_url': f"https://docscan.app/document/{doc_id}"
+            'action_url': f"{APP_URL}/document/{doc_id}"
         }
     )
     
@@ -1629,7 +1632,7 @@ async def request_signature(doc_id: str, request: SignatureRequest, background_t
             'requester_email': request.requester_email,
             'document_title': doc.get('title', 'Untitled'),
             'message': request.message,
-            'action_url': f"https://docscan.app/sign/{doc_id}"
+            'action_url': f"{APP_URL}/sign/{doc_id}"
         }
     )
     
@@ -1653,7 +1656,7 @@ async def share_document(doc_id: str, request: ShareDocumentRequest, background_
             'sender_email': request.sender_email,
             'document_title': doc.get('title', 'Untitled'),
             'message': request.message,
-            'action_url': f"https://docscan.app/document/{doc_id}"
+            'action_url': f"{APP_URL}/document/{doc_id}"
         }
     )
     

@@ -18,7 +18,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 # Test configuration
-BASE_URL = "https://widget-native-build.preview.emergentagent.com/api"
+BASE_URL = "https://document-scanner-pro-7.preview.emergentagent.com/api"
 TEST_USER_EMAIL = "ratetest@test.com"
 TEST_USER_PASSWORD = "Secure@Pass123!"
 TEST_USER_NAME = "Rate Test"

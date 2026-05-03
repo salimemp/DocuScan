@@ -6,7 +6,7 @@
 import { test, expect } from '@playwright/test';
 import { goToDashboard, navigateTo, skipOnboarding } from './helpers';
 
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'https://widget-native-build.preview.emergentagent.com';
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'https://document-scanner-pro-7.preview.emergentagent.com';
 
 test.describe('Scan Flow', () => {
   test.beforeEach(async ({ page }) => {
