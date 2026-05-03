@@ -34,8 +34,9 @@ RUN pip install --upgrade pip \
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PORT=8001
+    PYTHONUNBUFFERED=1
+# Note: do NOT hardcode ENV PORT here — Railway/Render/Fly inject $PORT at runtime.
+# Setting it at build time can prevent runtime override on some platforms.
 
 # Runtime libs for opencv-headless + Pillow
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -58,9 +59,10 @@ USER appuser
 
 EXPOSE 8001
 
-# Health check uses the new /health endpoint
+# Health check uses the new /health endpoint with PORT fallback
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-    CMD curl --fail http://localhost:${PORT}/health || exit 1
+    CMD curl --fail http://localhost:${PORT:-8001}/health || exit 1
 
-# Use shell form so $PORT expansion works (Railway injects this dynamically)
-CMD uvicorn server:app --host 0.0.0.0 --port ${PORT} --workers 1
+# Exec form via sh -c so $PORT expansion works (Railway injects $PORT at runtime).
+# Echo the actual PORT to logs first to make debugging easier.
+CMD ["sh", "-c", "echo \"🚀 Starting uvicorn on port ${PORT:-8001}\" && exec uvicorn server:app --host 0.0.0.0 --port ${PORT:-8001} --workers 1"]
