@@ -23,8 +23,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /install
 
 COPY requirements.txt .
+# emergentintegrations is hosted on Emergent's private index, not PyPI.
+# Use --extra-index-url so pip falls back to PyPI for everything else.
 RUN pip install --upgrade pip \
-    && pip install --prefix=/install/deps -r requirements.txt
+    && pip install --prefix=/install/deps \
+        --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/ \
+        -r requirements.txt
 
 # ─── Stage 2: Runtime ──────────────────────────────────────────
 FROM python:3.11-slim
