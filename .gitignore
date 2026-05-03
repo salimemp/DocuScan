@@ -84,3 +84,6 @@ frontend/google-play-service-account.json
 *.pem
 *.key
 .credentials
+
+# Internal test credentials (do not commit or deploy)
+memory/test_credentials.md
