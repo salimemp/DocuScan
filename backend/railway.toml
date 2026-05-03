@@ -6,7 +6,8 @@ builder = "NIXPACKS"
 buildCommand = "pip install -r requirements.txt"
 
 [deploy]
-startCommand = "uvicorn server:app --host 0.0.0.0 --port $PORT --workers 1"
+# Note: NO startCommand here — let Dockerfile's CMD be authoritative.
+# Mixing both confuses Railway's PORT injection.
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
