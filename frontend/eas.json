@@ -14,7 +14,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://docuscan-production.up.railway.app"
+        "EXPO_PUBLIC_BACKEND_URL": "https://api.docscanpro.app"
       }
     },
     "preview": {
@@ -26,7 +26,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://docuscan-production.up.railway.app"
+        "EXPO_PUBLIC_BACKEND_URL": "https://api.docscanpro.app"
       }
     },
     "ios-simulator": {
@@ -35,7 +35,7 @@
         "simulator": true
       },
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://docuscan-production.up.railway.app"
+        "EXPO_PUBLIC_BACKEND_URL": "https://api.docscanpro.app"
       }
     },
     "production": {
@@ -47,7 +47,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://docuscan-production.up.railway.app"
+        "EXPO_PUBLIC_BACKEND_URL": "https://api.docscanpro.app"
       }
     },
     "production-apk": {
