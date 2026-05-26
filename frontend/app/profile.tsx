@@ -486,6 +486,50 @@ export default function ProfileScreen() {
           </View>
         </TouchableOpacity>
 
+        {/* Help & Support */}
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>HELP & SUPPORT</Text>
+        <TouchableOpacity
+          style={[styles.card, { backgroundColor: colors.surface, ...shadows.sm }]}
+          onPress={() => router.push('/help')}
+          testID="help-faq-row"
+        >
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <View style={[styles.settingIcon, { backgroundColor: '#2563EB' + '18' }]}>
+                <Ionicons name="help-circle" size={22} color="#2563EB" />
+              </View>
+              <View>
+                <Text style={[styles.settingTitle, { color: colors.textPrimary }]}>Help &amp; FAQ</Text>
+                <Text style={[styles.settingDesc, { color: colors.textTertiary }]}>
+                  Browse FAQs, contact support
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.card, { backgroundColor: colors.surface, ...shadows.sm, marginTop: 8 }]}
+          onPress={() => router.push('/feedback')}
+          testID="send-feedback-row"
+        >
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <View style={[styles.settingIcon, { backgroundColor: '#7C3AED' + '18' }]}>
+                <Ionicons name="chatbubble-ellipses" size={22} color="#7C3AED" />
+              </View>
+              <View>
+                <Text style={[styles.settingTitle, { color: colors.textPrimary }]}>Send Feedback</Text>
+                <Text style={[styles.settingDesc, { color: colors.textTertiary }]}>
+                  Tell us what you think
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+          </View>
+        </TouchableOpacity>
+
         {/* Logout */}
         <TouchableOpacity
           style={[styles.logoutBtn, { borderColor: '#DC2626' }]}
