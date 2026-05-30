@@ -1,0 +1,59 @@
+{
+  "summary": "Tested Share functionality on DocumentDetail screen, /help FAQ flow, and backend PDF export endpoint. DocumentDetail Share bottom-sheet modal works correctly — all 4 options (share-as-pdf-btn, share-as-image-btn, share-as-text-btn, share-more-formats-btn) render and the 'More Formats…' option opens the export sheet. Modal dismisses via Escape and close icon. /help screen loads independently with FAQ expand/collapse and category switching all functional. Backend POST /api/documents/{id}/export?format=pdf returns valid base64 PDF (verified %PDF magic bytes). Could NOT functionally test preview-share-btn (requires completed scan workflow) and could NOT verify Profile→Help nav via UI because /profile gates auth and provided test creds returned 401 — both verified by static code review only. Console shows React Native warnings: deprecated 'textShadow*'/'shadow*' style props and 'Unexpected text node . cannot be a child of a <View>' errors across screens (non-blocking but should be cleaned).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Profile → Help/FAQ navigation",
+        "issue": "Could not verify the help-faq-row tap-through end-to-end via UI because /profile redirects unauthenticated users to /auth and the test credentials in /app/memory/test_credentials.md returned 401 on Sign In. testID and router.push('/help') exist in source (profile.tsx ~line 494). Needs main-agent verification with valid auth.",
+        "affected_testIDs": ["help-faq-row"]
+      },
+      {
+        "flow": "Preview share button (preview-share-btn)",
+        "issue": "Could not exercise the preview share button via web automation — it requires a live camera scan completion path. Source review confirms the testID exists, the button is gated on analysis completion (disabled while analyzing) and triggers Share.share when tapped. Recommend manual on-device QA or a stubbed analysis state for E2E.",
+        "affected_testIDs": ["preview-share-btn"]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "global",
+        "issues": [
+          "Console emits repeated 'Unexpected text node: . A text node cannot be a child of a <View>' errors on dashboard and document detail — stray whitespace/conditional rendering outside a <Text> in a View. Should be tracked down (likely a `{condition && ' '}` or trailing space in JSX).",
+          "Deprecated React Native Web style props 'textShadow*' and 'shadow*' used in styles — migrate to combined 'textShadow' / 'boxShadow' properties to silence warnings."
+        ]
+      }
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_share_pdf_export.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Manually (or with valid auth seed) verify the Profile → Help/FAQ tap navigation end-to-end; the wiring exists in code but UI auth gate blocked automated coverage.",
+    "Manually verify on a real scan that preview-share-btn becomes enabled after analysis completion and that Share.share fires successfully (couldn't be reached via headless web).",
+    "Investigate and fix the recurring 'Unexpected text node' RN web error (likely stray string/whitespace inside a <View> not wrapped in <Text>).",
+    "Update test credentials in /app/memory/test_credentials.md or fix seed so test users authenticate successfully — current creds returned 401 from /api/auth/login."
+  ],
+  "critical_code_review_comments": [
+    "DocumentDetail share modal correctly disables 'Share as Image' when doc.image_thumbnail is missing — good defensive UX (shows 'No image available').",
+    "Share-as-PDF path writes base64 from /api/documents/{id}/export to cache and invokes expo-sharing — works on native but expo-sharing has limited web support; ensure graceful fallback warning on web preview."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_share_pdf_export.py (created)",
+    "/app/test_reports/iteration_3.json (created)"
+  ],
+  "success_rate": {
+    "backend": "100% (3/3 pytest cases passed)",
+    "frontend": "Share modal 100%; FAQ 100%; Profile→Help & preview share NOT verified end-to-end (code-review only)"
+  },
+  "seed_data_creation": "None — used existing document id d3775c1b-69ce-4da4-bd8a-89daf612a443 from /api/documents.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Onboarding can be skipped by tapping 'Skip' on first screen. /profile and most authed routes redirect to /auth — current test_credentials.md creds return 401. /help and /document/{id} are reachable without auth. Use existing doc id from GET /api/documents?page=1&page_size=20.",
+  "rca_of_issue": "N/A — all tested feature paths functional."
+}
