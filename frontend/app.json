@@ -99,7 +99,8 @@
         }
       ],
       "./plugins/force-androidx",
-      "./plugins/widget-plugin"
+      "./plugins/widget-plugin",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

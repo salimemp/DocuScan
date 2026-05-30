@@ -81,6 +81,8 @@ export default function DocumentDetailScreen() {
   const [newTitle, setNewTitle] = useState('');
   const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showShareOptions, setShowShareOptions] = useState(false);
+  const [sharing, setSharing] = useState(false);
   
   // Comment state
   const [newComment, setNewComment] = useState('');
@@ -208,13 +210,88 @@ export default function DocumentDetailScreen() {
     }
   };
 
-  const handleShare = async () => {
+  const handleShare = () => {
+    setShowShareOptions(true);
+  };
+
+  // Share the document image (thumbnail) as a file via native share sheet
+  const handleShareImage = async () => {
+    setSharing(true);
     try {
-      const shareContent = {
+      if (!doc?.image_thumbnail) {
+        throw new Error('No image available to share');
+      }
+      const filename = `${(doc?.title || 'document').replace(/[^a-zA-Z0-9-_]/g, '_')}.jpg`;
+      const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+      await FileSystem.writeAsStringAsync(fileUri, doc.image_thumbnail, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'image/jpeg',
+          dialogTitle: `Share ${doc?.title || 'Document'}`,
+          UTI: 'public.jpeg',
+        });
+      } else {
+        Alert.alert('Unavailable', 'Sharing is not available on this device.');
+      }
+      setShowShareOptions(false);
+    } catch (e: unknown) {
+      Alert.alert('Share Failed', getErrorMessage(e));
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  // Share the document as a PDF via the backend export endpoint
+  const handleSharePdf = async () => {
+    setSharing(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/documents/${id}/export?format=pdf`, {
+        method: 'POST',
+      });
+      if (!res.ok) throw new Error('PDF generation failed');
+      const data = await res.json();
+      const filename = data.filename || `${(doc?.title || 'document').replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf`;
+      const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+      await FileSystem.writeAsStringAsync(fileUri, data.base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'application/pdf',
+          dialogTitle: `Share ${doc?.title || 'Document'}`,
+          UTI: 'com.adobe.pdf',
+        });
+      } else {
+        Alert.alert('Unavailable', 'Sharing is not available on this device.');
+      }
+      setShowShareOptions(false);
+    } catch (e: unknown) {
+      Alert.alert('Share Failed', getErrorMessage(e));
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  // Share extracted text content via native share
+  const handleShareText = async () => {
+    try {
+      const body = [
+        doc?.title || 'Document',
+        '',
+        doc?.summary ? `Summary:\n${doc.summary}\n` : '',
+        doc?.formatted_output || doc?.raw_text || '',
+        '',
+        '— Shared from DocScan Pro',
+      ]
+        .filter(Boolean)
+        .join('\n');
+      await Share.share({
         title: doc?.title || 'Document',
-        message: `${doc?.title || 'Document'}\n\n${doc?.summary || ''}\n\n${doc?.formatted_output || doc?.raw_text || ''}`,
-      };
-      await Share.share(shareContent);
+        message: body,
+      });
+      setShowShareOptions(false);
     } catch (e: unknown) {
       Alert.alert('Share Failed', getErrorMessage(e));
     }
@@ -1006,6 +1083,111 @@ export default function DocumentDetailScreen() {
         </Pressable>
       </Modal>
 
+      {/* Share Options Modal */}
+      <Modal visible={showShareOptions} transparent animationType="slide" onRequestClose={() => setShowShareOptions(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => !sharing && setShowShareOptions(false)}>
+          <View style={[styles.shareModal, { backgroundColor: colors.surface, ...shadows.lg }]} onStartShouldSetResponder={() => true}>
+            <View style={styles.shareModalHandle} />
+            <View style={styles.shareHeader}>
+              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Share Document</Text>
+              <TouchableOpacity onPress={() => !sharing && setShowShareOptions(false)} disabled={sharing}>
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.shareSubtitle, { color: colors.textSecondary }]}>
+              Choose how you'd like to share this document
+            </Text>
+
+            {/* Share as PDF */}
+            <TouchableOpacity
+              testID="share-as-pdf-btn"
+              style={[styles.shareOption, { borderColor: colors.border }]}
+              onPress={handleSharePdf}
+              disabled={sharing}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.shareIconWrap, { backgroundColor: '#DC2626' + '18' }]}>
+                <Ionicons name="document-text" size={22} color="#DC2626" />
+              </View>
+              <View style={styles.shareInfo}>
+                <Text style={[styles.shareLabel, { color: colors.textPrimary }]}>Share as PDF</Text>
+                <Text style={[styles.shareDesc, { color: colors.textTertiary }]}>Best for documents & printing</Text>
+              </View>
+              {sharing ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+              )}
+            </TouchableOpacity>
+
+            {/* Share as Image */}
+            <TouchableOpacity
+              testID="share-as-image-btn"
+              style={[styles.shareOption, { borderColor: colors.border }]}
+              onPress={handleShareImage}
+              disabled={sharing || !doc?.image_thumbnail}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.shareIconWrap, { backgroundColor: '#2563EB' + '18' }]}>
+                <Ionicons name="image" size={22} color="#2563EB" />
+              </View>
+              <View style={styles.shareInfo}>
+                <Text style={[styles.shareLabel, { color: colors.textPrimary }]}>Share as Image</Text>
+                <Text style={[styles.shareDesc, { color: colors.textTertiary }]}>
+                  {doc?.image_thumbnail ? 'Send original scan as JPG' : 'No image available'}
+                </Text>
+              </View>
+              {sharing ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+              )}
+            </TouchableOpacity>
+
+            {/* Share Text Content */}
+            <TouchableOpacity
+              testID="share-as-text-btn"
+              style={[styles.shareOption, { borderColor: colors.border }]}
+              onPress={handleShareText}
+              disabled={sharing}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.shareIconWrap, { backgroundColor: '#059669' + '18' }]}>
+                <Ionicons name="text" size={22} color="#059669" />
+              </View>
+              <View style={styles.shareInfo}>
+                <Text style={[styles.shareLabel, { color: colors.textPrimary }]}>Share Text</Text>
+                <Text style={[styles.shareDesc, { color: colors.textTertiary }]}>Send extracted content as text</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+            </TouchableOpacity>
+
+            {/* More export options */}
+            <TouchableOpacity
+              testID="share-more-formats-btn"
+              style={[styles.shareOption, { borderColor: colors.border }]}
+              onPress={() => {
+                setShowShareOptions(false);
+                setTimeout(() => setShowExport(true), 250);
+              }}
+              disabled={sharing}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.shareIconWrap, { backgroundColor: '#8B5CF6' + '18' }]}>
+                <Ionicons name="apps" size={22} color="#8B5CF6" />
+              </View>
+              <View style={styles.shareInfo}>
+                <Text style={[styles.shareLabel, { color: colors.textPrimary }]}>More Formats…</Text>
+                <Text style={[styles.shareDesc, { color: colors.textTertiary }]}>Word, Excel, EPUB & 14+ more</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+            </TouchableOpacity>
+
+            <View style={{ height: 16 }} />
+          </View>
+        </Pressable>
+      </Modal>
+
       {/* Read Aloud Modal */}
       <ReadAloudControls
         text={doc?.formatted_output || doc?.raw_text || doc?.summary || ''}
@@ -1155,4 +1337,31 @@ const styles = StyleSheet.create({
   requestSubtitle: { fontSize: 13, marginBottom: 16 },
   requestInput: { borderRadius: 10, padding: 14, fontSize: 15, marginBottom: 12 },
   requestMessageInput: { minHeight: 80, textAlignVertical: 'top' },
+
+  // Share Modal
+  shareModal: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 20, paddingBottom: 32,
+  },
+  shareModalHandle: {
+    width: 36, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(0,0,0,0.15)', alignSelf: 'center', marginBottom: 12,
+  },
+  shareHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', marginBottom: 4,
+  },
+  shareSubtitle: { fontSize: 13, marginBottom: 18 },
+  shareOption: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingVertical: 14, borderBottomWidth: 0.5,
+  },
+  shareIconWrap: {
+    width: 44, height: 44, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  shareInfo: { flex: 1 },
+  shareLabel: { fontSize: 15, fontWeight: '600' },
+  shareDesc: { fontSize: 12, marginTop: 2 },
 });

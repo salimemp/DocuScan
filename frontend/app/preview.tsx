@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, Image, Dimensions,
+  Alert, ActivityIndicator, Image, Dimensions, Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,8 @@ import { useTheme } from '../hooks/useTheme';
 import { useLanguage } from '../hooks/useLanguage';
 import { getScanPages, clearScanData } from '../utils/scanStore';
 import { getErrorMessage } from '../utils/errorHelpers';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -232,6 +234,42 @@ export default function PreviewScreen() {
     router.back();
   };
 
+  // Quick share for an unsaved scan — shares the original image + extracted text
+  const handleQuickShare = async () => {
+    try {
+      // Prefer sharing the actual image file if available
+      if (currentPage?.base64) {
+        const filename = `${(result?.title || 'scan').replace(/[^a-zA-Z0-9-_]/g, '_')}.jpg`;
+        const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+        await FileSystem.writeAsStringAsync(fileUri, currentPage.base64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(fileUri, {
+            mimeType: 'image/jpeg',
+            dialogTitle: `Share ${result?.title || 'Document'}`,
+            UTI: 'public.jpeg',
+          });
+          return;
+        }
+      }
+      // Fallback to plain-text share
+      const body = [
+        result?.title || 'Document',
+        '',
+        result?.summary ? `Summary:\n${result.summary}\n` : '',
+        result?.formatted_output || result?.raw_text || '',
+        '',
+        '— Shared from DocScan Pro',
+      ]
+        .filter(Boolean)
+        .join('\n');
+      await Share.share({ title: result?.title || 'Document', message: body });
+    } catch (e: unknown) {
+      Alert.alert('Share Failed', getErrorMessage(e));
+    }
+  };
+
   const meta = result ? getMeta(result.document_type) : getMeta('general_document');
   const confidencePct = result ? Math.round((result.confidence ?? 0) * 100) : 0;
 
@@ -317,7 +355,15 @@ export default function PreviewScreen() {
           <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('documentPreview')}</Text>
-        <View style={{ width: 36 }} />
+        <TouchableOpacity
+          testID="preview-share-btn"
+          onPress={handleQuickShare}
+          activeOpacity={0.7}
+          style={styles.headerBack}
+          disabled={!result}
+        >
+          <Ionicons name="share-outline" size={22} color={result ? colors.primary : colors.textTertiary} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
