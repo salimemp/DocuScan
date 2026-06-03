@@ -338,10 +338,15 @@ export default function DashboardScreen() {
               style={styles.headerLogo}
               resizeMode="contain"
             />
-            <View>
-              <Text style={[styles.greeting, { color: colors.textSecondary }]}>{greeting} 👋</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={[styles.appTitle, { color: colors.textPrimary }]}>DocScan Pro</Text>
+            <View style={styles.headerTextWrap}>
+              <Text style={[styles.greeting, { color: colors.textSecondary }]} numberOfLines={1}>{greeting} 👋</Text>
+              <View style={styles.titleRow}>
+                <Text
+                  style={[styles.appTitle, { color: colors.textPrimary }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
+                >DocScan Pro</Text>
                 <BetaBadge />
               </View>
             </View>
@@ -1090,14 +1095,21 @@ const styles = StyleSheet.create({
   },
   headerLeft: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
+    flex: 1, minWidth: 0,
+  },
+  headerTextWrap: {
+    flex: 1, minWidth: 0,
+  },
+  titleRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1,
   },
   headerLogo: {
     width: 48, height: 48, borderRadius: 12,
   },
   greeting: { fontSize: 14, fontWeight: '500' },
-  appTitle: { fontSize: 26, fontWeight: '700', letterSpacing: -0.5 },
+  appTitle: { fontSize: 26, fontWeight: '700', letterSpacing: -0.5, flexShrink: 1 },
   dateText: { fontSize: 13, paddingHorizontal: 20, marginBottom: 20 },
-  iconBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  iconBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginLeft: 8 },
   statScroll: { marginBottom: 24 },
   statsRow: { paddingHorizontal: 20, gap: 12 },
   statCard: { borderRadius: 16, padding: 16, width: 130, alignItems: 'flex-start', gap: 8 },
