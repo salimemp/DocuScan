@@ -17,6 +17,7 @@ import { CloudProviderIcon } from '../../components/CloudProviderIcon';
 import { VoiceCommandsHelp } from '../../components/VoiceCommandsHelp';
 import { getErrorMessage } from '../../utils/errorHelpers';
 import { BetaBanner, BetaBadge } from '../../components/BetaBanner';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 
@@ -47,6 +48,7 @@ export default function DashboardScreen() {
   const { colors, shadows, isDark } = useTheme();
   const { t, currentLanguage, setLanguage, getCurrentLanguageInfo, languages } = useLanguage();
   const router = useRouter();
+  const { isAtLeastTablet, isDesktop } = useBreakpoint();
   const [stats, setStats] = useState({ total_scans: 0, storage_used: '0 KB', last_scan: 'Never' });
   const [recentDocs, setRecentDocs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -327,7 +329,11 @@ export default function DashboardScreen() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          isAtLeastTablet && { maxWidth: 1100, width: '100%', alignSelf: 'center' },
+          isDesktop && { paddingHorizontal: 12 },
+        ]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
         {/* Header */}

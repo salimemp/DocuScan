@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useBreakpoint } from '../hooks/useBreakpoint';
 
 interface FaqItem {
   id: string;
@@ -147,6 +148,7 @@ export default function HelpFAQ() {
   const router = useRouter();
   const [openId, setOpenId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('getting-started');
+  const { isAtLeastTablet } = useBreakpoint();
 
   const handleContactSupport = async () => {
     const subject = encodeURIComponent('DocScan Pro – Support Request');
@@ -170,7 +172,14 @@ export default function HelpFAQ() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <Stack.Screen options={{ title: 'Help & FAQ', headerShown: true }} />
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.scrollContent,
+          isAtLeastTablet && { maxWidth: 820, width: '100%', alignSelf: 'center' },
+        ]}
+        showsVerticalScrollIndicator
+      >
         <Text style={styles.heroTitle}>How can we help?</Text>
         <Text style={styles.heroSubtitle}>
           Browse FAQs, get troubleshooting tips, or contact support.

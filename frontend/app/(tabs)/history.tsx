@@ -11,6 +11,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useLanguage } from '../../hooks/useLanguage';
 import { SpeechInput } from '../../components/SpeechInput';
 import { BetaBanner } from '../../components/BetaBanner';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 const PAGE_SIZE = 20;
@@ -104,6 +105,9 @@ export default function HistoryScreen() {
   const { colors, shadows, isDark } = useTheme();
   const { t } = useLanguage();
   const router = useRouter();
+  const { isAtLeastTablet, isDesktop } = useBreakpoint();
+  // On desktop force grid; on tablet keep user choice but default to grid; on mobile keep user choice
+  const desktopColumns = isDesktop ? 4 : isAtLeastTablet ? 3 : 2;
 
   // Documents state
   const [docs, setDocs] = useState<DocumentListItem[]>([]);
@@ -654,9 +658,12 @@ export default function HistoryScreen() {
           data={filtered}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
-          contentContainerStyle={isGrid ? styles.gridContainer : styles.listContainer}
-          numColumns={isGrid ? 2 : 1}
-          key={isGrid ? 'grid' : 'list'}
+          contentContainerStyle={[
+            isGrid ? styles.gridContainer : styles.listContainer,
+            isAtLeastTablet && { maxWidth: 1200, width: '100%', alignSelf: 'center' },
+          ]}
+          numColumns={isGrid ? desktopColumns : 1}
+          key={`${isGrid ? 'grid' : 'list'}-${desktopColumns}`}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
           onEndReached={onEndReached}
           onEndReachedThreshold={0.3}

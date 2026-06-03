@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../hooks/useTheme';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
 import * as ImagePicker from 'expo-image-picker';
 
 interface MathSolution {
@@ -22,6 +23,7 @@ interface MathSolution {
 
 export default function MathSolverScreen() {
   const { colors, shadows } = useTheme();
+  const { isAtLeastTablet } = useBreakpoint();
   const [equation, setEquation] = useState('');
   const [solution, setSolution] = useState<MathSolution | null>(null);
   const [loading, setLoading] = useState(false);
@@ -112,7 +114,10 @@ export default function MathSolverScreen() {
   };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={isAtLeastTablet ? { maxWidth: 900, width: '100%', alignSelf: 'center', paddingHorizontal: 16 } : undefined}
+    >
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.textPrimary }]}>Math Solver</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
