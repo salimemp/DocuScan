@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
 import { useLanguage } from '../../hooks/useLanguage';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { SignatureCanvas } from '../../components/SignatureCanvas';
@@ -67,6 +68,7 @@ export default function DocumentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors, shadows, isDark } = useTheme();
   const { t } = useLanguage();
+  const { isAtLeastTablet } = useBreakpoint();
 
   const [doc, setDoc] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -497,7 +499,10 @@ export default function DocumentDetailScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[
+        styles.scrollContent,
+        isAtLeastTablet && { maxWidth: 1000, width: '100%', alignSelf: 'center' },
+      ]}>
         {/* Document Preview Card */}
         <View style={[styles.previewCard, { backgroundColor: colors.surface, ...shadows.md }]}>
           {doc.image_thumbnail ? (

@@ -12,6 +12,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { useTheme } from '../hooks/useTheme';
+import { useBreakpoint } from '../hooks/useBreakpoint';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuth } from '../contexts/AuthContext';
 import { PasswordStrengthMeter, validatePassword } from '../components/PasswordStrengthMeter';
@@ -35,6 +36,7 @@ export default function AuthScreen() {
   const router = useRouter();
   const { colors, shadows } = useTheme();
   const { t } = useLanguage();
+  const { isAtLeastTablet } = useBreakpoint();
   const { login, register, isAuthenticated, isLoading: authLoading, user } = useAuth();
   
   const [mode, setMode] = useState<AuthMode>('login');
@@ -484,7 +486,10 @@ export default function AuthScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView 
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            isAtLeastTablet && { maxWidth: 480, width: '100%', alignSelf: 'center', justifyContent: 'center', flexGrow: 1 },
+          ]}
           keyboardShouldPersistTaps="handled"
         >
           {/* Logo */}

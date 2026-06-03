@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../hooks/useTheme';
+import { useBreakpoint } from '../hooks/useBreakpoint';
 import { getErrorMessage } from '../utils/errorHelpers';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
@@ -27,6 +28,7 @@ const STAR_LABELS = ['', 'Poor', 'Fair', 'Good', 'Great', 'Amazing'];
 export default function FeedbackScreen() {
   const { colors, shadows } = useTheme();
   const router = useRouter();
+  const { isAtLeastTablet } = useBreakpoint();
   
   const [rating, setRating] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -165,7 +167,10 @@ export default function FeedbackScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            isAtLeastTablet && { maxWidth: 720, width: '100%', alignSelf: 'center' },
+          ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
