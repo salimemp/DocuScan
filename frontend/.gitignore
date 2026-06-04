@@ -40,3 +40,6 @@ app-example
 
 # Google Play service account (DO NOT COMMIT)
 google-play-service-account.json
+
+# Prefer yarn — keep npm lockfile out of the repo to avoid drift on Cloudflare builds
+package-lock.json
