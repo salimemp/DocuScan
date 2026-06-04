@@ -33,6 +33,9 @@ export default function Root({ children }: PropsWithChildren) {
         <meta name="language" content="English" />
         <meta name="revisit-after" content="3 days" />
         <meta name="rating" content="General" />
+
+        {/* Search engine verification */}
+        <meta name="msvalidate.01" content="6D738BE6B98C4FAB5152757BEF3D069E" />
         <meta name="distribution" content="global" />
         <meta name="coverage" content="Worldwide" />
         <meta name="HandheldFriendly" content="True" />
