@@ -98,7 +98,7 @@ jobs:
         # Cloudflare Pages assumes any project WITHOUT a top-level
         # 404.html is an SPA, and silently rewrites every unknown
         # path to / BEFORE user _redirects rules apply. That breaks
-        # /assets/* passthroughs (the bug that prompted this fix).
+        # /assets/* passthroughs (the bug fixed in 86d73b9).
         # Adding 404.html flips Pages out of "SPA mode" and lets our
         # _redirects rules run directly on incoming URLs. The catch-
         # all `/* /index.html 200` still serves the SPA shell for
@@ -106,6 +106,25 @@ jobs:
         # correctly instead of getting rewritten.
         working-directory: frontend
         run: cp dist/index.html dist/404.html
+
+      - name: Rename assets/node_modules to bypass wrangler IGNORE_LIST
+        # wrangler's pages deploy has a hardcoded IGNORE_LIST that
+        # skips files under /node_modules/ paths (cloudflare/workers-
+        # sdk#3615, "won't fix"). Expo Metro emits Expo vector-icons
+        # fonts and react-navigation icons under
+        # /assets/node_modules/... — exactly the files wrangler skips.
+        # Rename the dir to /assets/_nm/ and rely on a _redirects
+        # rule (added in the next step) to translate URLs back so
+        # the JS bundle's hardcoded /assets/node_modules/* references
+        # still resolve.
+        working-directory: frontend
+        run: |
+          if [ -d dist/assets/node_modules ]; then
+            mv dist/assets/node_modules dist/assets/_nm
+            echo "renamed dist/assets/node_modules → dist/assets/_nm"
+          else
+            echo "(dist/assets/node_modules not present — nothing to rename)"
+          fi
 
       - name: Sanity check _redirects is intact
         working-directory: frontend
@@ -115,13 +134,20 @@ jobs:
           # commit 86d73b9. These checks fail loud if a future change
           # ever drops or breaks the asset passthrough rules.
           test -s dist/_redirects || { echo "ERROR: dist/_redirects is missing or empty"; exit 1; }
+          grep -q '^/assets/node_modules/\*  */assets/_nm/:splat  *200' dist/_redirects \
+            || { echo "ERROR: /assets/node_modules/ → /assets/_nm/ translation rule missing from dist/_redirects (wrangler IGNORE_LIST won't upload files under /node_modules/)"; exit 1; }
           grep -q '^/assets/\*  */assets/:splat  *200' dist/_redirects \
             || { echo "ERROR: /assets/ passthrough rule missing from dist/_redirects"; exit 1; }
           grep -q '^/\*  */index.html  *200' dist/_redirects \
             || { echo "ERROR: catch-all /index.html rule missing from dist/_redirects"; exit 1; }
           test -s dist/404.html \
             || { echo "ERROR: dist/404.html missing — without it, Cloudflare Pages' built-in SPA fallback rewrites every URL to / BEFORE _redirects rules apply, breaking /assets/* passthroughs"; exit 1; }
-          echo "✓ dist/_redirects and dist/404.html look correct"
+          # Check that the rename actually happened.
+          test -d dist/assets/_nm \
+            || { echo "ERROR: dist/assets/_nm missing — the rename step didn't run or failed"; exit 1; }
+          test ! -d dist/assets/node_modules \
+            || { echo "ERROR: dist/assets/node_modules still exists — rename step didn't run"; exit 1; }
+          echo "✓ dist/_redirects, dist/404.html, and node_modules rename all look correct"
 
       - name: Ensure Pages project exists
         # Self-healing: if this is the first deploy, the Pages project
