@@ -94,6 +94,19 @@ jobs:
           CI: 'true'
         run: npx expo export -p web --output-dir dist
 
+      - name: Disable Cloudflare Pages built-in SPA fallback
+        # Cloudflare Pages assumes any project WITHOUT a top-level
+        # 404.html is an SPA, and silently rewrites every unknown
+        # path to / BEFORE user _redirects rules apply. That breaks
+        # /assets/* passthroughs (the bug that prompted this fix).
+        # Adding 404.html flips Pages out of "SPA mode" and lets our
+        # _redirects rules run directly on incoming URLs. The catch-
+        # all `/* /index.html 200` still serves the SPA shell for
+        # true client-side routes; unknown file paths now 404
+        # correctly instead of getting rewritten.
+        working-directory: frontend
+        run: cp dist/index.html dist/404.html
+
       - name: Sanity check _redirects is intact
         working-directory: frontend
         run: |
@@ -106,7 +119,9 @@ jobs:
             || { echo "ERROR: /assets/ passthrough rule missing from dist/_redirects"; exit 1; }
           grep -q '^/\*  */index.html  *200' dist/_redirects \
             || { echo "ERROR: catch-all /index.html rule missing from dist/_redirects"; exit 1; }
-          echo "✓ dist/_redirects looks correct"
+          test -s dist/404.html \
+            || { echo "ERROR: dist/404.html missing — without it, Cloudflare Pages' built-in SPA fallback rewrites every URL to / BEFORE _redirects rules apply, breaking /assets/* passthroughs"; exit 1; }
+          echo "✓ dist/_redirects and dist/404.html look correct"
 
       - name: Ensure Pages project exists
         # Self-healing: if this is the first deploy, the Pages project
