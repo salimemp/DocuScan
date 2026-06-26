@@ -9,6 +9,9 @@ dist/
 web-build/
 expo-env.d.ts
 
+# Wrangler local dev cache (created by `wrangler pages dev`)
+.wrangler/
+
 # Native
 .kotlin/
 *.orig.*
