@@ -110,13 +110,23 @@ jobs:
 
       - name: Ensure Pages project exists
         # Self-healing: if this is the first deploy, the Pages project
-        # may not exist yet. Create it (idempotent — wrangler errors
-        # with a clear "already exists" message and we ignore that).
+        # may not exist yet. Create it via a separate wrangler call.
+        # The 2nd wrangler-action below will succeed once this passes
+        # (either creation succeeded or project already exists).
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages project create ${{ env.PROJECT_NAME }} --production-branch=main --compatibility-date=2024-12-01 2>&1 || echo "(project may already exist — continuing)"
+          preCommands: |
+            echo "Ensuring Pages project '${{ env.PROJECT_NAME }}' exists..."
+            if npx wrangler pages project list 2>/dev/null | grep -q "${{ env.PROJECT_NAME }}"; then
+              echo "✓ project already exists — skipping create"
+            else
+              echo "project not found — creating..."
+              npx wrangler pages project create "${{ env.PROJECT_NAME }}" \
+                --production-branch=main \
+                --compatibility-date=2024-12-01
+            fi
 
       - name: Deploy to Cloudflare Pages
         id: deploy
