@@ -1,3 +1,14 @@
+/**
+ * "Powered by Elixio Digital" attribution footer.
+ *
+ * Elixio Digital is the studio behind DocScan Pro. This component renders
+ * the brand attribution that appears on the Dashboard tab. Used by:
+ *   - frontend/app/(tabs)/dashboard.tsx  (mounted at the bottom of the screen)
+ *
+ * If you rebrand away from Elixio (or want to hide the attribution behind a
+ * feature flag), do it here in one place — do not duplicate the strings in
+ * each screen. See memory/BRAND.md for the current attribution policy.
+ */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../hooks/useTheme';

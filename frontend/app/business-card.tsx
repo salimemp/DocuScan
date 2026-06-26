@@ -12,6 +12,7 @@ import * as Contacts from 'expo-contacts';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../hooks/useTheme';
 import { getErrorMessage } from '../utils/errorHelpers';
+import { textShadow } from '../utils/shadow';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 
@@ -745,9 +746,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 14,
     fontWeight: '500',
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    ...textShadow({ offsetY: 1, blur: 2, color: '#000', opacity: 0.5 }),
   },
   cameraControls: {
     flexDirection: 'row',

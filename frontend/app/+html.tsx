@@ -87,19 +87,23 @@ export default function Root({ children }: PropsWithChildren) {
         <meta name="twitter:image" content="https://docscanpro.app/twitter-image.png" />
         <meta name="twitter:image:alt" content="DocScan Pro app showing AI document scanning, OCR, and export" />
         <meta name="twitter:app:name:iphone" content="DocScan Pro" />
-        <meta name="twitter:app:id:iphone" content="123456789" />
+        {/* TODO: replace IOS_APP_STORE_ID with the real numeric App Store ID before App Store submission.
+            Set via env (EXPO_PUBLIC_IOS_APP_STORE_ID) or hardcode after first release. */}
+        <meta name="twitter:app:id:iphone" content="__IOS_APP_STORE_ID_PLACEHOLDER__" />
         <meta name="twitter:app:name:googleplay" content="DocScan Pro" />
-        <meta name="twitter:app:id:googleplay" content="com.docscanpro.app" />
+        <meta name="twitter:app:id:googleplay" content="com.salimmakrana.docscanpro" />
 
         {/* ═══ APP LINKS ═══ */}
         <meta property="al:ios:url" content="docscanpro://" />
-        <meta property="al:ios:app_store_id" content="123456789" />
+        <meta property="al:ios:app_store_id" content="__IOS_APP_STORE_ID_PLACEHOLDER__" />
         <meta property="al:ios:app_name" content="DocScan Pro" />
         <meta property="al:android:url" content="docscanpro://" />
-        <meta property="al:android:package" content="com.docscanpro.app" />
+        {/* NOTE: align Android package name with app.json bundleIdentifier (com.salimmakrana.docscanpro).
+            Old value "com.docscanpro.app" was inconsistent with the actual published bundle. */}
+        <meta property="al:android:package" content="com.salimmakrana.docscanpro" />
         <meta property="al:android:app_name" content="DocScan Pro" />
         <meta property="al:web:url" content="https://docscanpro.app" />
-        <meta name="apple-itunes-app" content="app-id=123456789" />
+        <meta name="apple-itunes-app" content="app-id=__IOS_APP_STORE_ID_PLACEHOLDER__" />
 
         {/* ═══ PWA ═══ */}
         <meta name="theme-color" content="#2563EB" />
