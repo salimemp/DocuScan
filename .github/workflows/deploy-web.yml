@@ -61,7 +61,13 @@ permissions:
 
 env:
   NODE_VERSION: '20'
-  PROJECT_NAME: ${{ vars.CLOUDFLARE_PROJECT_NAME || 'docscanpro' }}
+  # Deploy to the 'docscanpro-site' project, which has the custom
+  # domain docscanpro.app attached. (There's also a 'docscanpro'
+  # project that was created during initial setup — that's a stale
+  # duplicate; we deploy to docscanpro-site to ensure auto-deploys
+  # flow through to the custom domain. The stale 'docscanpro'
+  # project can be deleted manually via the Cloudflare dashboard.)
+  PROJECT_NAME: ${{ vars.CLOUDFLARE_PROJECT_NAME || 'docscanpro-site' }}
 
 jobs:
   build:
