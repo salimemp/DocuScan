@@ -30,10 +30,6 @@ next-env.d.ts
 dist/
 dist
 
-# Credentials files (NOT .env — Emergent deploy needs those)
-*token.json*
-*credentials.json*
-
 # Logs and debug files
 npm-debug.log*
 yarn-debug.log*
@@ -73,6 +69,7 @@ agenthub/agents/youtube/db
 
 # Build caches
 .cache/
+.metro-cache/
 
 # Mobile development
 android-sdk/
@@ -85,95 +82,21 @@ frontend/google-play-service-account.json
 *.key
 .credentials
 
-# Internal test credentials (do not commit or deploy)
+# ─── Environment / credentials (DO NOT COMMIT) ───────────────────────
+# Local secrets live in `.env` files (gitignored). For team-shared
+# variables, use `.env.example` placeholders + your platform's secret
+# manager (Railway Variables, Vercel Project Settings, GitHub Secrets,
+# 1Password CLI, etc.).
+.env
+.env.*
+*.env
+backend/.env
+frontend/.env
+
+# Test-only credential docs may leak prod keys — keep them out of git.
 memory/test_credentials.md
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
+
+# Other credential artefacts
 credentials.json
-*.pem
-*.key
-.credentials
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
+*token.json*
+*credentials.json*
