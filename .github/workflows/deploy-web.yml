@@ -1,0 +1,139 @@
+# DocScan Pro — Web (Cloudflare Pages) auto-deploy
+# ====================================================
+# Builds the Expo web bundle from `frontend/` and deploys it to the
+# Cloudflare Pages project `docscanpro` on every push to `main`.
+# Pull requests get a preview deployment automatically (wrangler
+# pages deploy handles the production-vs-preview branch logic).
+#
+# Required GitHub repository secrets (Settings → Secrets → Actions):
+#
+#   CLOUDFLARE_API_TOKEN
+#     Cloudflare API token with the following permissions on the
+#     account that owns the docscanpro Pages project:
+#       - Account → Cloudflare Pages → Edit
+#     Generate at:
+#       https://dash.cloudflare.com/profile/api-tokens
+#     Use the "Edit Cloudflare Pages" template, OR a custom token
+#     with the scope above. Account ID is provided separately so
+#     the token doesn't need Zone resources.
+#
+#   CLOUDFLARE_ACCOUNT_ID
+#     Found at: https://dash.cloudflare.com → Workers & Pages →
+#     docscanpro → "Account ID" in the right sidebar. Also visible
+#     in any `*.pages.dev` URL: https://dash.cloudflare.com/<id>/pages
+#
+# Optional repository variables (Settings → Variables → Actions):
+#
+#   CLOUDFLARE_PROJECT_NAME
+#     Defaults to "docscanpro". Override only if you renamed the
+#     Pages project in the Cloudflare dashboard.
+#
+# Notes:
+#   - `EXPO_PUBLIC_*` env vars are inlined at `npx expo export`
+#     build time (the bundle captures them in the JS chunks). They
+#     live in this workflow's env: block so every push builds with
+#     the same backend / Turnstile settings as production.
+#   - wrangler-action v3 is the replacement for the deprecated
+#     `cloudflare/pages-action` (archived Oct 2024). See:
+#       https://github.com/cloudflare/wrangler-action
+#   - The "Sanity check _redirects" step is a guard against the
+#     SPA-fallback bug fixed in 86d73b9. If anyone removes the
+#     asset passthrough rules from `frontend/public/_redirects`,
+#     the deploy will fail loudly instead of silently shipping a
+#     broken web bundle.
+
+name: Deploy Web to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  deployments: write
+
+env:
+  NODE_VERSION: '20'
+  PROJECT_NAME: ${{ vars.CLOUDFLARE_PROJECT_NAME || 'docscanpro' }}
+
+jobs:
+  build:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'yarn'
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: yarn install --frozen-lockfile || yarn install
+
+      - name: Build Expo web bundle
+        working-directory: frontend
+        env:
+          # Inlined at build time — see comment at top of file.
+          EXPO_PUBLIC_BACKEND_URL: https://api.docscanpro.app
+          EXPO_PUBLIC_TURNSTILE_SITE_KEY: '0x4AAAAAACxLwEuO5d52Pe0g'
+          EXPO_PUBLIC_SITE_URL: https://docscanpro.app
+          NODE_ENV: production
+          CI: 'true'
+        run: npx expo export -p web --output-dir dist
+
+      - name: Sanity check _redirects is intact
+        working-directory: frontend
+        run: |
+          # Guard against the SPA-fallback bug: catch-all /index.html
+          # was rewriting every /assets/*.ttf to index.html before
+          # commit 86d73b9. These checks fail loud if a future change
+          # ever drops or breaks the asset passthrough rules.
+          test -s dist/_redirects || { echo "ERROR: dist/_redirects is missing or empty"; exit 1; }
+          grep -q '^/assets/\*  */assets/:splat  *200' dist/_redirects \
+            || { echo "ERROR: /assets/ passthrough rule missing from dist/_redirects"; exit 1; }
+          grep -q '^/\*  */index.html  *200' dist/_redirects \
+            || { echo "ERROR: catch-all /index.html rule missing from dist/_redirects"; exit 1; }
+          echo "✓ dist/_redirects looks correct"
+
+      - name: Deploy to Cloudflare Pages
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Wrangler auto-detects production vs preview from the
+          # current git branch — main → production, PR → preview URL.
+          command: pages deploy frontend/dist --project-name=${{ env.PROJECT_NAME }} --branch=${{ github.ref_name }} --commit-dirty=true
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment on PR with preview URL
+        if: github.event_name == 'pull_request' && steps.deploy.outputs.deployment-url != ''
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: cloudflare-pages-preview
+          message: |
+            🚀 **Preview deployment ready**
+
+            URL: ${{ steps.deploy.outputs.deployment-url }}
+
+            Alias: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
+
+            This is a preview build of the web app for PR #${{ github.event.pull_request.number }}. It will be deleted when the PR is closed.
+      - name: Print production deployment URL
+        if: github.event_name != 'pull_request' && steps.deploy.outputs.deployment-url != ''
+        run: |
+          echo "🚀 Production deployment: ${{ steps.deploy.outputs.deployment-url }}"
+          echo "   (custom domain docscanpro.app is updated on the Cloudflare dashboard)"
