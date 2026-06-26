@@ -1,2 +1,61 @@
-# Cloudflare Pages SPA fallback — all unknown routes serve the SPA shell.
+# Cloudflare Pages redirects — DocScan Pro Web
+# ===============================================
+# Cloudflare Pages evaluates _redirects top-to-bottom and the FIRST
+# matching rule wins. The prebuilt Expo web export emits real .html
+# files for every known route (dashboard.html, scan.html, etc.) AND
+# static assets under /assets/, /_expo/, /static/, /icons/. Cloudflare
+# Pages will serve those files automatically — but ONLY when no
+# redirect rule claims the URL. A catch-all `/* /index.html 200`
+# claims every URL, including /assets/* and /icons/*, and rewrites
+# them to index.html with Content-Type: text/html. That's the bug
+# that was breaking every icon font on the live site.
+#
+# Strategy:
+#   1) Pass-through rewrites for every static-asset directory, using
+#      splat capture so the rewritten URL still hits the static file.
+#   2) A literal pass-through for each prerendered HTML route so the
+#      catch-all below doesn't intercept /dashboard, /scan, etc.
+#   3) The catch-all `/*` goes LAST, only matching truly-unknown paths.
+#
+# Per Cloudflare, rules with no splats/placeholders perform better
+# when placed above splat-bearing rules — ordering is cosmetic but
+# removes a parser warning.
+
+# ============================================================
+# Static asset passthroughs (must come before the catch-all)
+# ============================================================
+
+# --- Literal asset paths at the site root (no splats, fast path) ---
+/favicon.ico                    /favicon.ico                    200
+/favicon-16x16.png              /favicon-16x16.png              200
+/favicon-32x32.png              /favicon-32x32.png              200
+/apple-touch-icon.png           /apple-touch-icon.png           200
+/manifest.json                  /manifest.json                  200
+/robots.txt                     /robots.txt                     200
+/BingSiteAuth.xml               /BingSiteAuth.xml               200
+/og-image.png                   /og-image.png                   200
+/twitter-image.png              /twitter-image.png              200
+/google-site-verification.html  /google-site-verification.html  200
+/yandex_30228b25e87e4a62.html   /yandex_30228b25e87e4a62.html   200
+/sitemap.xml                    /sitemap.xml                    200
+/sitemap-images.xml             /sitemap-images.xml             200
+/_sitemap.html                  /_sitemap.html                  200
+/+not-found.html                /+not-found.html                200
+
+# --- Splat-bearing asset directories (intercepts asset URLs) ---
+# Rewrite to self via :splat so the static file gets served. The first
+# match wins, blocking the catch-all below from firing on these paths.
+/assets/*        /assets/:splat        200
+/_expo/*         /_expo/:splat         200
+/static/*        /static/:splat        200
+/icons/*         /icons/:splat         200
+/blog/*          /blog/:splat          200
+/document/*      /document/:splat      200
+/(tabs)/*        /(tabs)/:splat        200
+
+# ============================================================
+# SPA catch-all — must be LAST
+# ============================================================
+# Any path not already claimed (true client-side routes) gets the SPA
+# shell so Expo Router can take over.
 /*    /index.html    200
