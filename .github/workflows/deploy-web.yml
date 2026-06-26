@@ -157,7 +157,12 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           # Wrangler auto-detects production vs preview from the
           # current git branch — main → production, PR → preview URL.
-          command: pages deploy frontend/dist --project-name=${{ env.PROJECT_NAME }} --branch=${{ github.ref_name }} --commit-dirty=true
+          # --skip-caching forces a full re-upload instead of relying
+          # on wrangler's content-hash dedup, which has been observed
+          # to undercount files when the deployment has stale state
+          # (resulting in 404s for legitimate /assets/* paths that
+          # exist on disk but were never uploaded to Pages).
+          command: pages deploy frontend/dist --project-name=${{ env.PROJECT_NAME }} --branch=${{ github.ref_name }} --commit-dirty=true --skip-caching
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Comment on PR with preview URL
