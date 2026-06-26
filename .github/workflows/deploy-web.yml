@@ -58,6 +58,9 @@ concurrency:
 permissions:
   contents: read
   deployments: write
+  # `pull-requests: write` lets marocchino/sticky-pull-request-comment@v2
+  # post a sticky comment with the preview deployment URL on PRs.
+  pull-requests: write
 
 env:
   NODE_VERSION: '20'
