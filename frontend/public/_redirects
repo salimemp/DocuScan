@@ -45,13 +45,23 @@
 # --- Splat-bearing asset directories (intercepts asset URLs) ---
 # Rewrite to self via :splat so the static file gets served. The first
 # match wins, blocking the catch-all below from firing on these paths.
-/assets/*        /assets/:splat        200
-/_expo/*         /_expo/:splat         200
-/static/*        /static/:splat        200
-/icons/*         /icons/:splat         200
-/blog/*          /blog/:splat          200
-/document/*      /document/:splat      200
-/(tabs)/*        /(tabs)/:splat        200
+#
+# /assets/node_modules/* — Cloudflare Pages is reached via wrangler
+# `pages deploy`, which has a hardcoded IGNORE_LIST that skips files
+# under /node_modules/ paths (cloudflare/workers-sdk#3615, won't fix).
+# Expo Metro emits Expo vector-icons fonts + react-navigation icons
+# under /assets/node_modules/... — the very files wrangler skips. The
+# CI workflow renames that dir to /assets/_nm/ before deploy, so this
+# rule translates the JS bundle's hardcoded /assets/node_modules/*
+# references to the real on-disk path /assets/_nm/:splat.
+/assets/node_modules/*  /assets/_nm/:splat  200
+/assets/*              /assets/:splat      200
+/_expo/*               /_expo/:splat       200
+/static/*              /static/:splat      200
+/icons/*               /icons/:splat       200
+/blog/*                /blog/:splat        200
+/document/*            /document/:splat    200
+/(tabs)/*              /(tabs)/:splat      200
 
 # ============================================================
 # SPA catch-all — must be LAST
