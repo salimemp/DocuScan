@@ -186,10 +186,20 @@ jobs:
           # are skipped, breaking icon fonts on the live site. Pin to
           # 4.x which handles the full file set correctly.
           wranglerVersion: '4'
+          # Production deploys MUST NOT pass --branch, or Cloudflare
+          # marks the deploy as a 'preview' and the custom domain
+          # (docscanpro.app) stays pinned to the old production
+          # deployment. PRs still need --branch=<name> to deploy as
+          # a preview URL.
           # --skip-caching forces a full re-upload instead of relying
           # on wrangler's content-hash dedup, which can undercount
           # files when the deployment has stale state.
-          command: pages deploy frontend/dist --project-name=${{ env.PROJECT_NAME }} --branch=${{ github.ref_name }} --commit-dirty=true --skip-caching
+          command: |
+            pages deploy frontend/dist \
+              --project-name=${{ env.PROJECT_NAME }} \
+              --commit-dirty=true \
+              --skip-caching
+              ${{ github.event_name == 'pull_request' && format('--branch=pr-{0}', github.event.pull_request.number) || '' }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Comment on PR with preview URL
