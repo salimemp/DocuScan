@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../hooks/useTheme';
+import { shadow } from '../utils/shadow';
 import Svg, { Path, G } from 'react-native-svg';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -308,11 +309,7 @@ const styles = StyleSheet.create({
   colorBtnSelected: {
     borderWidth: 3,
     borderColor: '#FFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 4,
+    ...shadow({ offsetY: 2, blur: 3, opacity: 0.3, color: '#000', elevation: 4 }),
   },
   widthRow: {
     flexDirection: 'row',
