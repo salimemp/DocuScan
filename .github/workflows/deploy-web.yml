@@ -110,23 +110,29 @@ jobs:
 
       - name: Ensure Pages project exists
         # Self-healing: if this is the first deploy, the Pages project
-        # may not exist yet. Create it via a separate wrangler call.
-        # The 2nd wrangler-action below will succeed once this passes
-        # (either creation succeeded or project already exists).
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          preCommands: |
-            echo "Ensuring Pages project '${{ env.PROJECT_NAME }}' exists..."
-            if npx wrangler pages project list 2>/dev/null | grep -q "${{ env.PROJECT_NAME }}"; then
-              echo "✓ project already exists — skipping create"
-            else
-              echo "project not found — creating..."
-              npx wrangler pages project create "${{ env.PROJECT_NAME }}" \
-                --production-branch=main \
-                --compatibility-date=2024-12-01
-            fi
+        # may not exist yet. Create it via the Cloudflare REST API
+        # directly. The API returns 200 with success=true if created,
+        # or 409 if it already exists — both are "OK to proceed" for
+        # us. Any other non-2xx is a real error.
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "Ensuring Pages project '${{ env.PROJECT_NAME }}' exists..."
+          HTTP_CODE=$(/usr/bin/curl -s -o /tmp/cf-create.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"${{ env.PROJECT_NAME }}","production_branch":"main","build_config":{"compatibility_date":"2024-12-01"}}' \
+            "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects")
+          echo "HTTP ${HTTP_CODE}"
+          cat /tmp/cf-create.json
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "409" ]; then
+            echo "✓ Pages project ready (HTTP ${HTTP_CODE}: created or already exists)"
+          else
+            echo "✗ Failed to create Pages project (HTTP ${HTTP_CODE})" >&2
+            exit 1
+          fi
 
       - name: Deploy to Cloudflare Pages
         id: deploy
