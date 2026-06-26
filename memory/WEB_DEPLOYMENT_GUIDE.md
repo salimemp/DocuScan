@@ -41,21 +41,67 @@ After the first deploy, Cloudflare gives you a URL like `https://docscanpro.page
 
 ---
 
-## Option B — GitHub auto-deploy (recommended for CI/CD)
+## Option B — GitHub auto-deploy via Actions (recommended for CI/CD)
 
-1. Push the repo to GitHub.
-2. Cloudflare Dashboard → Workers & Pages → **Create application** → **Pages** → **Connect to Git** → pick your repo.
-3. Build configuration:
-   - **Framework preset:** None
-   - **Build command:** `cd frontend && yarn install --frozen-lockfile && npx expo export -p web --output-dir dist`
-   - **Build output directory:** `frontend/dist`
-   - **Root directory:** `/` (leave empty)
-   - **Environment variables (Production):**
-     - `EXPO_PUBLIC_BACKEND_URL=https://api.docscanpro.app`
-     - `EXPO_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAACxLwEuO5d52Pe0g`
-     - `NODE_VERSION=20`
-4. Save → first build runs (~3-5 min).
-5. Add custom domain `docscanpro.app` (same flow as Option A step 5).
+We use a dedicated workflow at `.github/workflows/deploy-web.yml` that runs `cloudflare/wrangler-action@v3` (the successor to the deprecated `cloudflare/pages-action`, archived Oct 2024). Pushes to `main` deploy to production, pull requests get a preview URL posted back to the PR as a comment.
+
+### One-time setup (5 min)
+
+1. **Create the Cloudflare Pages project** (only needed once):
+   ```bash
+   cd frontend
+   yarn install
+   yarn build  # or npx expo export -p web --output-dir dist
+   npx wrangler pages project create docscanpro --production-branch=main --compatibility-date=2024-12-01
+   ```
+2. **Add custom domain** `docscanpro.app` (and `www.docscanpro.app`) in Cloudflare Dashboard → Workers & Pages → docscanpro → **Custom domains**. Cloudflare auto-creates the DNS records. SSL provisions in ~30s.
+3. **Generate a Cloudflare API token** at https://dash.cloudflare.com/profile/api-tokens:
+   - Use the **"Edit Cloudflare Pages"** template, OR a custom token with:
+     - Permissions: Account → Cloudflare Pages → Edit
+   - Copy the token value (you'll only see it once).
+4. **Find your Cloudflare Account ID** at https://dash.cloudflare.com → Workers & Pages → docscanpro → right sidebar "Account ID". Also visible in any `*.pages.dev` URL.
+5. **Add GitHub repository secrets** at https://github.com/<owner>/DocuScan/settings/secrets/actions:
+   - `CLOUDFLARE_API_TOKEN` — paste the token from step 3
+   - `CLOUDFLARE_ACCOUNT_ID` — paste the ID from step 4
+6. *(Optional)* Add a repository **variable** `CLOUDFLARE_PROJECT_NAME` if you renamed the project (default: `docscanpro`).
+7. Push a commit to `main` (or open a PR). The workflow runs in ~3-5 min and posts the deployment URL.
+
+### How the workflow works
+
+| Trigger | Behaviour |
+|---|---|
+| Push to `main` | Production deploy → updates `https://docscanpro.app` |
+| Pull request | Preview deploy → unique `*.docscanpro.pages.dev` URL, posted as PR comment |
+| Manual dispatch | Re-runs the build/deploy on demand from the Actions tab |
+
+`EXPO_PUBLIC_*` env vars are inlined into the JS bundle at build time, so they're set in the workflow's `env:` block — change them in the workflow file, not on the Cloudflare dashboard.
+
+### Verifying the deploy worked
+
+After a `main` push:
+1. Wait ~3-5 min for the workflow run to finish.
+2. Visit `https://docscanpro.app`. Cloudflare bot-challenge runs first (~3-5s); then the app should load with all icons rendered correctly.
+3. `curl -sI https://docscanpro.app/assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf | grep -i content-type` → should return `font/ttf`. If it returns `text/html`, the `_redirects` bug has regressed.
+
+### Sanity check built into the workflow
+
+The "Sanity check _redirects is intact" step verifies two things on every build:
+- `dist/_redirects` is non-empty
+- The `/assets/*` passthrough rule exists
+- The `/*` SPA fallback exists
+
+If a future change ever drops these, the workflow **fails the deploy** rather than shipping a broken web bundle. This is the bug fixed in commit `86d73b9` (see the section below).
+
+### Switching between auto-deploy and manual
+
+The Actions workflow does **not** conflict with manual `wrangler pages deploy` calls. They both talk to the same Pages project. If you want to disable auto-deploy temporarily, change `on:` in the workflow file to only `workflow_dispatch`.
+
+### Alternative: Cloudflare's built-in Git integration
+
+Cloudflare Pages also has a native GitHub integration (Dashboard → Pages → Connect to Git). That works too, but:
+- It's less flexible than Actions (no PR previews out of the box, no build-time sanity checks, no PR comments).
+- Setting it up requires you to configure build settings via the Cloudflare dashboard instead of in code.
+- The Actions workflow is the standard pattern going forward — pick one and stick with it.
 
 ---
 
