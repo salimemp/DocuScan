@@ -77,8 +77,35 @@ allow_origins=[
 
 | File | Purpose |
 |---|---|
-| `_redirects` | SPA fallback — every unknown path serves `index.html` (so React Router/Expo Router can take over). |
+| `_redirects` | SPA fallback — every unknown path serves `index.html` (so React Router/Expo Router can take over). **All static-asset paths (`/assets/*`, `/_expo/*`, `/icons/*`, etc.) must be listed BEFORE the catch-all** as pass-through rewrites (`/assets/* /assets/:splat 200`), otherwise the wildcard `/*` would rewrite every asset URL to `index.html` with `Content-Type: text/html`, breaking every icon font on the page. This is the bug that was breaking `Ionicons.ttf` and `favicon-32x32.png` on the live site before 2026-06-26. |
 | `_headers` | Security headers (HSTS, X-Frame-Options, Permissions-Policy) + long-cache for hashed assets, no-cache for HTML. |
+
+### ⚠️ `_redirects` rules to know
+- **First match wins.** Order matters — asset passthroughs must precede the catch-all.
+- **No `!` exclusion syntax.** Cloudflare Pages docs only describe `<source> <destination> <code>` per line; `!`-prefixed lines are silently ignored.
+- **Wildcard `/*` matches everything** including asset URLs. It must be the LAST rule.
+- **Literal-only rules perform better** — wrangler emits a warning when splat rules appear above literal rules; cosmetic but cleaner.
+- **`/* /index.html 200` triggers an "infinite loop" warning** from Cloudflare's parser. This is benign for SPA fallback but worth knowing about.
+
+### Verifying the redirects locally before deploying
+
+`npx serve dist` is NOT enough — it doesn't honor `_redirects`. Use `wrangler pages dev`:
+
+```bash
+# Build first
+EXPO_PUBLIC_BACKEND_URL=https://api.docscanpro.app npx expo export -p web --output-dir dist
+
+# Serve with Cloudflare Pages' own runtime
+npx wrangler pages dev dist --port 4174 --compatibility-date 2024-12-01
+
+# Smoke test the previously-broken URLs (should NOT return text/html)
+curl -sI http://localhost:4174/assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf | grep -i content-type
+curl -sI http://localhost:4174/favicon-32x32.png | grep -i content-type
+
+# SPA routes (should still return text/html)
+curl -sI http://localhost:4174/dashboard | grep -i content-type
+curl -sI http://localhost:4174/scan | grep -i content-type
+```
 
 Both files are automatically copied into `dist/` during `expo export`.
 
