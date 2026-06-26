@@ -105,6 +105,34 @@ Cloudflare Pages also has a native GitHub integration (Dashboard → Pages → C
 
 ---
 
+## ⚠️ Gotchas that bit us — read these before debugging a "stuck" deployment
+
+### 1. Two-Project trap: `wrangler pages project create` creates a new project, doesn't reuse the Git-integrated one
+
+If the Cloudflare dashboard already has a Pages project with the custom domain attached (from when you originally set up "Connect to Git"), running `wrangler pages project create docscanpro` creates a **second, separate** project. Your `wrangler pages deploy` then lands on the new (empty) project, and the custom domain stays pinned to the original project's deployment — which Cloudflare's GitHub integration keeps rebuilding with its dashboard-configured build command (no `404.html` copy, no `assets/node_modules → assets/_nm` rename, etc.).
+
+Symptoms: every test URL passes locally, `*.pages.dev` shows the right assets, but the custom domain serves an older build.
+
+Fix: point the workflow's `PROJECT_NAME` env at the project that has the custom domain (verify via `Workers & Pages → <project> → Custom domains`). Or disconnect the GitHub integration and let your workflow be the sole deployer.
+
+### 2. Custom domain pinned to a stale deployment
+
+Cloudflare Pages' custom domain aliases stay attached to whatever deployment was active when you added the custom domain, until you either:
+- Remove + re-add the custom domain (1 click in the dashboard)
+- Push a new commit that triggers a Cloudflare-side production rebuild AND the new deploy becomes the canonical/production one (the GitHub integration's build does this automatically if it's connected)
+
+`wrangler pages deploy` always creates **preview** deployments by default, even without `--branch`. To promote one to production you need either the GitHub integration's auto-build, or to trigger a production deployment via the REST API (`POST /accounts/{id}/pages/projects/{name}/deployments` with `branch: main` and the right `commit_hash`).
+
+### 3. Cloudflare edge cache serves stale `text/html` after a real deploy
+
+After a successful deploy, requests to assets that previously returned `text/html` (404 responses during the old broken deploy) may keep returning `text/html` from Cloudflare's edge cache for hours. The new deploy IS serving the right file, but the edge serves the old cached 404.
+
+Symptoms: `curl -I https://your-domain/asset.ttf?v=$(date +%s)` (with cache-bust) returns `font/ttf`, but `curl -I https://your-domain/asset.ttf` returns `text/html`.
+
+Fix: purge Cloudflare's cache after a deploy — Caching → Configuration → Purge Everything. Or wait it out (the cache TTL is one week for static assets per the Cloudflare docs, but in practice the wrong `text/html` response can stick around for hours).
+
+---
+
 ## 🔐 CORS — Already handled
 Backend (`/app/backend/server.py:2455`) uses `allow_origins=["*"]`, so requests from `https://docscanpro.app` are accepted with no backend changes needed. Tokens are passed via `Authorization` header (not cookies), so cross-origin works.
 
