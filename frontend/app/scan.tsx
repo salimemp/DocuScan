@@ -247,6 +247,86 @@ export default function ScanScreen() {
     }
   };
 
+  // WEB FALLBACK: show a web-specific screen that exposes only the
+  // gallery-import flow. The mobile app's live camera view doesn't work
+  // on web — expo-camera on web is a stub — so we don't bother with the
+  // permission prompt or shutter UI. Users get a clear "use the mobile
+  // app for live scanning" message + the gallery-import button as the
+  // only working path. This keeps web parity-without-camera per the
+  // product requirement.
+  const isWeb = Platform.OS === 'web';
+  if (isWeb) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+          <View style={[styles.webHeader, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity
+              testID="scan-close-btn"
+              style={styles.webHeaderBtn}
+              onPress={handleCancel}
+              accessibilityLabel="Close"
+            >
+              <Ionicons name="close" size={24} color={colors.textPrimary} />
+            </TouchableOpacity>
+            <Text style={[styles.webHeaderTitle, { color: colors.textPrimary }]}>
+              {t('scanDocument')}
+            </Text>
+            <View style={styles.webHeaderBtn} />
+          </View>
+
+          <View style={styles.webBody}>
+            <View style={[styles.webIconWrap, { backgroundColor: colors.primary + '15' }]}>
+              <Ionicons name="camera-outline" size={56} color={colors.primary} />
+            </View>
+            <Text style={[styles.webTitle, { color: colors.textPrimary }]}>
+              Live Scanning is Mobile-Only
+            </Text>
+            <Text style={[styles.webSubtitle, { color: colors.textSecondary }]}>
+              The DocScan Pro mobile app uses your camera to capture pages
+              in real time with auto-edge detection. On the web, you can
+              still import images from your device to scan documents.
+            </Text>
+
+            <TouchableOpacity
+              testID="web-gallery-btn"
+              style={[styles.webPrimaryBtn, { backgroundColor: colors.primary }]}
+              onPress={pickFromGallery}
+              accessibilityLabel="Import images to scan"
+            >
+              <Ionicons name="images-outline" size={20} color="#FFF" />
+              <Text style={styles.webPrimaryBtnText}>{t('gallery')}</Text>
+            </TouchableOpacity>
+
+            <View style={[styles.webHint, { backgroundColor: colors.surfaceHighlight, borderColor: colors.border }]}>
+              <Ionicons name="phone-portrait-outline" size={18} color={colors.textSecondary} />
+              <Text style={[styles.webHintText, { color: colors.textSecondary }]}>
+                For live camera scanning, batch mode, and OCR, download the
+                DocScan Pro mobile app.
+              </Text>
+            </View>
+
+            {pages.length > 0 && (
+              <View style={[styles.webPagesPill, { backgroundColor: colors.primary }]}>
+                <Text style={styles.webPagesPillText}>
+                  {pages.length} {pages.length === 1 ? 'page' : 'pages'} ready
+                </Text>
+                <TouchableOpacity
+                  testID="web-continue-btn"
+                  style={styles.webPagesPillBtn}
+                  onPress={handleContinue}
+                  accessibilityLabel="Continue to preview"
+                >
+                  <Text style={styles.webPagesPillBtnText}>{t('continue')}</Text>
+                  <Ionicons name="arrow-forward" size={16} color="#FFF" />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
   // Permission not yet determined
   if (!permission) {
     return <View style={{ flex: 1, backgroundColor: '#000' }} />;
@@ -799,6 +879,78 @@ const styles = StyleSheet.create({
 
   // Permission
   permissionSafe: { flex: 1 },
+
+  // Web fallback styles
+  webHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  webHeaderBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  webHeaderTitle: { fontSize: 17, fontWeight: '700' },
+  webBody: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 36,
+    gap: 16,
+  },
+  webIconWrap: {
+    width: 112,
+    height: 112,
+    borderRadius: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  webTitle: { fontSize: 22, fontWeight: '700', textAlign: 'center' },
+  webSubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 21,
+    maxWidth: 480,
+  },
+  webPrimaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginTop: 8,
+  },
+  webPrimaryBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  webHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 8,
+    maxWidth: 480,
+  },
+  webHintText: { fontSize: 12, lineHeight: 18, flex: 1 },
+  webPagesPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 999,
+    marginTop: 8,
+  },
+  webPagesPillText: { color: '#FFF', fontSize: 13, fontWeight: '600' },
+  webPagesPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  webPagesPillBtnText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
   permissionContent: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 36, gap: 16,

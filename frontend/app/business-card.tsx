@@ -268,6 +268,78 @@ export default function BusinessCardScanner() {
     );
   }
 
+  // WEB FALLBACK: live business-card camera scanning is mobile-only.
+  // On web we skip the permission prompt and the broken camera view,
+  // and present a clean import-from-gallery screen so the user can
+  // still scan a business card from an image file. (Mirrors the
+  // /scan web fallback pattern.)
+  const isWeb = Platform.OS === 'web';
+  if (isWeb) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        {/* Header */}
+        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <TouchableOpacity 
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)/dashboard');
+              }
+            }} 
+            style={styles.backBtn}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+            Business Card Scanner
+          </Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <View style={styles.permissionContainer}>
+          <View style={[styles.permissionIconContainer, { backgroundColor: colors.primary + '15' }]}>
+            <Ionicons name="camera-outline" size={48} color={colors.primary} />
+          </View>
+          <Text style={[styles.permissionTitle, { color: colors.textPrimary }]}>
+            Live Scanning is Mobile-Only
+          </Text>
+          <Text style={[styles.permissionText, { color: colors.textSecondary }]}>
+            The DocScan Pro mobile app uses your camera to scan business
+            cards in real time. On the web, you can still import an
+            image of a business card to extract the contact details.
+          </Text>
+          <TouchableOpacity
+            style={[styles.permissionBtn, { backgroundColor: colors.primary }]}
+            onPress={pickImage}
+            accessibilityLabel="Import business card image"
+          >
+            <Ionicons name="images-outline" size={20} color="#FFF" style={{ marginRight: 8 }} />
+            <Text style={styles.permissionBtnText}>Import from Gallery</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.permissionBackBtn, { marginTop: 8 }]}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)/dashboard');
+              }
+            }}
+          >
+            <Text style={[styles.permissionBackBtnText, { color: colors.primary }]}>
+              Go Back to Dashboard
+            </Text>
+          </TouchableOpacity>
+          <Text style={[styles.permissionText, { color: colors.textTertiary, marginTop: 16, fontSize: 12 }]}>
+            For live business-card scanning and contact saving, use the
+            DocScan Pro mobile app.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (!permission.granted) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
