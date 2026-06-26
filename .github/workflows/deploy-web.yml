@@ -181,6 +181,56 @@ jobs:
             exit 1
           fi
 
+      - name: Update Pages build config to include post-build steps
+        # PATCH the project's build_config so Cloudflare's GitHub
+        # integration (which auto-deploys to the custom domain) uses
+        # the SAME build command as our Actions workflow. This is
+        # the critical step that makes pushes to main update the
+        # custom domain docscanpro.app with our fixes — without it,
+        # the GitHub integration rebuilds the project with its
+        # dashboard-configured build command (no _redirects 404.html,
+        # no node_modules→_nm rename) and the custom domain stays
+        # stuck on the broken build.
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "Updating build_config for ${{ env.PROJECT_NAME }}..."
+          HTTP_CODE=$(/usr/bin/curl -s -o /tmp/cf-patch.json -w "%{http_code}" \
+            -X PATCH \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "build_config": {
+                "build_command": "cd frontend && yarn install --frozen-lockfile || yarn install && npx expo export -p web --output-dir dist && cp dist/index.html dist/404.html && (test -d dist/assets/node_modules && mv dist/assets/node_modules dist/assets/_nm || echo \"(no node_modules rename needed)\")",
+                "destination_dir": "frontend/dist",
+                "root_dir": "",
+                "compatibility_date": "2024-12-01"
+              },
+              "deployment_configs": {
+                "preview": {
+                  "build_command": "cd frontend && yarn install --frozen-lockfile || yarn install && npx expo export -p web --output-dir dist && cp dist/index.html dist/404.html && (test -d dist/assets/node_modules && mv dist/assets/node_modules dist/assets/_nm || echo \"(no node_modules rename needed)\")",
+                  "destination_dir": "frontend/dist",
+                  "compatibility_date": "2024-12-01"
+                },
+                "production": {
+                  "build_command": "cd frontend && yarn install --frozen-lockfile || yarn install && npx expo export -p web --output-dir dist && cp dist/index.html dist/404.html && (test -d dist/assets/node_modules && mv dist/assets/node_modules dist/assets/_nm || echo \"(no node_modules rename needed)\")",
+                  "destination_dir": "frontend/dist",
+                  "compatibility_date": "2024-12-01"
+                }
+              }
+            }' \
+            "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${{ env.PROJECT_NAME }}")
+          echo "HTTP ${HTTP_CODE}"
+          cat /tmp/cf-patch.json | head -c 500
+          echo ""
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✓ build_config updated successfully"
+          else
+            echo "✗ Failed to update build_config (HTTP ${HTTP_CODE})" >&2
+            exit 1
+          fi
+
       - name: Deploy to Cloudflare Pages
         id: deploy
         uses: cloudflare/wrangler-action@v3
@@ -192,16 +242,60 @@ jobs:
           # are skipped, breaking icon fonts on the live site. Pin to
           # 4.x which handles the full file set correctly.
           wranglerVersion: '4'
-          # Production deploys MUST NOT pass --branch, or Cloudflare
-          # marks the deploy as a 'preview' and the custom domain
-          # (docscanpro.app) stays pinned to the old production
-          # deployment. PRs still need --branch=<name> to deploy as
-          # a preview URL.
           # --skip-caching forces a full re-upload instead of relying
           # on wrangler's content-hash dedup, which can undercount
-          # files when the deployment has stale state.
+          # files when the deployment has stale state. PRs still get
+          # --branch=pr-{number} so they deploy as preview URLs.
           command: pages deploy frontend/dist --project-name=${{ env.PROJECT_NAME }} --commit-dirty=true --skip-caching ${{ github.event_name == 'pull_request' && format('--branch=pr-{0}', github.event.pull_request.number) || '' }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote deployment to production
+        # wrangler pages deploy creates PREVIEW deployments by default.
+        # To make the custom domain (docscanpro.app) auto-update, we
+        # need to either:
+        #   (a) rely on Cloudflare's GitHub integration (which auto-
+        #       deploys the production branch on push), OR
+        #   (b) explicitly create a production deployment via the API.
+        # We do both: the PATCH step above configures the project so
+        # GitHub integration's auto-build uses our build command, AND
+        # this step triggers a fresh production build that picks up
+        # the latest source. After this runs, docscanpro.app points
+        # at the new build within ~30s.
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_PROJECT: ${{ env.PROJECT_NAME }}
+          COMMIT_SHA: ${{ github.sha }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          # Only trigger production builds on pushes to main, not on PRs.
+          if [ "${{ github.event_name }}" != "push" ]; then
+            echo "Skipping production trigger — not a push event (${{ github.event_name }})"
+            exit 0
+          fi
+          echo "Triggering production deployment for $CF_PROJECT at $COMMIT_SHA..."
+          HTTP_CODE=$(/usr/bin/curl -s -o /tmp/cf-prod.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"branch\": \"main\",
+              \"commit_hash\": \"${COMMIT_SHA}\",
+              \"commit_message\": $(echo "$COMMIT_MSG" | /usr/bin/python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().strip()[:200]))'),
+              \"commit_dirty\": false
+            }" \
+            "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${CF_PROJECT}/deployments")
+          echo "HTTP ${HTTP_CODE}"
+          head -c 500 /tmp/cf-prod.json
+          echo ""
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "202" ]; then
+            DEPLOY_ID=$(/usr/bin/python3 -c "import json; print(json.load(open('/tmp/cf-prod.json')).get('result', {}).get('id', ''))" 2>/dev/null || echo "")
+            echo "✓ Production deployment triggered (id=$DEPLOY_ID)"
+          else
+            echo "✗ Failed to trigger production deployment (HTTP $HTTP_CODE)" >&2
+            cat /tmp/cf-prod.json >&2
+            exit 1
+          fi
 
       - name: Comment on PR with preview URL
         if: github.event_name == 'pull_request' && steps.deploy.outputs.deployment-url != ''
