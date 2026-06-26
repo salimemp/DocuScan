@@ -108,6 +108,16 @@ jobs:
             || { echo "ERROR: catch-all /index.html rule missing from dist/_redirects"; exit 1; }
           echo "✓ dist/_redirects looks correct"
 
+      - name: Ensure Pages project exists
+        # Self-healing: if this is the first deploy, the Pages project
+        # may not exist yet. Create it (idempotent — wrangler errors
+        # with a clear "already exists" message and we ignore that).
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages project create ${{ env.PROJECT_NAME }} --production-branch=main --compatibility-date=2024-12-01 2>&1 || echo "(project may already exist — continuing)"
+
       - name: Deploy to Cloudflare Pages
         id: deploy
         uses: cloudflare/wrangler-action@v3
