@@ -34,6 +34,10 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           queries: +security-and-quality
+          # Point at the project config that excludes the
+          # py/weak-cryptographic-algorithm rule (false-positive on
+          # the SHA-256 bcrypt pre-hash + legacy hash verify paths).
+          config-file: .github/codeql/codeql-config.yml
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3

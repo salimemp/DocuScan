@@ -3,13 +3,15 @@ Authentication Module for DocScan Pro
 Supports: Email/Password, Magic Link, Google OAuth, Apple Sign-In, 2FA (TOTP/Hardware), Passkeys, Biometrics
 """
 import os
+import logging
+
 logger = logging.getLogger("docscan.auth")
+
 import secrets
 import hashlib
 import base64
 import uuid
 import asyncio
-import logging
 import bcrypt
 import pyotp
 import httpx
