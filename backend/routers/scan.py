@@ -5,22 +5,16 @@ Endpoints extracted from server.py.
 """
 from __future__ import annotations
 
+import base64
+import io
 import json
 import logging
-import os
 import re
-import sys
 import uuid
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
-# See routers/ai.py for the rationale behind this local stub. The
-# emergentintegrations package was never on PyPI; the stub preserves
-# the import surface so the rest of the app boots.
-_STUB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "local_stubs")
-if _STUB_DIR not in sys.path:
-    sys.path.insert(0, _STUB_DIR)
-
-from emergentintegrations.llm.chat import ImageContent, LlmChat, UserMessage  # noqa: E402
+from ai_client import DEFAULT_MODEL, ImageContent, LlmChat, UserMessage
 from fastapi import APIRouter, HTTPException
 
 from db import db
@@ -63,7 +57,7 @@ async def scan_document(request: ScanRequest):
     images = [strip_b64_prefix(img) for img in request.images]
     n = len(images)
     try:
-        chat = LlmChat(api_key=api_key, session_id=str(uuid.uuid4()), system_message=SYSTEM_PROMPT).with_model("gemini", "gemini-3-flash-preview")
+        chat = LlmChat(api_key=api_key, session_id=str(uuid.uuid4()), system_message=SYSTEM_PROMPT).with_model("gemini", DEFAULT_MODEL)
         file_contents = [ImageContent(image_base64=img) for img in images]
         prompt = get_multi_prompt(n) if n > 1 else USER_PROMPT
         response = await chat.send_message(UserMessage(text=prompt, file_contents=file_contents))
@@ -169,7 +163,7 @@ async def ai_assistant(request: AIAssistantRequest):
             api_key=api_key,
             session_id=str(uuid.uuid4()),
             system_message=AI_ASSISTANT_PROMPT
-        ).with_model("gemini", "gemini-3-flash-preview")
+        ).with_model("gemini", DEFAULT_MODEL)
         
         full_message = f"{context}User question: {request.message}"
         response = await chat.send_message(UserMessage(text=full_message))
@@ -202,7 +196,7 @@ async def recognize_text(image: str = "", region: Optional[Dict[str, int]] = Non
             api_key=api_key,
             session_id=str(uuid.uuid4()),
             system_message="Extract all text from this image exactly as shown. Return only the text, no formatting."
-        ).with_model("gemini", "gemini-3-flash-preview")
+        ).with_model("gemini", DEFAULT_MODEL)
         
         response = await chat.send_message(UserMessage(
             text="Extract all text from this image:",
@@ -228,7 +222,7 @@ async def measure(request: MeasurementRequest):
                 api_key=api_key,
                 session_id=str(uuid.uuid4()),
                 system_message="You are a counting assistant. Count the specified items in images."
-            ).with_model("gemini", "gemini-3-flash-preview")
+            ).with_model("gemini", DEFAULT_MODEL)
             
             response = await chat.send_message(UserMessage(
                 text="Count all distinct items/objects in this image. Return JSON: {\"count\": number, \"items\": [list of items]}",
@@ -282,7 +276,7 @@ async def batch_scan_documents(request: BatchScanRequest):
                 api_key=api_key,
                 session_id=f"batch-{uuid.uuid4()}",
                 system_message="Extract all text from this document image accurately."
-            ).with_model("gemini", "gemini-2.5-flash")
+            ).with_model("gemini", DEFAULT_MODEL)
             
             image_content = ImageContent(image_base64=clean_b64)
             user_message = UserMessage(

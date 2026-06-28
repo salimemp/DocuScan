@@ -5,23 +5,11 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
-import sys
 import uuid
 from datetime import datetime, timezone
 
-# The emergentintegrations package was never published to PyPI. Until
-# production migrates to a real LLM client (e.g. google-generativeai),
-# we route the import to a local stub via sys.path. The stub preserves
-# the import surface (ImageContent / LlmChat / UserMessage) but raises
-# NotImplementedError on construction, so the AI endpoints return 501
-# instead of crashing the whole app.
-_STUB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "local_stubs")
-if _STUB_DIR not in sys.path:
-    sys.path.insert(0, _STUB_DIR)
-
-from emergentintegrations.llm.chat import ImageContent, LlmChat, UserMessage  # noqa: E402
+from ai_client import DEFAULT_MODEL, ImageContent, LlmChat, UserMessage
 from fastapi import APIRouter, HTTPException
 
 from db import db
@@ -78,8 +66,8 @@ IMPORTANT:
 - Format phone numbers consistently with country code if visible
 - Clean up email addresses (remove spaces)
 - Return ONLY the JSON object, no other text"""
-        ).with_model("gemini", "gemini-3-flash-preview")
-        
+        ).with_model("gemini", DEFAULT_MODEL)
+
         image_data = strip_b64_prefix(request.image_base64)
         
         result = await chat.send_message(UserMessage(
@@ -216,7 +204,7 @@ Step 2: [Second step with explanation]
 **Explanation:** [Brief explanation of the concept or method used]
 
 Be thorough but concise. Use proper mathematical notation where possible."""
-        ).with_model("gemini", "gemini-2.5-flash")
+        ).with_model("gemini", DEFAULT_MODEL)
         
         if request.image_base64:
             # Image-based math solving
@@ -225,7 +213,7 @@ Be thorough but concise. Use proper mathematical notation where possible."""
             
             user_message = UserMessage(
                 text="Please analyze this math problem image and solve it step-by-step. Show all your work and explain each step clearly.",
-                image_contents=[image_content]
+                file_contents=[image_content]
             )
         else:
             # Text-based equation solving
@@ -281,14 +269,14 @@ Return JSON format:
     "suggested_tags": ["tag1", "tag2"],
     "summary": "Brief document summary"
 }}"""
-        ).with_model("gemini", "gemini-2.5-flash")
+        ).with_model("gemini", DEFAULT_MODEL)
         
         if request.image_base64:
             clean_base64 = strip_b64_prefix(request.image_base64)
             image_content = ImageContent(image_base64=clean_base64)
             user_message = UserMessage(
                 text="Classify this document and extract key information.",
-                image_contents=[image_content]
+                file_contents=[image_content]
             )
         else:
             user_message = UserMessage(
