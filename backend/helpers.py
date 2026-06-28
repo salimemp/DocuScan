@@ -33,8 +33,15 @@ logger = logging.getLogger(__name__)
 # ── API key + b64 helpers ───────────────────────────────────────────────────
 
 def get_api_key() -> str:
-    """Return the active Gemini API key (or Emergent fallback)."""
-    key = os.environ.get("GEMINI_API_KEY") or os.environ.get("EMERGENT_LLM_KEY")
+    """Return the active Gemini API key.
+
+    Raises HTTP 500 if `GEMINI_API_KEY` is not set. The previous
+    `EMERGENT_LLM_KEY` fallback was dropped 2026-06-28 when the
+    emergentintegrations stub was replaced with the real google-genai
+    client (PR #34) — there's no longer a code path that uses
+    Emergent's universal key.
+    """
+    key = os.environ.get("GEMINI_API_KEY")
     if not key:
         raise HTTPException(500, "No AI API key configured")
     return key
