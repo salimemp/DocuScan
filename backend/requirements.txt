@@ -27,10 +27,14 @@ motor==3.3.1
 pymongo==4.5.0
 
 # ── Auth, JWT, 2FA, passkeys ────────────────────────────────────────────────
+# bcrypt re-added 2026-06-28 — auth.hash_password now uses bcrypt (cost 12)
+# with a SHA-256 pre-hash to support passphrases longer than bcrypt's
+# 72-byte input limit (NIST SP 800-63B allows this). Legacy SHA-256-salt
+# hashes still verify via a format-aware path and are lazily upgraded
+# to bcrypt on next successful login.
 PyJWT==2.11.0
 bcrypt==4.1.3
 cryptography==46.0.5
-passlib==1.7.4
 python-jose[cryptography]==3.5.0
 pyotp==2.9.0
 webauthn==2.7.1
@@ -55,18 +59,25 @@ opencv-python-headless==4.13.0.92
 pillow==12.1.1
 
 # ── Document export generators (exports.py) ───────────────────────────────
+# CairoSVG removed 2026-06-28 — exports.py generates SVG via raw f-strings,
+# never rasterises, so the cairosvg dep was dead weight (and pulled in
+# libcairo system libs).
 fpdf2==2.8.7
 python-docx==1.2.0
 python-pptx==1.0.2
 xlsxwriter==3.2.9
 EbookLib==0.20
-CairoSVG==2.8.2
 markdown2==2.5.5
 
 # ── Emergent LLM proxy (routes Gemini through Emergent's universal key) ────
-emergentintegrations==0.1.0
+# emergentintegrations was never published to PyPI — removed 2026-06-28.
+# The backend now imports a local stub at backend/local_stubs/emergentintegrations/
+# which preserves the import surface but raises NotImplementedError when
+# LlmChat/UserMessage are constructed. AI endpoints return 501 until we
+# migrate to a real LLM client (google-generativeai or anthropic).
+# See backend/local_stubs/emergentintegrations/llm/chat.py for the stub.
 
-# ── Misc runtime utilities ─────────────────────────────────────────────────
+# ── Misc runtime utilities ─────────────────────────────────────────────
 python-dotenv==1.2.1
 python-multipart==0.0.22
 tenacity==9.1.4

@@ -5,11 +5,23 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
+import sys
 import uuid
 from datetime import datetime, timezone
 
-from emergentintegrations.llm.chat import ImageContent, LlmChat, UserMessage
+# The emergentintegrations package was never published to PyPI. Until
+# production migrates to a real LLM client (e.g. google-generativeai),
+# we route the import to a local stub via sys.path. The stub preserves
+# the import surface (ImageContent / LlmChat / UserMessage) but raises
+# NotImplementedError on construction, so the AI endpoints return 501
+# instead of crashing the whole app.
+_STUB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "local_stubs")
+if _STUB_DIR not in sys.path:
+    sys.path.insert(0, _STUB_DIR)
+
+from emergentintegrations.llm.chat import ImageContent, LlmChat, UserMessage  # noqa: E402
 from fastapi import APIRouter, HTTPException
 
 from db import db

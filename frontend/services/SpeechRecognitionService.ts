@@ -1,8 +1,18 @@
 /**
  * Speech Recognition Service for DocScan Pro
- * Provides voice input capabilities with real-time transcription
+ * Provides voice input capabilities with real-time transcription.
+ *
+ * Platform dispatch (2026-06-28 — see FOLLOW_UPS.md #5):
+ *   • Web    → browser SpeechRecognition API (Chrome/Edge/Safari Tech-Preview)
+ *   • Native → @react-native-voice/voice (iOS + Android, requires the
+ *               NSMicrophone + NSSpeechRecognition / RECORD_AUDIO permissions
+ *               declared in app.json — already present.)
+ *
+ * Both paths normalize to the same callback surface (onStart / onEnd /
+ * onResult / onPartialResult / onError) so consumers don't need to branch
+ * on Platform.OS.
  */
-import { Platform, NativeEventEmitter, NativeModules } from 'react-native';
+import { Platform } from 'react-native';
 import { getErrorMessage } from '../utils/errorHelpers';
 
 // Types
@@ -40,39 +50,113 @@ export const SPEECH_LOCALES = {
   'bn-IN': 'Bengali',
 };
 
+// ── Web Speech API type shims (not in standard lib.dom.d.ts) ────────────────
+// The Web Speech API is the W3C draft and is prefixed in Chrome. We only
+// declare the parts we use; everything else is left as `any`.
+
+interface WebSpeechRecognitionResult {
+  readonly transcript: string;
+  readonly confidence: number;
+}
+
+interface WebSpeechRecognitionEvent extends Event {
+  readonly resultIndex: number;
+  readonly results: ArrayLike<{
+    readonly isFinal: boolean;
+    readonly length: number;
+    [index: number]: WebSpeechRecognitionResult;
+  }>;
+}
+
+interface WebSpeechRecognitionErrorEvent extends Event {
+  readonly error: string;
+  readonly message?: string;
+}
+
+interface WebSpeechRecognitionInstance extends EventTarget {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onresult: ((this: WebSpeechRecognitionInstance, ev: WebSpeechRecognitionEvent) => void) | null;
+  onerror: ((this: WebSpeechRecognitionInstance, ev: WebSpeechRecognitionErrorEvent) => void) | null;
+  onend: ((this: WebSpeechRecognitionInstance, ev: Event) => void) | null;
+  onstart: ((this: WebSpeechRecognitionInstance, ev: Event) => void) | null;
+}
+
+type WebSpeechRecognitionCtor = new () => WebSpeechRecognitionInstance;
+
+function getWebSpeechRecognition(): WebSpeechRecognitionCtor | null {
+  if (typeof window === 'undefined') return null;
+  const w = window as unknown as {
+    SpeechRecognition?: WebSpeechRecognitionCtor;
+    webkitSpeechRecognition?: WebSpeechRecognitionCtor;
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
 class SpeechRecognitionService {
   private isInitialized: boolean = false;
   private isListening: boolean = false;
   private currentLocale: string = 'en-US';
   private Voice: any = null;
-  private eventEmitter: NativeEventEmitter | null = null;
-  
+
+  // Web-specific
+  private webRecognition: WebSpeechRecognitionInstance | null = null;
+
   // Callbacks
   private onResultCallback: SpeechRecognitionCallback | null = null;
   private onErrorCallback: SpeechErrorCallback | null = null;
   private onStartCallback: (() => void) | null = null;
   private onEndCallback: (() => void) | null = null;
   private onPartialResultCallback: SpeechRecognitionCallback | null = null;
-  
+
   // Event subscription cleanup
   private subscriptions: any[] = [];
 
   /**
-   * Initialize the speech recognition service
+   * Initialize the speech recognition service for the current platform.
+   * Returns true if the platform's recognition backend is available
+   * (native module on iOS/Android; Web Speech API in browser).
    */
   async initialize(): Promise<boolean> {
     if (this.isInitialized) return true;
-    
-    try {
-      // Dynamic import to handle web platform gracefully
-      const VoiceModule = require('@react-native-voice/voice').default;
-      this.Voice = VoiceModule;
-      
-      if (!this.Voice) {
-        console.log('Speech recognition not available on this platform');
+
+    if (Platform.OS === 'web') {
+      const Ctor = getWebSpeechRecognition();
+      if (!Ctor) {
+        console.log('[Speech] Web SpeechRecognition API not available in this browser');
         return false;
       }
-      
+      this.webRecognition = new Ctor();
+      this.webRecognition.continuous = false;
+      this.webRecognition.interimResults = true;
+      this.webRecognition.maxAlternatives = 1;
+
+      this.webRecognition.onstart = () => this.handleSpeechStart();
+      this.webRecognition.onend = () => this.handleSpeechEnd();
+      this.webRecognition.onerror = (ev) => this.handleWebError(ev);
+      this.webRecognition.onresult = (ev) => this.handleWebResult(ev);
+
+      this.isInitialized = true;
+      return true;
+    }
+
+    try {
+      // Dynamic import so the native module is only loaded on iOS/Android.
+      // On web this require() resolves to a no-op stub (web bundles
+      // shouldn't try to load the native module).
+      const VoiceModule = require('@react-native-voice/voice').default;
+      this.Voice = VoiceModule;
+
+      if (!this.Voice) {
+        console.log('[Speech] Native voice module not available');
+        return false;
+      }
+
       // Set up event listeners with proper cleanup tracking
       this.Voice.onSpeechStart = this.handleSpeechStart.bind(this);
       this.Voice.onSpeechEnd = this.handleSpeechEnd.bind(this);
@@ -81,23 +165,27 @@ class SpeechRecognitionService {
       this.Voice.onSpeechError = this.handleSpeechError.bind(this);
       this.Voice.onSpeechRecognized = this.handleSpeechRecognized.bind(this);
       this.Voice.onSpeechVolumeChanged = this.handleVolumeChanged.bind(this);
-      
+
       this.isInitialized = true;
       return true;
     } catch (error) {
-      console.log('Failed to initialize speech recognition:', error);
+      console.log('[Speech] Failed to initialize native speech recognition:', error);
       return false;
     }
   }
 
   /**
-   * Check if speech recognition is available
+   * Check if speech recognition is available on this platform.
    */
   async isAvailable(): Promise<boolean> {
-    if (!this.Voice) {
-      await this.initialize();
+    if (!this.isInitialized) {
+      const ok = await this.initialize();
+      if (!ok) return false;
     }
-    
+
+    if (Platform.OS === 'web') {
+      return this.webRecognition !== null;
+    }
     try {
       if (this.Voice && this.Voice.isAvailable) {
         return await this.Voice.isAvailable();
@@ -112,10 +200,19 @@ class SpeechRecognitionService {
    * Get available locales for speech recognition
    */
   async getAvailableLocales(): Promise<string[]> {
-    if (!this.Voice) {
+    if (!this.isInitialized) {
       await this.initialize();
     }
-    
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const SpeechRecognition = getWebSpeechRecognition();
+      if (!SpeechRecognition) return Object.keys(SPEECH_LOCALES);
+      // The Web Speech API doesn't expose a list of supported languages,
+      // so we return our curated set and let the browser silently reject
+      // any locale it doesn't support.
+      return Object.keys(SPEECH_LOCALES);
+    }
+
     try {
       if (this.Voice && this.Voice.getSpeechRecognitionServices) {
         return await this.Voice.getSpeechRecognitionServices();
@@ -150,14 +247,40 @@ class SpeechRecognitionService {
       });
       return false;
     }
-    
+
     if (this.isListening) {
       await this.stopListening();
     }
-    
+
+    const locale = options?.locale || this.currentLocale;
+
+    if (Platform.OS === 'web') {
+      if (!this.webRecognition) {
+        this.onErrorCallback?.({
+          code: 'NOT_INITIALIZED',
+          message: 'Web SpeechRecognition not initialized',
+        });
+        return false;
+      }
+      try {
+        this.webRecognition.lang = locale;
+        this.webRecognition.continuous = options?.continuous ?? false;
+        this.webRecognition.interimResults = options?.interimResults ?? true;
+        this.webRecognition.start();
+        this.isListening = true;
+        return true;
+      } catch (error: unknown) {
+        // Browsers throw InvalidStateError if start() is called twice
+        // without an intermediate stop(). Treat as recoverable.
+        this.onErrorCallback?.({
+          code: 'START_ERROR',
+          message: getErrorMessage(error) || 'Failed to start speech recognition',
+        });
+        return false;
+      }
+    }
+
     try {
-      const locale = options?.locale || this.currentLocale;
-      
       await this.Voice.start(locale);
       this.isListening = true;
       return true;
@@ -174,13 +297,23 @@ class SpeechRecognitionService {
    * Stop listening for speech input
    */
   async stopListening(): Promise<void> {
-    if (!this.Voice || !this.isListening) return;
-    
+    if (!this.isListening) return;
+
+    if (Platform.OS === 'web') {
+      if (!this.webRecognition) return;
+      try {
+        this.webRecognition.stop();
+      } catch (error) {
+        console.log('[Speech] Error stopping web recognition:', error);
+      }
+      return;
+    }
+
+    if (!this.Voice) return;
     try {
       await this.Voice.stop();
-      this.isListening = false;
     } catch (error) {
-      console.log('Error stopping speech recognition:', error);
+      console.log('[Speech] Error stopping speech recognition:', error);
     }
   }
 
@@ -188,14 +321,23 @@ class SpeechRecognitionService {
    * Cancel speech recognition
    */
   async cancel(): Promise<void> {
+    if (Platform.OS === 'web') {
+      if (!this.webRecognition) return;
+      try {
+        this.webRecognition.abort();
+      } catch (error) {
+        console.log('[Speech] Error canceling web recognition:', error);
+      }
+      this.isListening = false;
+      return;
+    }
     if (!this.Voice) return;
-    
     try {
       await this.Voice.cancel();
-      this.isListening = false;
     } catch (error) {
-      console.log('Error canceling speech recognition:', error);
+      console.log('[Speech] Error canceling speech recognition:', error);
     }
+    this.isListening = false;
   }
 
   /**
@@ -207,10 +349,20 @@ class SpeechRecognitionService {
       if (this.isListening) {
         await this.cancel();
       }
-      
-      if (this.Voice) {
+
+      if (Platform.OS === 'web') {
+        if (this.webRecognition) {
+          // Detach handlers to avoid leaks when the Web SpeechRecognition
+          // object is GC'd. Browsers will fire onend on their own.
+          this.webRecognition.onresult = null;
+          this.webRecognition.onerror = null;
+          this.webRecognition.onend = null;
+          this.webRecognition.onstart = null;
+          this.webRecognition = null;
+        }
+      } else if (this.Voice) {
         await this.Voice.destroy();
-        
+
         // Clear all callbacks
         this.Voice.onSpeechStart = null;
         this.Voice.onSpeechEnd = null;
@@ -220,22 +372,22 @@ class SpeechRecognitionService {
         this.Voice.onSpeechRecognized = null;
         this.Voice.onSpeechVolumeChanged = null;
       }
-      
+
       // Clear local callbacks
       this.onResultCallback = null;
       this.onErrorCallback = null;
       this.onStartCallback = null;
       this.onEndCallback = null;
       this.onPartialResultCallback = null;
-      
+
       // Clear subscriptions
       this.subscriptions.forEach(sub => sub?.remove?.());
       this.subscriptions = [];
-      
+
       this.isInitialized = false;
       this.isListening = false;
     } catch (error) {
-      console.log('Error destroying speech recognition:', error);
+      console.log('[Speech] Error destroying speech recognition:', error);
     }
   }
 
@@ -246,7 +398,8 @@ class SpeechRecognitionService {
     return this.isListening;
   }
 
-  // Event handlers
+  // ── Event handlers ──────────────────────────────────────────────────────
+
   private handleSpeechStart(): void {
     this.isListening = true;
     this.onStartCallback?.();
@@ -287,15 +440,49 @@ class SpeechRecognitionService {
     });
   }
 
-  private handleSpeechRecognized(event: any): void {
+  private handleSpeechRecognized(_event: any): void {
     // Handle recognition event if needed
   }
 
-  private handleVolumeChanged(event: any): void {
+  private handleVolumeChanged(_event: any): void {
     // Handle volume changes for visual feedback if needed
   }
 
-  // Callback setters
+  // Web event handlers — the W3C SpeechRecognitionEvent shape is different
+  // from @react-native-voice's, so we normalize here.
+
+  private handleWebResult(ev: WebSpeechRecognitionEvent): void {
+    // The Web Speech API may emit multiple results per event (one per
+    // finalized phrase + interim phrases). We forward each as its own
+    // result/partialResult depending on `isFinal`.
+    const results = Array.from(ev.results ?? []);
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      const alt = r[0];
+      if (!alt) continue;
+      const payload: SpeechRecognitionResult = {
+        text: alt.transcript ?? '',
+        confidence: alt.confidence ?? 0,
+        isFinal: !!r.isFinal,
+      };
+      if (payload.isFinal) {
+        this.onResultCallback?.(payload);
+      } else {
+        this.onPartialResultCallback?.(payload);
+      }
+    }
+  }
+
+  private handleWebError(ev: WebSpeechRecognitionErrorEvent): void {
+    this.isListening = false;
+    this.onErrorCallback?.({
+      code: ev.error || 'UNKNOWN',
+      message: ev.message || `Speech recognition error: ${ev.error}`,
+    });
+  }
+
+  // ── Callback setters ────────────────────────────────────────────────────
+
   onResult(callback: SpeechRecognitionCallback): void {
     this.onResultCallback = callback;
   }
