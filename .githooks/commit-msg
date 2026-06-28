@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# .githooks/commit-msg — DocScan Pro commit-message guard
+#
+# Rejects:
+#   * Empty first lines
+#   * The "auto-commit for <uuid>" pattern that polluted history with
+#     428 low-information commits
+#   * First lines shorter than 10 characters (encourages real descriptions)
+#
+# Optional: enforce Conventional Commits (feat:, fix:, chore:, etc.) by
+# uncommenting the type check at the bottom.
+#
+# Enable:  git config core.hooksPath .githooks
+# Bypass:  git commit --no-verify (use sparingly)
+
+set -euo pipefail
+
+msg_file="$1"
+first_line=$(head -n1 "$msg_file")
+
+# Strip leading whitespace
+first_line="${first_line#"${first_line%%[![:space:]]*}"}"
+
+if [ -z "$first_line" ]; then
+  echo "❌ Commit message is empty. Please describe what changed and why." >&2
+  exit 1
+fi
+
+# Junk pattern: literal "auto-commit for <uuid>" with no other context.
+if [[ "$first_line" =~ ^auto-commit\ for\ [0-9a-fA-F-]+$ ]]; then
+  echo "❌ Junk commit message rejected: '$first_line'" >&2
+  echo "   Use a real description of what changed (e.g. 'fix(auth): upgrade SHA-256 to bcrypt')." >&2
+  exit 1
+fi
+
+# Too short — encourages real descriptions instead of "fix" / "update".
+if [ "${#first_line}" -lt 10 ]; then
+  echo "❌ Commit subject too short (${#first_line} chars; minimum 10)." >&2
+  echo "   Got: '$first_line'" >&2
+  echo "   Try: 'fix(scope): clear, descriptive summary of what changed'." >&2
+  exit 1
+fi
+
+# ── Optional Conventional Commits enforcement ──────────────────────────────
+# Uncomment to require the <type>(<scope>): <subject> format.
+#
+# if ! [[ "$first_line" =~ ^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([a-zA-Z0-9_./-]+\))?:\  ]]; then
+#   echo "❌ Commit subject must follow Conventional Commits:" >&2
+#   echo "   <type>(<scope>): <subject>" >&2
+#   echo "   e.g. 'fix(auth): upgrade password hashing to bcrypt'" >&2
+#   echo "   Got: '$first_line'" >&2
+#   exit 1
+# fi
+
+exit 0

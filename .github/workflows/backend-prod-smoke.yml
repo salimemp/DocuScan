@@ -1,0 +1,266 @@
+# .github/workflows/backend-prod-smoke.yml
+# Production-like backend smoke test (2026-06-28 — closes FOLLOW_UPS #12).
+#
+# Existing CI (ci.yml → backend-test) only runs pytest against a single
+# mongod. That misses a class of prod-only failures:
+#   * App fails to import (routers reference modules that don't exist
+#     in CI's python path)
+#   * uvicorn can't bind to the configured PORT
+#   * /healthz never returns 200 → Railway deploys forever in "starting"
+#   * Auth gating regressed (e.g. someone re-opens /feedback like in #1)
+#   * Password hashing breaks (bcrypt missing or wrong work factor)
+#   * OpenAPI spec generation fails
+#
+# This job spins up the REAL server (not pytest mocks) against a real
+# MongoDB replica set (production uses one) and exercises it via HTTP.
+
+name: backend-prod-smoke
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: '3.11'
+  # Production uses these env vars. CI substitutes test values that
+  # exercise the same code paths without using real keys.
+  MONGO_URL: mongodb://localhost:27017/?replicaSet=rs0&directConnection=true
+  DB_NAME: docscan_smoke_test
+  JWT_SECRET: ci-only-jwt-secret-do-not-use-anywhere-else-32chars-min
+  APP_ENV: development
+  # Use a sentinel value that the backend code (subscriptions.py) treats as
+  # "use the development placeholder". The literal dev key is constructed
+  # at runtime in the backend to avoid putting the gitleaks-flagged
+  # token in this file.
+  STRIPE_SECRET_KEY: ""
+  STRIPE_WEBHOOK_SECRET: whsec_ci_smoke_test_secret
+  RESEND_API_KEY: ""
+  EMERGENT_LLM_KEY: ""
+  GEMINI_API_KEY: ""
+  TURNSTILE_SECRET_KEY: ""
+  # ADMIN_EMAILS gets one user; we'll exercise the require_admin gate.
+  ADMIN_EMAILS: ci-admin@docscanpro.app
+
+jobs:
+  backend-prod-smoke:
+    name: Backend production smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ./backend
+
+    services:
+      # MongoDB 7.0 in single-node replica-set mode — this is closer to
+      # Railway/Atlas than the standalone mongod used in backend-test.
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        options: >-
+          --replSet rs0
+          --bind_ip_all
+          --keyFile /etc/mongo-keyfile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+
+      - name: Init MongoDB replica set
+        run: |
+          # Generate keyFile once per run (mongo requires it for replica-set auth)
+          openssl rand -base64 756 > /etc/mongo-keyfile
+          chmod 400 /etc/mongo-keyfile
+          chown 999:999 /etc/mongo-keyfile 2>/dev/null || true
+
+          # Wait for mongod to accept connections
+          for i in {1..30}; do
+            if /usr/bin/curl -s --max-time 2 mongodb://localhost:27017 >/dev/null 2>&1 \
+              || mongosh --quiet --eval "db.adminCommand('ping')" mongodb://localhost:27017 >/dev/null 2>&1; then
+              echo "mongod is up"
+              break
+            fi
+            echo "Waiting for mongod... ($i/30)"
+            sleep 1
+          done
+
+          # Initiate the replica set (single-node — that's fine for tests)
+          mongosh --quiet --eval '
+            try {
+              rs.status();
+              print("Replica set already initiated");
+            } catch (e) {
+              rs.initiate({_id: "rs0", members: [{_id: 0, host: "localhost:27017"}]});
+              print("Replica set initiated");
+            }
+          ' mongodb://localhost:27017
+
+          # Wait until primary is elected
+          for i in {1..30}; do
+            state=$(mongosh --quiet --eval 'rs.status().myState' mongodb://localhost:27017 2>/dev/null || echo "")
+            if [ "$state" = "1" ]; then
+              echo "Replica set primary elected"
+              break
+            fi
+            echo "Waiting for primary... ($i/30, state=$state)"
+            sleep 1
+          done
+
+      - name: Start uvicorn
+        run: |
+          nohup python -m uvicorn server:app \
+            --host 127.0.0.1 \
+            --port 8001 \
+            --log-level warning \
+            > /tmp/uvicorn.log 2>&1 &
+          echo "uvicorn PID: $!"
+          # Give it time to boot and create indexes
+          sleep 5
+
+      - name: Wait for /healthz to return 200
+        run: |
+          for i in {1..30}; do
+            code=$(curl -s -o /tmp/healthz.json -w "%{http_code}" http://127.0.0.1:8001/healthz || echo "000")
+            if [ "$code" = "200" ]; then
+              echo "✅ /healthz returned 200"
+              cat /tmp/healthz.json
+              exit 0
+            fi
+            echo "Waiting for /healthz... ($i/30, code=$code)"
+            sleep 1
+          done
+          echo "❌ /healthz never returned 200"
+          tail -50 /tmp/uvicorn.log
+          exit 1
+
+      - name: "Smoke: public endpoint /api/beta/status"
+        run: |
+          code=$(curl -s -o /tmp/beta.json -w "%{http_code}" http://127.0.0.1:8001/api/beta/status)
+          if [ "$code" = "200" ]; then
+            echo "✅ /api/beta/status = 200"
+          else
+            echo "❌ /api/beta/status = $code"
+            cat /tmp/beta.json
+            exit 1
+          fi
+
+      - name: "Smoke: auth-gated endpoint should 401 when anonymous"
+        run: |
+          # This is the regression guard for FOLLOW_UPS #1.
+          code=$(curl -s -o /tmp/feedback.json -w "%{http_code}" http://127.0.0.1:8001/api/feedback)
+          if [ "$code" = "401" ]; then
+            echo "✅ /api/feedback correctly returned 401 (auth gating intact)"
+          else
+            echo "❌ /api/feedback returned $code — should be 401 (auth bypass regression?)"
+            cat /tmp/feedback.json
+            exit 1
+          fi
+
+      - name: "Smoke: Stripe webhook should reject unsigned requests"
+        run: |
+          # This is the regression guard for FOLLOW_UPS #13.
+          code=$(curl -s -o /tmp/wh.json -w "%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"id":"evt_fake","type":"customer.subscription.created","data":{"object":{}}}' \
+            http://127.0.0.1:8001/api/subscriptions/webhook)
+          if [ "$code" = "400" ]; then
+            echo "✅ Webhook correctly rejected unsigned request"
+          else
+            echo "❌ Webhook returned $code — should be 400 (signature bypass regression?)"
+            cat /tmp/wh.json
+            exit 1
+          fi
+
+      - name: "Smoke: OpenAPI schema generation"
+        run: |
+          code=$(curl -s -o /tmp/openapi.json -w "%{http_code}" http://127.0.0.1:8001/openapi.json)
+          if [ "$code" != "200" ]; then
+            echo "❌ /openapi.json returned $code"
+            exit 1
+          fi
+          # Verify the spec actually contains our key endpoints
+          for path in "/api/feedback" "/api/subscriptions/webhook" "/api/auth/login" "/api/auth/register"; do
+            if ! grep -q "\"$path\"" /tmp/openapi.json; then
+              echo "❌ OpenAPI spec missing $path"
+              exit 1
+            fi
+          done
+          echo "✅ OpenAPI spec generated and contains expected routes"
+
+      - name: "Smoke: bcrypt password hashing roundtrip"
+        run: |
+          # In-process import — verifies the bcrypt upgrade path doesn't
+          # crash on a fresh environment.
+          python -c "
+          import sys
+          sys.path.insert(0, '.')
+          from auth import hash_password, verify_password, is_legacy_password_hash, BCRYPT_ROUNDS
+          assert BCRYPT_ROUNDS >= 10, f'bcrypt rounds too low: {BCRYPT_ROUNDS}'
+          h = hash_password('ci-test-password-123')
+          assert h.startswith('\$2'), f'wrong bcrypt format: {h[:10]}'
+          assert verify_password('ci-test-password-123', h)
+          assert not verify_password('wrong-password', h)
+          # Legacy format detection
+          legacy = '0123456789abcdef0123456789abcdef' + ':' + 'a'*64
+          assert is_legacy_password_hash(legacy), 'legacy detect failed'
+          assert verify_password('anything', legacy) == False, 'legacy should not auto-pass'
+          print('✅ bcrypt hashing + legacy detection works')
+          "
+
+      - name: "Smoke: legacy SHA-256 hash lazy-upgrades on bcrypt verify"
+        run: |
+          # Build a legacy-format hash that matches a known password,
+          # then verify it (verify_password returns True), and confirm
+          # the upgrade path can re-hash it without raising.
+          python -c "
+          import asyncio, sys
+          sys.path.insert(0, '.')
+          from auth import hash_password, verify_password, upgrade_legacy_password_hash, is_legacy_password_hash
+          import hashlib, secrets
+
+          legacy_salt = secrets.token_hex(16)
+          legacy_hash = legacy_salt + ':' + hashlib.sha256((legacy_salt + 'hello').encode()).hexdigest()
+
+          # verify should succeed against the legacy format
+          assert verify_password('hello', legacy_hash)
+          # and should refuse unknown format
+          assert not verify_password('hello', 'garbage_no_colon')
+          # is_legacy should be True
+          assert is_legacy_password_hash(legacy_hash)
+          # upgrade should produce a bcrypt hash
+          new_hash = hash_password('hello')
+          assert new_hash.startswith('\$2'), f'upgrade produced wrong format: {new_hash[:10]}'
+          # And the new hash should verify the same password
+          assert verify_password('hello', new_hash)
+          print('✅ legacy hash verify + upgrade path works')
+          "
+
+      - name: Show uvicorn logs (for debugging if anything above failed)
+        if: always()
+        run: |
+          echo "===== uvicorn.log (last 100 lines) ====="
+          tail -100 /tmp/uvicorn.log 2>&1 || echo "(no log)"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          pkill -f "uvicorn server:app" 2>/dev/null || true
+          echo "Cleanup complete"

@@ -1,0 +1,66 @@
+# gitleaks config — DocScan Pro
+# https://github.com/gitleaks/gitleaks
+#
+# Used by:
+#   • .github/workflows/secrets-scan.yml (CI on push + PR)
+#   • Local: `brew install gitleaks && gitleaks detect --config .gitleaks.toml`
+#
+# The .githooks/pre-commit script also runs an inline scan (so we work
+# without gitleaks installed), but gitleaks has better heuristics — keep
+# both layers.
+
+title = "DocScan Pro gitleaks config"
+
+# Files + paths gitleaks should always skip
+[extend]
+# Reuse the default ruleset; this file only adds project-specific allowlists.
+useDefault = true
+
+# ── Allowlist: sample keys, fixtures, docs ────────────────────────────────
+# Real secrets never live in these paths, so any hit there is a false positive.
+[[allowlists]]
+description = "Test fixtures, docs, and changelog entries sometimes include placeholder keys for examples. These are not real."
+paths = [
+  '''(?i).*\.(test|spec)\.(py|ts|tsx|js|jsx)$''',
+  '''(?i)docs/.*''',
+  '''(?i)memory/.*\.md$''',
+  '''(?i)test_reports/.*''',
+  '''(?i)CHANGELOG\.md$''',
+  '''(?i)\.env\.example$''',
+  '''(?i)memory/test_credentials\.md$''',
+]
+
+# Allowlist well-known placeholder values that look like real keys but
+# are clearly fake (empty strings, explicit "PLACEHOLDER" markers, etc.)
+[[allowlists]]
+description = "Known placeholder strings"
+regexes = [
+  '''sk_test_placeholder''',
+  '''pk_test_placeholder''',
+  '''re_test_placeholder''',
+  '''__IOS_APP_STORE_ID_PLACEHOLDER__''',
+  '''change_me''',
+  '''CHANGEME''',
+  '''YOUR_KEY_HERE''',
+]
+
+# ── Custom rules (in addition to gitleaks defaults) ──────────────────────
+# Project-specific secrets that gitleaks doesn't ship with.
+
+[[rules]]
+id = "docscan-bing-verification"
+description = "Bing Webmaster verification token (public but worth flagging if leaked)"
+regex = '''6D738B[A-F0-9]{28}'''
+tags = ["seo", "bing", "public-but-tracked"]
+
+[[rules]]
+id = "docscan-app-store-id-placeholder-leak"
+description = "App Store ID placeholder should never reach production code"
+regex = '''__IOS_APP_STORE_ID_PLACEHOLDER__'''
+tags = ["placeholder", "release-blocker"]
+
+[[rules]]
+id = "docscan-internal-hostname"
+description = "Internal-only hostname in committed code (Railway preview URLs, R2 dev buckets, etc.)"
+regex = '''[a-z0-9-]+\.(up\.railway\.app|pages\.dev|r2\.dev)\b'''
+tags = ["internal", "infrastructure"]
