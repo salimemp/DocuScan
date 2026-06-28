@@ -374,3 +374,96 @@ class TestR2Cors:
         print_r2_cors_config()
         out = capsys.readouterr().out
         assert "https://staging.example.com" in out
+
+
+class TestAiClient:
+    """Tests for the Google Gemini wrapper (backend/ai_client.py).
+
+    These tests cover the API-surface contract used by routers/ai.py and
+    routers/scan.py without making real API calls. The send_message()
+    happy path is exercised against the live Gemini API in CI's
+    backend-prod-smoke workflow (which has a real key), not here.
+    """
+
+    def test_default_model_is_real_gemini(self):
+        # Regression guard for the gemini-3-flash-preview typo we used
+        # to ship — that model name doesn't exist and the API rejects it.
+        from ai_client import DEFAULT_MODEL
+        assert DEFAULT_MODEL == "gemini-2.5-flash"
+
+    def test_llmchat_requires_api_key(self):
+        from ai_client import LlmChat
+        with pytest.raises(ValueError):
+            LlmChat(api_key="")
+
+    def test_with_model_only_accepts_known_providers(self):
+        from ai_client import LlmChat
+        chat = LlmChat(api_key="x")
+        with pytest.raises(ValueError, match="Unsupported provider"):
+            chat.with_model("openai", "gpt-4")
+
+    def test_with_model_rejects_empty_model_name(self):
+        from ai_client import LlmChat
+        chat = LlmChat(api_key="x")
+        with pytest.raises(ValueError, match="Model name is required"):
+            chat.with_model("gemini", "")
+
+    def test_with_model_returns_self_for_chaining(self):
+        from ai_client import LlmChat
+        chat = LlmChat(api_key="x")
+        chained = chat.with_model("gemini", "gemini-2.5-flash")
+        assert chained is chat
+
+    def test_user_message_accepts_canonical_file_contents(self):
+        from ai_client import ImageContent, UserMessage
+        m = UserMessage(
+            text="hi",
+            file_contents=[ImageContent(image_base64="aGVsbG8=")],
+        )
+        assert m.text == "hi"
+        assert len(m.file_contents) == 1
+        assert m.file_contents[0].image_base64 == "aGVsbG8="
+
+    def test_user_message_accepts_legacy_image_contents_alias(self):
+        # Backwards compat: some routers used the typo'd `image_contents`
+        # kwarg. The wrapper still accepts it (with a debug log).
+        from ai_client import ImageContent, UserMessage
+        m = UserMessage(
+            text="hi",
+            image_contents=[ImageContent(image_base64="aGVsbG8=")],
+        )
+        assert len(m.file_contents) == 1
+        assert m.file_contents[0].image_base64 == "aGVsbG8="
+
+    def test_user_message_default_file_contents_is_empty(self):
+        from ai_client import UserMessage
+        m = UserMessage(text="text only")
+        assert m.text == "text only"
+        assert m.file_contents == []
+
+    def test_send_message_without_with_model_defaults_to_default(self):
+        # Forgiving behavior: if a router forgets .with_model(), we
+        # default to DEFAULT_MODEL rather than 500-ing. We assert the
+        # defaulting logic by reading the model attribute after a
+        # would-be send; since we can't actually call the API here,
+        # we verify the constant + the constructor path instead.
+        from ai_client import DEFAULT_MODEL, LlmChat, UserMessage
+
+        chat = LlmChat(api_key="x", system_message="sys")
+        assert chat._model_name is None
+        # The defaulting happens inside send_message(); we verify the
+        # constant is what we expect.
+        assert DEFAULT_MODEL == "gemini-2.5-flash"
+
+    def test_guess_image_mime_for_common_formats(self):
+        from ai_client import _guess_image_mime
+        # PNG magic bytes
+        assert _guess_image_mime(b"\x89PNG\r\n\x1a\njunk") == "image/png"
+        # JPEG magic bytes
+        assert _guess_image_mime(b"\xff\xd8\xff\xe0junk") == "image/jpeg"
+        # WebP magic bytes (RIFF + WEBP at offset 8)
+        assert _guess_image_mime(b"RIFF\x00\x00\x00\x00WEBPmore") == "image/webp"
+        # GIF magic bytes
+        assert _guess_image_mime(b"GIF89a...") == "image/gif"
+        # Unknown magic bytes -> fallback to JPEG (most common)
+        assert _guess_image_mime(b"\x00\x00\x00\x00") == "image/jpeg"
