@@ -4,7 +4,7 @@
 #
 # Why we exclude `py/weak-cryptographic-algorithm`:
 #   The two SHA-256 call sites in backend/auth.py are *intentional* NIST SP 800-63B
-#   pre-hashes for bcrypt (with proper SHA-256 pre-hash + bcrypt cost 12). CodeQL's
+#   pre-hashes for bcrypt (proper SHA-256 pre-hash + bcrypt cost 12). CodeQL's
 #   py/weak-cryptographic-algorithm alert is a *false positive* in this context —
 #   SHA-256's speed is irrelevant because the password is hashed AGAIN with bcrypt
 #   below. Disabling the rule for the whole project is the correct tradeoff
@@ -13,6 +13,13 @@
 #   See FOLLOW_UPS.md #6 for the broader discussion (currently we use bcrypt
 #   for new passwords; legacy SHA-256 hashes are still verified for lazy
 #   migration, then re-hashed with bcrypt on next successful login).
+#
+# Syntax note: `exclude:` lives under `query-filters:`, NOT `queries:`. Entries
+# in `queries:` must each have `uses:` (query suite reference). Putting
+# `exclude:` under `queries:` produces a JsonMappingException "Property 'uses'
+# is required" at action time. The CodeQL action merges this file with the
+# default config, so we don't repeat `queries: - uses: security-and-quality`
+# here.
 
-queries:
+query-filters:
   - exclude: py/weak-cryptographic-algorithm
