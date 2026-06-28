@@ -58,6 +58,11 @@ concurrency:
 permissions:
   contents: read
   deployments: write
+  # Required so marocchino/sticky-pull-request-comment@v2 can post the
+  # preview URL as a sticky comment on PRs (added 2026-06-28; same
+  # fix that lives on PR #31's branch — duplicating here so PRs branch
+  # off main work too).
+  pull-requests: write
 
 env:
   NODE_VERSION: '20'

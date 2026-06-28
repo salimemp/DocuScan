@@ -70,9 +70,14 @@ EbookLib==0.20
 markdown2==2.5.5
 
 # ── Emergent LLM proxy (routes Gemini through Emergent's universal key) ────
-emergentintegrations==0.1.0
+# emergentintegrations was never published to PyPI — removed 2026-06-28.
+# The backend now imports a local stub at backend/local_stubs/emergentintegrations/
+# which preserves the import surface but raises NotImplementedError when
+# LlmChat/UserMessage are constructed. AI endpoints return 501 until we
+# migrate to a real LLM client (google-generativeai or anthropic).
+# See backend/local_stubs/emergentintegrations/llm/chat.py for the stub.
 
-# ── Misc runtime utilities ─────────────────────────────────────────────────
+# ── Misc runtime utilities ─────────────────────────────────────────────
 python-dotenv==1.2.1
 python-multipart==0.0.22
 tenacity==9.1.4
