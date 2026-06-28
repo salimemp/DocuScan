@@ -182,10 +182,10 @@ BCRYPT_ROUNDS = 12  # 2^12 = ~250ms per hash on modern x86. OWASP recommends ≥
 
 def _bcrypt_input(password: str) -> bytes:
     """Pre-hash a password so it fits within bcrypt's 72-byte input limit."""
-    # CodeQL false positive: SHA-256 here is the NIST SP 800-63B-approved
+    # codeql[py/weak-cryptographic-algorithm]: SHA-256 here is the NIST SP 800-63B-approved
     # pre-hash for bcrypt. The password is hashed AGAIN with bcrypt (cost 12)
     # below — the strength is bcrypt's work factor, not SHA-256's speed.
-    return hashlib.sha256(password.encode("utf-8")).digest()  # codeql[py/weak-cryptographic-algorithm]
+    return hashlib.sha256(password.encode("utf-8")).digest()
 
 
 def hash_password(password: str) -> str:
@@ -208,12 +208,11 @@ def verify_legacy_password(password: str, stored_hash: str) -> bool:
     `upgrade_legacy_password_hash` after a successful legacy verify."""
     try:
         salt, hashed = stored_hash.split(":", 1)
-        # CodeQL false positive: this verifies pre-existing legacy hashes
-        # from before the bcrypt migration. The hashes already exist in the
-        # DB with this format; we can't change them without a forced reset.
-        # The user is upgraded to bcrypt on next successful verify via
-        # `upgrade_legacy_password_hash`.
-        return hashlib.sha256(f"{salt}{password}".encode("utf-8")).hexdigest() == hashed  # codeql[py/weak-cryptographic-algorithm]
+        # codeql[py/weak-cryptographic-algorithm]: this verifies pre-existing legacy SHA-256 hashes
+        # from before the bcrypt migration. The hashes already exist in the DB with this
+        # format; we can't change them without a forced reset. The user is upgraded to
+        # bcrypt on next successful verify via `upgrade_legacy_password_hash`.
+        return hashlib.sha256(f"{salt}{password}".encode("utf-8")).hexdigest() == hashed
     except Exception:
         return False
 
