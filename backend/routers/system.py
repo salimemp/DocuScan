@@ -8,9 +8,10 @@ from typing import Annotated, Any
 
 import resend
 
-from fastapi import APIRouter, Body, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from auth import require_admin
 from db import db
 from helpers import send_email
 from models import (
@@ -220,8 +221,13 @@ async def submit_feedback(
 
 
 @router.get("/feedback")
-async def get_all_feedback():
-    """Get all feedback (admin endpoint)"""
+async def get_all_feedback(_admin: dict = Depends(require_admin)):
+    """Get all feedback (admin endpoint).
+
+    Previously this returned ALL user-submitted feedback (including
+    email addresses and free-text messages) to any anonymous caller.
+    That was an active data leak. Now gated behind require_admin.
+    """
     feedback_collection = db.feedback
     feedbacks = []
     cursor = feedback_collection.find({}).sort("created_at", -1).limit(100)
@@ -232,7 +238,10 @@ async def get_all_feedback():
 
 
 @router.get("/feedback/stats")
-async def get_feedback_stats():
+async def get_feedback_stats(_admin: dict = Depends(require_admin)):
+    """Aggregate feedback stats. Admin-only — same data-leak fix as
+    GET /feedback above.
+    """
     feedback_collection = db.feedback
     total = await feedback_collection.count_documents({})
     pipeline = [{"$group": {"_id": None, "avg_rating": {"$avg": "$rating"}, "count": {"$sum": 1}}}]

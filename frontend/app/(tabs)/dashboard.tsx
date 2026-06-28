@@ -12,7 +12,6 @@ import { useTheme } from '../../hooks/useTheme';
 import { useLanguage } from '../../hooks/useLanguage';
 import { useVoiceCommands } from '../../hooks/useVoiceCommands';
 import { CookieConsentBanner } from '../../components/CookieConsentBanner';
-import { PoweredByElixio } from '../../components/PoweredByElixio';
 import { CloudProviderIcon } from '../../components/CloudProviderIcon';
 import { VoiceCommandsHelp } from '../../components/VoiceCommandsHelp';
 import { getErrorMessage } from '../../utils/errorHelpers';
@@ -1082,9 +1081,6 @@ export default function DashboardScreen() {
         visible={showVoiceHelp}
         onClose={() => setShowVoiceHelp(false)}
       />
-
-      {/* Powered By Elixio Digital */}
-      <PoweredByElixio style={{ bottom: 90 }} />
 
       {/* Cookie Consent Banner */}
       <CookieConsentBanner />

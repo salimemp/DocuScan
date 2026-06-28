@@ -7,11 +7,20 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
+import sys
 import uuid
 from typing import Dict, List, Optional
 
-from emergentintegrations.llm.chat import ImageContent, LlmChat, UserMessage
+# See routers/ai.py for the rationale behind this local stub. The
+# emergentintegrations package was never on PyPI; the stub preserves
+# the import surface so the rest of the app boots.
+_STUB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "local_stubs")
+if _STUB_DIR not in sys.path:
+    sys.path.insert(0, _STUB_DIR)
+
+from emergentintegrations.llm.chat import ImageContent, LlmChat, UserMessage  # noqa: E402
 from fastapi import APIRouter, HTTPException
 
 from db import db
