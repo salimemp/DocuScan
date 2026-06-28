@@ -139,7 +139,6 @@ class TestHelpers:
     def test_get_api_key_raises_without_env(self, monkeypatch):
         from helpers import get_api_key
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-        monkeypatch.delenv("EMERGENT_LLM_KEY", raising=False)
         from fastapi import HTTPException
         with pytest.raises(HTTPException):
             get_api_key()
@@ -147,7 +146,6 @@ class TestHelpers:
     def test_get_api_key_returns_first_available(self, monkeypatch):
         from helpers import get_api_key
         monkeypatch.setenv("GEMINI_API_KEY", "gemini-test")
-        monkeypatch.delenv("EMERGENT_LLM_KEY", raising=False)
         assert get_api_key() == "gemini-test"
 
     def test_get_email_template_signature_request(self):

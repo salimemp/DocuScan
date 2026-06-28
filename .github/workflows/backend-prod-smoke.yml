@@ -41,7 +41,6 @@ env:
   STRIPE_SECRET_KEY: ""
   STRIPE_WEBHOOK_SECRET: whsec_ci_smoke_test_secret
   RESEND_API_KEY: ""
-  EMERGENT_LLM_KEY: ""
   GEMINI_API_KEY: ""
   TURNSTILE_SECRET_KEY: ""
   ADMIN_EMAILS: ci-admin@docscanpro.app

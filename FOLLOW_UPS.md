@@ -284,7 +284,7 @@ Better: use `gitleaks` (https://github.com/gitleaks/gitleaks) as a pre-commit + 
 
 ### Open follow-ups (post-rotation)
 
-- Update Railway env vars (`EMERGENT_LLM_KEY`, `GEMINI_API_KEY`, `RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`, etc.) with the new values.
+- Update Railway env vars (`GEMINI_API_KEY`, `RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`, etc.) with the new values.
 - Update `JWT_SECRET` while you're at it (it's been in `.env.example` forever; if it ever made it into history, rotate it).
 - The 28-day refresh-token TTL (`auth.py:186`) is also worth revisiting — 7 days for access, 28 days for refresh is generous. There's no token revocation list, so a stolen refresh token is valid for nearly a month.
 
