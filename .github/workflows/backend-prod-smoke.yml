@@ -30,7 +30,7 @@ env:
   PYTHON_VERSION: '3.11'
   # Production uses these env vars. CI substitutes test values that
   # exercise the same code paths without using real keys.
-  MONGO_URL: mongodb://localhost:27017/?replicaSet=rs0&directConnection=true
+  MONGO_URL: mongodb://localhost:27017/?replicaSet=rs0
   DB_NAME: docscan_smoke_test
   JWT_SECRET: ci-only-jwt-secret-do-not-use-anywhere-else-32chars-min
   APP_ENV: development
@@ -40,7 +40,6 @@ env:
   EMERGENT_LLM_KEY: ""
   GEMINI_API_KEY: ""
   TURNSTILE_SECRET_KEY: ""
-  # ADMIN_EMAILS gets one user; we'll exercise the require_admin gate.
   ADMIN_EMAILS: ci-admin@docscanpro.app
 
 jobs:
@@ -48,21 +47,29 @@ jobs:
     name: Backend production smoke test
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: ./backend
 
     services:
-      # MongoDB 7.0 in single-node replica-set mode — this is closer to
-      # Railway/Atlas than the standalone mongod used in backend-test.
+      # MongoDB 7.0 in single-node replica-set mode. The replica-set flag
+      # is passed to mongod via the service `command:` block (not via
+      # `options:` — those go to docker, not mongod).
       mongodb:
         image: mongo:7.0
         ports:
           - 27017:27017
+        env:
+          MONGO_INITDB_ROOT_USERNAME: ""
+          MONGO_INITDB_ROOT_PASSWORD: ""
         options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ping:1}).ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        # mongod flags for single-node replica set. The `--replSet rs0`
+        # arg must go here, NOT in options: (options are docker flags).
+        command: >
+          mongod
           --replSet rs0
           --bind_ip_all
-          --keyFile /etc/mongo-keyfile
 
     steps:
       - name: Checkout
@@ -74,22 +81,16 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
+        working-directory: backend
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest pytest-asyncio httpx
 
-      - name: Init MongoDB replica set
+      - name: Wait for MongoDB
         run: |
-          # Generate keyFile once per run (mongo requires it for replica-set auth)
-          openssl rand -base64 756 > /etc/mongo-keyfile
-          chmod 400 /etc/mongo-keyfile
-          chown 999:999 /etc/mongo-keyfile 2>/dev/null || true
-
-          # Wait for mongod to accept connections
           for i in {1..30}; do
-            if /usr/bin/curl -s --max-time 2 mongodb://localhost:27017 >/dev/null 2>&1 \
-              || mongosh --quiet --eval "db.adminCommand('ping')" mongodb://localhost:27017 >/dev/null 2>&1; then
+            if mongosh --quiet --eval 'db.adminCommand({ping:1}).ok' mongodb://localhost:27017 >/dev/null 2>&1; then
               echo "mongod is up"
               break
             fi
@@ -97,7 +98,10 @@ jobs:
             sleep 1
           done
 
-          # Initiate the replica set (single-node — that's fine for tests)
+      - name: Initiate MongoDB replica set
+        run: |
+          # One-time init for the single-node replica set. mongod was
+          # started with --replSet rs0 but no config yet.
           mongosh --quiet --eval '
             try {
               rs.status();
@@ -108,7 +112,7 @@ jobs:
             }
           ' mongodb://localhost:27017
 
-          # Wait until primary is elected
+          # Wait until primary is elected (state 1 = PRIMARY)
           for i in {1..30}; do
             state=$(mongosh --quiet --eval 'rs.status().myState' mongodb://localhost:27017 2>/dev/null || echo "")
             if [ "$state" = "1" ]; then
@@ -120,6 +124,7 @@ jobs:
           done
 
       - name: Start uvicorn
+        working-directory: backend
         run: |
           nohup python -m uvicorn server:app \
             --host 127.0.0.1 \
@@ -146,7 +151,7 @@ jobs:
           tail -50 /tmp/uvicorn.log
           exit 1
 
-      - name: "Smoke: public endpoint /api/beta/status"
+      - name: Smoke public endpoint /api/beta/status
         run: |
           code=$(curl -s -o /tmp/beta.json -w "%{http_code}" http://127.0.0.1:8001/api/beta/status)
           if [ "$code" = "200" ]; then
@@ -157,7 +162,7 @@ jobs:
             exit 1
           fi
 
-      - name: "Smoke: auth-gated endpoint should 401 when anonymous"
+      - name: Smoke auth-gated endpoint should 401 when anonymous
         run: |
           # This is the regression guard for FOLLOW_UPS #1.
           code=$(curl -s -o /tmp/feedback.json -w "%{http_code}" http://127.0.0.1:8001/api/feedback)
@@ -169,7 +174,7 @@ jobs:
             exit 1
           fi
 
-      - name: "Smoke: Stripe webhook should reject unsigned requests"
+      - name: Smoke Stripe webhook should reject unsigned requests
         run: |
           # This is the regression guard for FOLLOW_UPS #13.
           code=$(curl -s -o /tmp/wh.json -w "%{http_code}" \
@@ -185,7 +190,7 @@ jobs:
             exit 1
           fi
 
-      - name: "Smoke: OpenAPI schema generation"
+      - name: Smoke OpenAPI schema generation
         run: |
           code=$(curl -s -o /tmp/openapi.json -w "%{http_code}" http://127.0.0.1:8001/openapi.json)
           if [ "$code" != "200" ]; then
@@ -201,10 +206,9 @@ jobs:
           done
           echo "✅ OpenAPI spec generated and contains expected routes"
 
-      - name: "Smoke: bcrypt password hashing roundtrip"
+      - name: Smoke bcrypt password hashing roundtrip
+        working-directory: backend
         run: |
-          # In-process import — verifies the bcrypt upgrade path doesn't
-          # crash on a fresh environment.
           python -c "
           import sys
           sys.path.insert(0, '.')
@@ -221,15 +225,13 @@ jobs:
           print('✅ bcrypt hashing + legacy detection works')
           "
 
-      - name: "Smoke: legacy SHA-256 hash lazy-upgrades on bcrypt verify"
+      - name: Smoke legacy SHA-256 hash lazy-upgrades on bcrypt verify
+        working-directory: backend
         run: |
-          # Build a legacy-format hash that matches a known password,
-          # then verify it (verify_password returns True), and confirm
-          # the upgrade path can re-hash it without raising.
           python -c "
-          import asyncio, sys
+          import sys
           sys.path.insert(0, '.')
-          from auth import hash_password, verify_password, upgrade_legacy_password_hash, is_legacy_password_hash
+          from auth import hash_password, verify_password, is_legacy_password_hash
           import hashlib, secrets
 
           legacy_salt = secrets.token_hex(16)
