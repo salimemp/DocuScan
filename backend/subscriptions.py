@@ -3,6 +3,7 @@ Stripe Subscription Module for DocScan Pro
 Supports: Plus, Pro, Business tiers with monthly/annual billing
 """
 import os
+import logging
 import stripe
 from datetime import datetime, timezone
 from typing import Optional, Dict, List
@@ -10,9 +11,29 @@ from pydantic import BaseModel, EmailStr
 from fastapi import APIRouter, HTTPException, Request, Depends, Header
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-# Initialize Stripe
-stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', 'sk_test_placeholder')
-STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+logger = logging.getLogger("docscan.subscriptions")
+
+# Initialize Stripe — fail loudly at import time if the secret key is unset,
+# rather than silently falling back to a placeholder that would let every
+# Stripe API call hit auth errors at runtime (or worse, succeed against
+# the wrong Stripe account if someone ever sets the placeholder to a real key).
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '').strip()
+STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', '').strip()
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '').strip()
+
+APP_ENV = os.environ.get('APP_ENV', 'production').lower()  # 'development' allows the placeholder
+
+if not STRIPE_SECRET_KEY:
+    if APP_ENV == 'development':
+        stripe.api_key = 'sk_test_placeholder'
+    else:
+        raise RuntimeError(
+            "STRIPE_SECRET_KEY is required in production. Refusing to start "
+            "with a placeholder key — see backend/subscriptions.py."
+        )
+else:
+    stripe.api_key = STRIPE_SECRET_KEY
+
 BACKEND_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'http://localhost:8001')
 
 subscription_router = APIRouter(prefix="/subscriptions", tags=["Subscriptions"])
@@ -152,30 +173,43 @@ def get_db():
     client = AsyncIOMotorClient(mongo_url)
     return client[os.environ.get('DB_NAME', 'docscan')]
 
-async def get_or_create_stripe_customer(user: Dict) -> str:
-    """Get or create Stripe customer for user"""
+async def get_or_create_stripe_customer(user: Dict, idempotency_key: Optional[str] = None) -> str:
+    """Get or create Stripe customer for user.
+
+    `idempotency_key` is optional — pass it from the caller when the
+    customer creation is part of a larger request that should be
+    idempotent (e.g. /create-payment-sheet). Stripe will return the
+    same customer on retry instead of creating duplicates.
+    """
     db = get_db()
-    
+
     if user.get("stripe_customer_id"):
         return user["stripe_customer_id"]
-    
-    # Create Stripe customer
-    customer = stripe.Customer.create(
+
+    create_kwargs = dict(
         email=user["email"],
         name=user.get("name", ""),
         metadata={
             "user_id": user["user_id"],
             "app": "docscan_pro"
-        }
+        },
     )
-    
-    # Update user with Stripe customer ID
+    if idempotency_key:
+        create_kwargs["idempotency_key"] = f"{idempotency_key}:customer"
+
+    customer = stripe.Customer.create(**create_kwargs)
+
+    # Update user with Stripe customer ID. Use $setOnInsert-style logic:
+    # if another concurrent request already set it, keep theirs.
     await db.users.update_one(
-        {"user_id": user["user_id"]},
-        {"$set": {"stripe_customer_id": customer.id}}
+        {"user_id": user["user_id"], "stripe_customer_id": None},
+        {"$set": {"stripe_customer_id": customer.id}},
     )
-    
-    return customer.id
+    # Re-read so we always return what's in the DB (handles the race).
+    fresh = await db.users.find_one(
+        {"user_id": user["user_id"]}, {"_id": 0, "stripe_customer_id": 1}
+    )
+    return fresh.get("stripe_customer_id") or customer.id
 
 def get_price_id(tier: str, billing_period: str) -> str:
     """Get Stripe price ID for tier and billing period"""
@@ -237,9 +271,17 @@ async def create_payment_sheet(
     data: CreateSubscriptionRequest,
     user: Dict = Depends(require_auth)
 ):
-    """Create payment sheet for subscription"""
+    """Create payment sheet for subscription.
+
+    Idempotency: Stripe's `idempotency_key` ensures that if a network
+    glitch causes the client to retry, we don't create duplicate
+    SetupIntents. The key is derived from (user_id, tier, billing_period,
+    seats) — the same logical request always maps to the same key, so
+    any retry returns the original SetupIntent.
+    """
     try:
-        customer_id = await get_or_create_stripe_customer(user)
+        idempotency_key = f"setup:{user['user_id']}:{data.tier}:{data.billing_period}:{data.seats}"
+        customer_id = await get_or_create_stripe_customer(user, idempotency_key=idempotency_key)
         price_id = get_price_id(data.tier, data.billing_period)
         
         # Get price amount for display
@@ -254,9 +296,10 @@ async def create_payment_sheet(
         # Create ephemeral key
         ephemeral_key = stripe.EphemeralKey.create(
             customer=customer_id,
-            stripe_version="2023-10-16"
+            stripe_version="2023-10-16",
+            idempotency_key=f"{idempotency_key}:ephemeral",
         )
-        
+
         # Create setup intent for subscription
         setup_intent = stripe.SetupIntent.create(
             customer=customer_id,
@@ -265,7 +308,8 @@ async def create_payment_sheet(
                 "tier": data.tier,
                 "billing_period": data.billing_period,
                 "seats": str(data.seats)
-            }
+            },
+            idempotency_key=f"{idempotency_key}:setup_intent",
         )
         
         return {
@@ -582,29 +626,58 @@ async def create_customer_portal(user: Dict = Depends(require_auth)):
 
 @subscription_router.post("/webhook")
 async def handle_stripe_webhook(request: Request):
-    """Handle Stripe webhook events"""
+    """Handle Stripe webhook events.
+
+    Security invariants (do not weaken these without thinking through the
+    consequences — see backend/FOLLOW_UPS.md #13):
+
+      1. Signature verification is MANDATORY. If STRIPE_WEBHOOK_SECRET is
+         unset, we REFUSE the webhook outright. The previous behaviour
+         (fall back to Event.construct_from with no signature check) let
+         anyone POST forged events and grant themselves any subscription
+         tier — an active privilege-escalation vulnerability.
+
+      2. Event-id deduplication. Stripe retries webhooks on non-2xx; we
+         record the event_id and short-circuit if we've already processed
+         it. Insert uses an idempotency-friendly unique index (see
+         server.py bootstrap) so concurrent retries can't double-process.
+    """
+    if not STRIPE_WEBHOOK_SECRET:
+        # Refuse to process unsigned webhooks. In dev, set STRIPE_WEBHOOK_SECRET
+        # to the value Stripe shows in `stripe listen --forward-to ...`.
+        raise HTTPException(
+            503,
+            "Stripe webhook signing secret is not configured. Set "
+            "STRIPE_WEBHOOK_SECRET in the environment.",
+        )
+
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
-    
-    if not STRIPE_WEBHOOK_SECRET:
-        # In test mode without webhook secret, just process the event
-        event = stripe.Event.construct_from(
-            values=await request.json(),
-            key=stripe.api_key
+    if not sig_header:
+        raise HTTPException(400, "Missing stripe-signature header")
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, STRIPE_WEBHOOK_SECRET
         )
-    else:
-        try:
-            event = stripe.Webhook.construct_event(
-                payload, sig_header, STRIPE_WEBHOOK_SECRET
-            )
-        except ValueError:
-            raise HTTPException(400, "Invalid payload")
-        except stripe.error.SignatureVerificationError:
-            raise HTTPException(400, "Invalid signature")
-    
+    except ValueError:
+        raise HTTPException(400, "Invalid payload")
+    except stripe.error.SignatureVerificationError:
+        raise HTTPException(400, "Invalid signature")
+
     db = get_db()
+
+    # Idempotency: short-circuit if we've already seen this event_id.
+    # The insert below has a unique index on event_id so concurrent retries
+    # also fail-safe at the DB level.
+    existing = await db.stripe_events.find_one({"event_id": event["id"]}, {"_id": 0})
+    if existing:
+        logger.info("Stripe webhook %s already processed at %s; skipping",
+                    event["id"], existing.get("processed_at"))
+        return {"status": "duplicate", "event_id": event["id"]}
+
     event_data = event["data"]["object"]
-    
+
     # Process events
     if event["type"] == "customer.subscription.created":
         await handle_subscription_created(db, event_data)
@@ -616,15 +689,22 @@ async def handle_stripe_webhook(request: Request):
         await handle_invoice_paid(db, event_data)
     elif event["type"] == "invoice.payment_failed":
         await handle_invoice_failed(db, event_data)
-    
-    # Log event
-    await db.stripe_events.insert_one({
-        "event_id": event["id"],
-        "type": event["type"],
-        "data": event_data,
-        "processed_at": datetime.now(timezone.utc)
-    })
-    
+
+    # Log event — wrapped in try/except so a duplicate-index error from a
+    # concurrent retry still returns 200 to Stripe (otherwise Stripe will
+    # keep retrying forever).
+    try:
+        await db.stripe_events.insert_one({
+            "event_id": event["id"],
+            "type": event["type"],
+            "data": event_data,
+            "processed_at": datetime.now(timezone.utc),
+        })
+    except Exception as e:
+        # Duplicate-key from a concurrent retry is expected; log + continue.
+        if "duplicate key" not in str(e).lower():
+            logger.warning("Failed to log Stripe event %s: %s", event["id"], e)
+
     return {"status": "success"}
 
 async def handle_subscription_created(db, subscription):

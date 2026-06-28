@@ -185,6 +185,10 @@ async def _create_database_indexes_task():
         await db.subscriptions.create_index("user_id")
         await db.subscriptions.create_index("stripe_subscription_id", sparse=True)
         await db.subscriptions.create_index("status")
+        # Webhook idempotency — unique on event_id so concurrent retries from
+        # Stripe can't double-process the same event (the handler also does
+        # an in-memory check + catches DuplicateKeyError as belt-and-suspenders).
+        await db.stripe_events.create_index("event_id", unique=True)
         logger.info("✅ Database indexes created successfully")
     except Exception as e:
         logger.error("Failed to create indexes: %s", e)
