@@ -542,3 +542,4 @@ MIT License — see [LICENSE](LICENSE) for details.
 - **Documentation**: https://docs.docscanpro.app
 - **Issues**: https://github.com/your-org/docscan-pro/issues
 - **Blog**: https://docscanpro.app/blog
+
