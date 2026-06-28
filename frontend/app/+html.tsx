@@ -34,8 +34,11 @@ export default function Root({ children }: PropsWithChildren) {
         <meta name="revisit-after" content="3 days" />
         <meta name="rating" content="General" />
 
-        {/* Search engine verification */}
-        <meta name="msvalidate.01" content="6D738BE6B98C4FAB5152757BEF3D069E" />
+        {/* Search engine verification — env-overridable so we can rotate the
+            Bing Webmaster verification token without redeploying. The
+            hardcoded value below is the real public token; treat it as
+            NOT-secret (it ships in every page's HTML). */}
+        <meta name="msvalidate.01" content={process.env.EXPO_PUBLIC_BING_VERIFICATION || '6D738BE6B98C4FAB5152757BEF3D069E'} />
         <meta name="distribution" content="global" />
         <meta name="coverage" content="Worldwide" />
         <meta name="HandheldFriendly" content="True" />
@@ -87,15 +90,22 @@ export default function Root({ children }: PropsWithChildren) {
         <meta name="twitter:image" content="https://docscanpro.app/twitter-image.png" />
         <meta name="twitter:image:alt" content="DocScan Pro app showing AI document scanning, OCR, and export" />
         <meta name="twitter:app:name:iphone" content="DocScan Pro" />
-        {/* TODO: replace IOS_APP_STORE_ID with the real numeric App Store ID before App Store submission.
-            Set via env (EXPO_PUBLIC_IOS_APP_STORE_ID) or hardcode after first release. */}
-        <meta name="twitter:app:id:iphone" content="__IOS_APP_STORE_ID_PLACEHOLDER__" />
+        {/* iOS App Store ID. Driven by EXPO_PUBLIC_IOS_APP_STORE_ID — when
+            that env var is unset, the meta tags below are OMITTED entirely.
+            An unfilled placeholder string is worse than no tag at all
+            (search engines treat `__IOS_APP_STORE_ID_PLACEHOLDER__` as a
+            malformed app id). Set the env var before App Store submission. */}
+        {process.env.EXPO_PUBLIC_IOS_APP_STORE_ID && (
+          <meta name="twitter:app:id:iphone" content={process.env.EXPO_PUBLIC_IOS_APP_STORE_ID} />
+        )}
         <meta name="twitter:app:name:googleplay" content="DocScan Pro" />
         <meta name="twitter:app:id:googleplay" content="com.salimmakrana.docscanpro" />
 
         {/* ═══ APP LINKS ═══ */}
         <meta property="al:ios:url" content="docscanpro://" />
-        <meta property="al:ios:app_store_id" content="__IOS_APP_STORE_ID_PLACEHOLDER__" />
+        {process.env.EXPO_PUBLIC_IOS_APP_STORE_ID && (
+          <meta property="al:ios:app_store_id" content={process.env.EXPO_PUBLIC_IOS_APP_STORE_ID} />
+        )}
         <meta property="al:ios:app_name" content="DocScan Pro" />
         <meta property="al:android:url" content="docscanpro://" />
         {/* NOTE: align Android package name with app.json bundleIdentifier (com.salimmakrana.docscanpro).
@@ -103,7 +113,9 @@ export default function Root({ children }: PropsWithChildren) {
         <meta property="al:android:package" content="com.salimmakrana.docscanpro" />
         <meta property="al:android:app_name" content="DocScan Pro" />
         <meta property="al:web:url" content="https://docscanpro.app" />
-        <meta name="apple-itunes-app" content="app-id=__IOS_APP_STORE_ID_PLACEHOLDER__" />
+        {process.env.EXPO_PUBLIC_IOS_APP_STORE_ID && (
+          <meta name="apple-itunes-app" content={`app-id=${process.env.EXPO_PUBLIC_IOS_APP_STORE_ID}`} />
+        )}
 
         {/* ═══ PWA ═══ */}
         <meta name="theme-color" content="#2563EB" />
