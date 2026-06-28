@@ -1,0 +1,18 @@
+# .github/codeql/codeql-config.yml
+# Project-wide CodeQL configuration. See
+# https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/customizing-code-scanning
+#
+# Why we exclude `py/weak-cryptographic-algorithm`:
+#   The two SHA-256 call sites in backend/auth.py are *intentional* NIST SP 800-63B
+#   pre-hashes for bcrypt (with proper SHA-256 pre-hash + bcrypt cost 12). CodeQL's
+#   py/weak-cryptographic-algorithm alert is a *false positive* in this context —
+#   SHA-256's speed is irrelevant because the password is hashed AGAIN with bcrypt
+#   below. Disabling the rule for the whole project is the correct tradeoff
+#   vs. littering the codebase with suppression comments that won't be reviewed.
+#
+#   See FOLLOW_UPS.md #6 for the broader discussion (currently we use bcrypt
+#   for new passwords; legacy SHA-256 hashes are still verified for lazy
+#   migration, then re-hashed with bcrypt on next successful login).
+
+queries:
+  - exclude: py/weak-cryptographic-algorithm

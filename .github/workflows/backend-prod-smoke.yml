@@ -94,7 +94,11 @@ jobs:
       - name: Wait for MongoDB
         run: |
           for i in {1..30}; do
-            if mongosh --quiet --eval 'db.adminCommand({ping:1}).ok' mongodb://localhost:27017 >/dev/null 2>&1; then
+            # mongosh isn't installed on the GitHub-hosted runner (only
+            # inside the service container). Use pymongo which we just
+            # installed in the previous step — it reaches mongod via the
+            # standard MongoDB protocol on localhost:27017.
+            if python -c "from pymongo import MongoClient; MongoClient('mongodb://localhost:27017', serverSelectionTimeoutMS=500).admin.command('ping')" 2>/dev/null; then
               echo "mongod is up"
               break
             fi
@@ -105,20 +109,31 @@ jobs:
       - name: Initiate MongoDB replica set
         run: |
           # One-time init for the single-node replica set. mongod was
-          # started with --replSet rs0 but no config yet.
-          mongosh --quiet --eval '
-            try {
-              rs.status();
-              print("Replica set already initiated");
-            } catch (e) {
-              rs.initiate({_id: "rs0", members: [{_id: 0, host: "localhost:27017"}]});
-              print("Replica set initiated");
-            }
-          ' mongodb://localhost:27017
+          # started with --replSet rs0 but no config yet. Using pymongo
+          # here (mongosh isn't on the runner PATH — only inside the
+          # service container).
+          python <<'PY'
+          from pymongo import MongoClient
+          import sys
+          client = MongoClient("mongodb://localhost:27017/?directConnection=true")
+          try:
+              status = client.admin.command("replSetGetStatus")
+              print("Replica set already initiated; state:", status.get("myState"))
+          except Exception as e:
+              # NoReplicationSetForCollection / NotYetInitialized → initiate
+              print("Initializing replica set rs0...")
+              client.admin.command({
+                  "replSetInitiate": {
+                      "_id": "rs0",
+                      "members": [{"_id": 0, "host": "localhost:27017"}],
+                  }
+              })
+              print("Replica set initiated")
+          PY
 
           # Wait until primary is elected (state 1 = PRIMARY)
           for i in {1..30}; do
-            state=$(mongosh --quiet --eval 'rs.status().myState' mongodb://localhost:27017 2>/dev/null || echo "")
+            state=$(python -c "from pymongo import MongoClient; print(MongoClient('mongodb://localhost:27017/?directConnection=true', serverSelectionTimeoutMS=500).admin.command('replSetGetStatus').get('myState'))" 2>/dev/null || echo "")
             if [ "$state" = "1" ]; then
               echo "Replica set primary elected"
               break
