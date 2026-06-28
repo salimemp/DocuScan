@@ -3,10 +3,15 @@ Authentication Module for DocScan Pro
 Supports: Email/Password, Magic Link, Google OAuth, Apple Sign-In, 2FA (TOTP/Hardware), Passkeys, Biometrics
 """
 import os
+import sys
+logger = logging.getLogger("docscan.auth")
 import secrets
 import hashlib
 import base64
 import uuid
+import asyncio
+import logging
+import bcrypt
 import pyotp
 import httpx
 from datetime import datetime, timezone, timedelta
@@ -167,18 +172,88 @@ class AuthResponse(BaseModel):
 
 # ── Helper Functions ────────────────────────────────────────────────────────
 
+# Password hashing — bcrypt with SHA-256 pre-hash for passphrases >72 bytes
+# (NIST SP 800-63B allows pre-hashing). Bcrypt has a 72-byte input limit,
+# so we SHA-256 the input first. The stored format is bcrypt's standard
+# `$2b$12$...` modular crypt format, which is self-identifying — we can
+# detect legacy SHA-256 hashes (`<hex>:<hex>` format) and lazily upgrade
+# them on next successful login.
+
+BCRYPT_ROUNDS = 12  # 2^12 = ~250ms per hash on modern x86. OWASP recommends ≥10.
+
+def _bcrypt_input(password: str) -> bytes:
+    """Pre-hash a password so it fits within bcrypt's 72-byte input limit."""
+    return hashlib.sha256(password.encode("utf-8")).digest()
+
+
 def hash_password(password: str) -> str:
-    """Hash password using SHA-256 with salt"""
-    salt = secrets.token_hex(16)
-    hashed = hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
-    return f"{salt}:{hashed}"
+    """Hash a user password using bcrypt (cost 12) with SHA-256 pre-hash."""
+    return bcrypt.hashpw(_bcrypt_input(password), bcrypt.gensalt(rounds=BCRYPT_ROUNDS)).decode("utf-8")
+
+
+def is_legacy_password_hash(stored_hash: str) -> bool:
+    """True if the stored hash uses the pre-2026-06-28 SHA-256-salt format
+    (`<hex>:<hex>`, 16-byte salt + 32-byte SHA-256 hex)."""
+    if not stored_hash or ":" not in stored_hash:
+        return False
+    salt, hashed = stored_hash.split(":", 1)
+    return len(salt) == 32 and len(hashed) == 64 and all(c in "0123456789abcdef" for c in salt + hashed)
+
+
+def verify_legacy_password(password: str, stored_hash: str) -> bool:
+    """Verify a password against a legacy SHA-256-salt hash. Returns True
+    if the password matches. The caller should trigger a lazy upgrade via
+    `upgrade_legacy_password_hash` after a successful legacy verify."""
+    try:
+        salt, hashed = stored_hash.split(":", 1)
+        return hashlib.sha256(f"{salt}{password}".encode("utf-8")).hexdigest() == hashed
+    except Exception:
+        return False
+
 
 def verify_password(password: str, stored_hash: str) -> bool:
-    """Verify password against stored hash"""
+    """Verify a user password against either a bcrypt hash (current format)
+    or a legacy SHA-256-salt hash.
+
+    For bcrypt hashes: standard bcrypt.checkpw.
+    For legacy hashes: SHA-256-salt comparison. The caller is responsible
+    for triggering a lazy upgrade via `upgrade_legacy_password_hash`
+    after a successful legacy verify.
+    """
+    if not stored_hash:
+        return False
+    # bcrypt hashes always start with $2a$ / $2b$ / $2y$
+    if stored_hash.startswith(("$2a$", "$2b$", "$2y$")):
+        try:
+            return bcrypt.checkpw(_bcrypt_input(password), stored_hash.encode("utf-8"))
+        except (ValueError, TypeError):
+            return False
+    if is_legacy_password_hash(stored_hash):
+        return verify_legacy_password(password, stored_hash)
+    # Unknown format — fail closed.
+    return False
+
+
+async def upgrade_legacy_password_hash(user_id: str, password: str) -> bool:
+    """Re-hash `password` with bcrypt and persist. Called from the login
+    flow after a successful verify against a legacy SHA-256-salt hash.
+
+    Returns True if the user record was upgraded, False if no upgrade was
+    needed (already bcrypt) or the upgrade failed (logged, not raised —
+    the user is still logged in either way).
+    """
     try:
-        salt, hashed = stored_hash.split(':')
-        return hashlib.sha256(f"{salt}{password}".encode()).hexdigest() == hashed
-    except Exception:
+        from db import db as _db
+        new_hash = hash_password(password)
+        result = await _db.users.update_one(
+            {"user_id": user_id},
+            {"$set": {"password_hash": new_hash, "password_hash_format": "bcrypt"}},
+        )
+        if result.modified_count:
+            logger.info("Upgraded legacy password hash to bcrypt for user %s", user_id)
+        return bool(result.modified_count)
+    except Exception as e:
+        logger.warning("Failed to upgrade legacy password hash for user %s: %s", user_id, e)
         return False
 
 def create_jwt_token(user_id: str, email: str, token_type: str = "access") -> str:
@@ -347,6 +422,32 @@ async def require_auth(
         raise HTTPException(401, "Authentication required")
     return user
 
+
+async def require_admin(
+    request: Request,
+    authorization: Optional[str] = Header(None)
+) -> Dict:
+    """Require an authenticated user with admin privileges.
+
+    A user is admin if any of:
+      * `is_admin` is true on the user document, OR
+      * the user's email appears in the `ADMIN_EMAILS` env var
+        (comma-separated; case-insensitive). This lets us bootstrap the
+        first admin without a DB migration.
+
+    Used by endpoints like `GET /feedback` and `GET /feedback/stats`
+    that previously leaked all user-submitted feedback to the world.
+    """
+    user = await require_auth(request, authorization)
+    if user.get("is_admin"):
+        return user
+    admin_env = os.environ.get("ADMIN_EMAILS", "")
+    if admin_env:
+        allowed = {e.strip().lower() for e in admin_env.split(",") if e.strip()}
+        if user.get("email", "").lower() in allowed:
+            return user
+    raise HTTPException(403, "Admin privileges required")
+
 # ── Auth Endpoints ────────────────────────────────────────────────────────
 
 @auth_router.post("/register", response_model=AuthResponse)
@@ -384,13 +485,23 @@ async def register(data: UserRegister, request: Request):
     # Create user
     user_id = f"user_{uuid.uuid4().hex[:12]}"
     verification_token = generate_verification_token()
-    
+
+    # Auto-grant admin to emails listed in ADMIN_EMAILS env var so we can
+    # bootstrap the first admin without a DB migration. See require_admin().
+    admin_emails = {
+        e.strip().lower()
+        for e in os.environ.get("ADMIN_EMAILS", "").split(",")
+        if e.strip()
+    }
+    is_admin = data.email.lower() in admin_emails
+
     user_doc = {
         "user_id": user_id,
         "email": data.email.lower(),
         "name": data.name,
         "password_hash": hash_password(data.password),
         "email_verified": False,
+        "is_admin": is_admin,
         "two_factor_enabled": False,
         "two_factor_secret": None,
         "passkey_enabled": False,
@@ -450,7 +561,14 @@ async def login(data: UserLogin, response: Response):
     
     if not verify_password(data.password, user["password_hash"]):
         raise HTTPException(401, "Invalid email or password")
-    
+
+    # Lazy-upgrade legacy SHA-256-salt hashes to bcrypt after a successful
+    # verify. Fire-and-forget so it never blocks login. A failure here
+    # doesn't affect the user — they still get logged in normally and we
+    # try again on their next login.
+    if is_legacy_password_hash(user["password_hash"]):
+        asyncio.create_task(upgrade_legacy_password_hash(user["user_id"], data.password))
+
     # Check if 2FA is enabled
     if user.get("two_factor_enabled"):
         # Return partial response requiring 2FA
@@ -1225,4 +1343,4 @@ async def list_passkeys(user: Dict = Depends(require_auth)):
     return {"passkeys": passkeys}
 
 # Export router
-__all__ = ['auth_router', 'get_current_user', 'require_auth']
+__all__ = ['auth_router', 'get_current_user', 'require_auth', 'require_admin']
