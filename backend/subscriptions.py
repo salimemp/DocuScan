@@ -322,7 +322,7 @@ async def create_payment_sheet(
             "setup_intent_client_secret": setup_intent.client_secret,
             "ephemeral_key_secret": ephemeral_key.secret,
             "customer_id": customer_id,
-            "publishable_key": os.environ.get('STRIPE_PUBLISHABLE_KEY', 'pk_test_placeholder'),
+            "publishable_key": STRIPE_PUBLISHABLE_KEY or 'pk_test_placeholder',
             "amount": amount,
             "currency": "usd"
         }

@@ -8,7 +8,7 @@ from typing import Annotated, Any
 
 import resend
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from auth import require_admin
