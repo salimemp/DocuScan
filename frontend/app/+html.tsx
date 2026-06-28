@@ -93,8 +93,8 @@ export default function Root({ children }: PropsWithChildren) {
         {/* iOS App Store ID. Driven by EXPO_PUBLIC_IOS_APP_STORE_ID — when
             that env var is unset, the meta tags below are OMITTED entirely.
             An unfilled placeholder string is worse than no tag at all
-            (search engines treat `__IOS_APP_STORE_ID_PLACEHOLDER__` as a
-            malformed app id). Set the env var before App Store submission. */}
+            (search engines treat a non-numeric placeholder as a malformed
+            app id). Set the env var before App Store submission. */}
         {process.env.EXPO_PUBLIC_IOS_APP_STORE_ID && (
           <meta name="twitter:app:id:iphone" content={process.env.EXPO_PUBLIC_IOS_APP_STORE_ID} />
         )}

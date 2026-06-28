@@ -80,7 +80,7 @@ If you later want a generic "Powered by" footer without the studio name, drop in
 
 **Changes:**
 - `<meta name="msvalidate.01" ...>` now reads from `process.env.EXPO_PUBLIC_BING_VERIFICATION` with the real token (`6D738BE6B98C4FAB5152757BEF3D069E`) as the fallback.
-- All three `__IOS_APP_STORE_ID_PLACEHOLDER__` tags (`twitter:app:id:iphone`, `al:ios:app_store_id`, `apple-itunes-app`) are now wrapped in `{process.env.EXPO_PUBLIC_IOS_APP_STORE_ID && (<meta ... />)}`. When the env var is unset the tags are **omitted entirely** — no more unfilled placeholder strings reaching search engines.
+- All three iOS App Store ID meta tags (`twitter:app:id:iphone`, `al:ios:app_store_id`, `apple-itunes-app`) are now wrapped in `{process.env.EXPO_PUBLIC_IOS_APP_STORE_ID && (<meta ... />)}`. When the env var is unset the tags are **omitted entirely** — no more unfilled placeholder strings reaching search engines. The previous code shipped the literal placeholder string `[IOS_APP_STORE_ID_PLACEHOLDER]` to production HTML, which search engines treated as a malformed app id.
 
 **Operational:**
 - `EXPO_PUBLIC_BING_VERIFICATION` — set if you ever rotate the Bing token. Currently empty (the hardcoded fallback is the real one).
@@ -211,10 +211,10 @@ db.documents.updateMany(
 
 ## 🔴 Git-history secret scrub + key rotation (CRITICAL — outstanding)
 
-**Confirmed leaked:** A real Gemini API key (`REDACTED_LEAKED_GEMINI_KEY`) was committed and then later removed in a follow-up commit. Git's history retains the old value forever.
+**Confirmed leaked:** A real Gemini API key was committed and then later removed in a follow-up commit. Git's history retains the old value forever. (The actual key value is NOT reproduced here — gitleaks scans the repo and would flag a real-looking `AIza...` string. Look up the value in git history if you need it: `git log --all -p -S'GEMINI_API_KEY='` will surface every commit that touched it.)
 
 **Other confirmed leak patterns in history (from grep):**
-- `GEMINI_API_KEY=AIza...` (2 occurrences)
+- `GEMINI_API_KEY=AIza...` (2 occurrences — same Gemini key, two commits)
 - `TURNSTILE_SECRET_KEY=0x...` (38 occurrences — pattern matches Turnstile's `0x4AAA...` format)
 - `sk-...` (54 occurrences — Stripe secret keys)
 - `RESEND_API_KEY=...` (23 occurrences)
@@ -237,13 +237,15 @@ db.documents.updateMany(
 # Install
 brew install git-filter-repo
 
-# Create a replacements file with the old key → new placeholder
+# Create a replacements file with the old key → new placeholder.
+# IMPORTANT: look up the actual leaked values from `git log -p` first —
+# don't hardcode them in a public doc (gitleaks will flag them).
 cat > /tmp/secrets-to-remove.txt <<'EOF'
-REDACTED_LEAKED_GEMINI_KEY==>REDACTED_GEMINI_KEY
-0x4AAAAAAA...==>REDACTED_TURNSTILE_KEY
-sk_live_...==>REDACTED_STRIPE_KEY
-em_...==>REDACTED_EMERGENT_KEY
-re_...==>REDACTED_RESEND_KEY
+<PASTE_LEAKED_GEMINI_KEY_HERE>==>REDACTED_GEMINI_KEY
+<PASTE_LEAKED_TURNSTILE_KEY_HERE>==>REDACTED_TURNSTILE_KEY
+<PASTE_LEAKED_STRIPE_KEY_HERE>==>REDACTED_STRIPE_KEY
+<PASTE_LEAKED_EMERGENT_KEY_HERE>==>REDACTED_EMERGENT_KEY
+<PASTE_LEAKED_RESEND_KEY_HERE>==>REDACTED_RESEND_KEY
 EOF
 
 # Run the filter on a fresh clone
@@ -384,7 +386,7 @@ curl -i -H "Authorization: Bearer $ADMIN_TOKEN" https://api.docscanpro.app/feedb
 
 # 3. SEO tags omit when env unset
 curl -s https://docscanpro.app | grep -E "msvalidate|IOS_APP_STORE_ID|app-id="
-# → only the msvalidate.01 line should appear (no __IOS_APP_STORE_ID_PLACEHOLDER__)
+# → only the msvalidate.01 line should appear (no literal placeholder string)
 
 # 4. PoweredByElixio gone
 grep -rn "Elixio" frontend/app frontend/components

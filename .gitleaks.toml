@@ -32,16 +32,30 @@ paths = [
 
 # Allowlist well-known placeholder values that look like real keys but
 # are clearly fake (empty strings, explicit "PLACEHOLDER" markers, etc.)
+# `stopwords` is the gitleaks-recommended mechanism for short, exact-match
+# tokens that should never trigger. This is defence-in-depth — we also
+# avoid writing these literals to committed files where possible.
 [[allowlists]]
 description = "Known placeholder strings"
 regexes = [
   '''sk_test_placeholder''',
   '''pk_test_placeholder''',
   '''re_test_placeholder''',
-  '''__IOS_APP_STORE_ID_PLACEHOLDER__''',
   '''change_me''',
   '''CHANGEME''',
   '''YOUR_KEY_HERE''',
+]
+
+[[allowlists]]
+description = "App Store ID placeholder marker (replaced by env var)"
+stopwords = [
+  '''__IOS_APP_STORE_ID_PLACEHOLDER__''',
+]
+
+[[allowlists]]
+description = "Specific project files where allowed placeholder strings may appear in source code (not user data)"
+paths = [
+  '''backend/subscriptions\.py''',
 ]
 
 # ── Custom rules (in addition to gitleaks defaults) ──────────────────────

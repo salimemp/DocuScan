@@ -34,7 +34,11 @@ env:
   DB_NAME: docscan_smoke_test
   JWT_SECRET: ci-only-jwt-secret-do-not-use-anywhere-else-32chars-min
   APP_ENV: development
-  STRIPE_SECRET_KEY: sk_test_placeholder
+  # STRIPE_SECRET_KEY is left empty intentionally. The backend code in
+  # subscriptions.py falls back to the placeholder when APP_ENV=development
+  # and the env var is unset — so we don't need to commit the literal
+  # placeholder string (which would match gitleaks' default Stripe rule).
+  STRIPE_SECRET_KEY: ""
   STRIPE_WEBHOOK_SECRET: whsec_ci_smoke_test_secret
   RESEND_API_KEY: ""
   EMERGENT_LLM_KEY: ""
