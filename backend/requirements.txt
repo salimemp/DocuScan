@@ -14,12 +14,12 @@
 # that treats Pydantic models as query params under specific conditions;
 # the workarounds in `backend/routers/__init__.py` cover FastAPI 0.115+
 # but 0.110 is what the original endpoints were tested against.
-fastapi==0.110.1
-uvicorn[standard]==0.25.0
+fastapi==0.138.2
+uvicorn[standard]==0.49.0
 
 # ── Data validation ─────────────────────────────────────────────────────────
-pydantic==2.12.5
-pydantic_core==2.41.5
+pydantic==2.13.4
+pydantic_core==2.47.0
 email-validator==2.3.0
 
 # ── MongoDB (async) ─────────────────────────────────────────────────────────
